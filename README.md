@@ -50,17 +50,16 @@ The overview page for each workload highlights target performance metrics for th
 
 The following table lists each benchmark used to evaluate the model’s performance, along with their specific configurations.
 
-| Benchmark | Framework | Container Version | Model | Model Size | Type | Max Scale (# of GPUs) | Precision | Model Access Required |
-| :----| --------- | :---------------: | :---- | :--------: | :--- | :-------------------- | :-------- | :-------------------- |
-| Nemotron | NeMo | 24.12, 24.09 | Nemotron4 | 15B, 340B | Training | 2048 | FP8, BF16 | No |
-| Megatron | NeMo | 24.12 | GPT3      | 175B      | Training | 2048 | FP8, BF16 | No |
-| Llama | NeMo | 24.12 | Llama 3.1 | 8B, 70B, 405B | Training | 2304 | FP8, BF16 | Yes |
-| Maxtext | Maxtext | 25.01 | Llama3 | 70B | Training | 2048 | FP8, BF16 | No |
-| Grok | NeMo | 24.12 | Grok1 | 314B | Training  | 2048 | FP8, BF16 | No |
-| SFT | NeMo | 24.12 | Llama 3 | 8B, 70B | Supervised Fine-Tuning | 32 | FP8, BF16 | Yes |
-| LORA | NeMo | 24.12 | Llama 3 | 8B, 70B | LORA Fine-Tuning | 32 | FP8, BF16 | Yes | 
-| RAG Blueprint Pipeline | NIM | instruct:1.3.3, rerank:1.3, embed:1.3.1 | Llama 3.1 and 3.2 | 70b, 1b | Inference | n/a | n/a | Yes 
-| NIM | NIM | 1.0.3 | Llama 3|  70B | Inference | 4 | FP8 | Yes |
+| Framework | Container Version | Model | Model Size | Type | Max Scale (# of GPUs) | Precision | Model Access Required |
+| --------- | :---------------: | :---- | :--------: | :--- | :-------------------- | :-------- | :-------------------- |
+| NeMo | 24.12, 24.09 | Nemotron4 | 15B, 340B | Pretrain | 2048 | FP8, BF16 | No |
+| NeMo | 24.12 | GPT3      | 175B      | Pretrain | 2048 | FP8, BF16 | No |
+| NeMo | 24.12 | Llama 3.1 | 8B, 70B, 405B | Pretrain | 2304 | FP8, BF16 | Yes |
+| Maxtext | 25.01 | Llama3 | 70B | Pretrain | 2048 | FP8, BF16 | No |
+| NeMo | 24.12 | Grok1 | 314B | Pretrain  | 2048 | FP8, BF16 | No |
+| NeMo | 24.12 | Llama 3 | 8B, 70B | Fine-Tuning (SFT, LORA) | 32 | FP8, BF16 | Yes |
+| NIM | instruct:1.3.3, rerank:1.3, embed:1.3.1 | Llama 3.1 and 3.2 | 70b, 1b | Inference | n/a | n/a | Yes 
+| NIM | 1.0.3 | Llama 3|  70B | Inference | 4 | FP8 | Yes |
 
 
 Baseline performance metrics were using workloads on the NVIDIA DGX H100 Reference Architecture. For more information see [DGX H100 Systems](https://blogs.nvidia.com/blog/dgx-h100-systems-shipping/).
