@@ -11,7 +11,7 @@ This variant of the workload is best-suited for GPU clusters with:
 
 Once the training job has finished successfully it's performance measurement metric is it's training throughput which is based on time it took to complete each training step.
 
-The example below is taken from the end of the output log file - see `$STAGE_PATH/results/$GSW_VERSION/$DTYPE/175b/$JOB_TOTAL_GPUS/*.out`, where NUM_NODES=16, the training step time was measured as **5.9** seconds during step number 50.
+The example below is taken from the end of the output log file - see `$STAGE_PATH/results/$GSW_VERSION/$DTYPE/175b/$JOB_TOTAL_GPUS/*.out`, where JOB_TOTAL_GPUS=128, the training step time was measured as **5.9** seconds during step number 50.
 ```shell
 grep train_step_timing results/$GSW_VERSION/fp8/175b/128/*.out
 Epoch 0: : 100%|██████████| 50/50 [31:51<00:00, reduced_train_loss=6.130, global_step=50.0, consumed_samples=76800.0, train_step_timing in s=5.900, val_loss=6.250]

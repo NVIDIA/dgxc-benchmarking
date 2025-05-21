@@ -32,6 +32,7 @@ python3 $STAGE_PATH/launcher_scripts/main.py \
   data_preparation.file_numbers='0-3' \
   data_preparation.rm_downloaded=True \
   data_preparation.rm_extracted=True \
+  data_preparation.run.time_limit="0:45:00" \
   cluster.gpus_per_node=${SLURM_GPUS_ON_NODE:-} \
   cluster.account=$SLURM_JOB_ACCOUNT \
   cluster.partition=$SLURM_JOB_PARTITION \

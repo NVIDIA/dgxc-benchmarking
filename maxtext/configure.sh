@@ -115,7 +115,7 @@ BASE_CONFIG="use_iota_embed=true \
   dataset_path=local \
   dataset_type=synthetic \
   attention=cudnn_flash_te \
-  tokenizer_path=/opt/maxtext/assets/tokenizer.llama2 \
+  tokenizer_path=/opt/maxtext/assets/tokenizer_llama3.tiktoken \
   max_target_length=8192 \
   quantization=${QUANTIZATION} \
   hardware=gpu_multiprocess \

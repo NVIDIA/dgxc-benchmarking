@@ -5,7 +5,7 @@ This recipe contains information and scripts to produce performance results for 
 This variant of the workload is best-suited for GPU clusters with:
 * At least 8 GPUs with at least 80 GB memory each. Training of this 15-billion parameter variant of the workload will not fit on fewer GPUs with less memory.
 * This workload runs with BF16 or FP8 precision. FP8 is only supported by H100 GPUs. BF16 recipes are suitable for both A100 and H100 GPUs.
-* The minimum number of required H100 GPUs is 8 (fp8 precision) and 16 (bf16 precision). Out Of Memory errors could be encountered if using fewer number of GPUs.
+* It requires minimum of 16x H100 GPUs. Out Of Memory errors could be encountered if using fewer number of GPUs.
 
 
 # Expected Slurm Performance
