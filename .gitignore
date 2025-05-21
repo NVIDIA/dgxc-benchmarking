@@ -1,0 +1,8 @@
+nemo_megatron/*.out
+nemotron/*.out
+hf-*/*.out
+llama*/*.out
+paxml/*.out
+grok1/*.out
+maxtext/*.out
+*.swp

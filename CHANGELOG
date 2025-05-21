@@ -1,0 +1,50 @@
+## [v24.11] - 2024-12-13
+
+### Added
+
+  - Grok1 314b
+  - Llama3.1 8b, 70b, 405b
+  - Maxtext Llama2 70b
+  - Nemotron 15b, 340b
+
+### Changed
+
+  - Updated launch scripts and READMEs to align recipes:
+    - HuggingFace Mixtral and Llama
+    - Nemo Megatron
+    - Paxml
+
+### Removed
+
+  - Llama2
+  - Llama3
+
+## [v24.05] - 2024-05-31
+
+### Added
+
+  - HuggingFace Mixtral 7x8b fine tuning
+  - HuggingFace Llama 70b LoRA fine tuning
+
+### Changed
+
+- Nemo Megatron 175B 
+  - Update container version to 24.03.01
+  - Simplified launch scripts with fewer dependencies due to removal of NeMo Launcher from the process
+- Llama 
+  - Update container version to 24.03.01
+  - Simplified launch scripts with fewer dependencies due to removal of NeMo Launcher from the process
+  - Add grad_sync_dtype to config
+
+### Other
+
+- Paxml
+  - No change in container version, perf regression with the 2024-05-23 version
+
+## [v24.04] - 2024-04-30
+
+### Added
+
+- Nemo Megatron 175B 24.01
+- Llama 24.01
+- Paxml 24.03.04
