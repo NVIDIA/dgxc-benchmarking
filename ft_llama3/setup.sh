@@ -32,8 +32,6 @@ fi
 set -eu -o pipefail
 
 export FW_VERSION=24.12
-
-# create the squash file
 LLM_REPO=$PWD
 
 mkdir -vp $STAGE_PATH
@@ -41,7 +39,6 @@ mkdir -vp $STAGE_PATH
 cd $STAGE_PATH
 mkdir -vp HF_ckpt
 mkdir -vp logs
-srun bash -c "enroot import --output nvidia+nemo+${FW_VERSION}.sqsh docker://nvcr.io#nvidia/nemo:${FW_VERSION}"
 
 #setup variables
 export MEGATRON_DIR="Megatron-LM"
@@ -50,7 +47,7 @@ export NEMO_DIR="NeMo"
 export SCRIPTS_DIR="$NEMO_DIR/scripts/llm/performance"
 export MEGATRON_COMMIT="b997545c94dab2e80b30dcd8c49f1821b1ad7838"
 
-pip install pybind11
+pip install -r $LLM_REPO/requirements.txt
 
 #Setup Megatron-LM 
 if [ ! -d "$MEGATRON_DIR" ]; then
@@ -60,7 +57,6 @@ if [ ! -d "$MEGATRON_DIR" ]; then
 fi
 
 cd $STAGE_PATH/$MEGATRON_DIR
-pip install torch torchvision
 pip install . 
 echo "Megatron build done"
 cd $STAGE_PATH
@@ -74,10 +70,6 @@ if [ ! -d "$NEMO_DIR" ]; then
 fi
 
 cd $STAGE_PATH/$NEMO_DIR
-pip install --upgrade pip
-pip install Cython packaging
-pip install lightning-fabric pytorch-lightning cloudpickle psutil omegaconf hydra-core datasets einops transformers sentencepiece braceexpand webdataset h5py ijson matplotlib sacrebleu rouge_score faiss-cpu jieba opencc pangu
-pip install lightning==2.5.0.post0
 pip install .
 pip install git+https://github.com/NVIDIA/NeMo-Run.git@e70f1094afa3b372390c323d830aa88bf4f824af
 #copy the scripts to NeMo performance scripts directory
@@ -85,3 +77,6 @@ cd $LLM_REPO
 cp ./llama3_finetune.py $STAGE_PATH/$SCRIPTS_DIR
 cp ./llama3_finetune_utils.py $STAGE_PATH/$SCRIPTS_DIR
 echo "DONE SETUP proceed to launch script"
+
+# create the squash file
+srun bash -c "enroot import --output nvidia+nemo+${FW_VERSION}.sqsh docker://nvcr.io#nvidia/nemo:${FW_VERSION}"

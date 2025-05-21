@@ -29,7 +29,7 @@ fi
 set -eu -o pipefail
 
 export FW_VERSION=25.02.01
-export GSW_VERSION=25.04
+export GSW_VERSION=25.04.01
 
 export OPENBLAS_NUM_THREADS=1 # optional, to avoid resource contention at the frontend node.
 export NEMORUN_HOME=$STAGE_PATH

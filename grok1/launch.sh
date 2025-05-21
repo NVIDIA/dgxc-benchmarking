@@ -43,7 +43,7 @@ LLMB_PATH="${LAUNCH_PATH%/*}" # parent dir
 # common functions
 source $LLMB_PATH/common/common-utils.sh
 
-export GSW_VERSION=25.04
+export GSW_VERSION=25.04.01
 export FRAMEWORK=nemo
 export MODEL=grok1
 export MODEL_SIZE=314b

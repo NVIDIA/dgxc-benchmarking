@@ -45,7 +45,7 @@ export FRAMEWORK=maxtext
 export MODEL=llama3
 export MODEL_SIZE=70b
 export FW_VERSION=25.01
-export GSW_VERSION=25.04
+export GSW_VERSION=25.04.01
 
 export IMAGE=${RUN_CONF_IMAGE:-$STAGE_PATH/nvidia+jax+maxtext-${FW_VERSION}.sqsh}
 

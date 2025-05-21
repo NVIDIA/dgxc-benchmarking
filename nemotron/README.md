@@ -56,43 +56,43 @@ MFU = (global batch size) * (model flops) / (training step time) / (number of GP
 
 The peak theoretical throughput for H100 FP8 is **1979** TFLOPS and for H100 BF16 is **989** TFLOPS.
 
-The model flops for Nemotron4 15b for GBS=1 is 434.5e12. Calculation shown [here](#notes).
+The model flops for Nemotron4 15b for GBS=1 is 3.85e14. Calculation shown [here](#notes).
 
 E.g. NeMotron4 15b BF16 on 64x H100 GPUs (GBS=256)
 ```shell
 peak FLOPS for H100 BF16 = 989 TFLOPS
 training step time = 2.693 s
-model flops = 434.5e12
+model flops = 3.85e14
 
-MFU = 256 * 434.5e12 / 2.693 / 64 / 989e+12 = 65.26%
+MFU = 256 * 3.85e14 / 2.693 / 64 / 989e+12 = 57.82%
 ```
 
 | Nemotron4 15b BF16 | 16x H100 GPUs  | 32x H100 GPUs  | 64x H100 GPUs  | 128x H100 GPUs  | 256x H100 GPUs  |  512x H100 GPUs  | 1024x H100 GPUs  | 2048x H100 GPUs  |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 Training step time (seconds per step)|2.66|2.66|2.67|2.67|2.68|2.71|2.74|2.78
 Throughput in tokens per second |98550|197101|392725|785450|1565039|3095427|6123072|12069940
-Model flops utilization|66.07%|66.07%|65.82%|65.82%|65.57%|64.85%|64.14%|63.21%
+Model flops utilization|58.54%|58.54%|58.32%|58.32%|58.10%|57.46%|56.83%|56.01%
 Time to train 1T tokens in days|117.44|58.72|29.47|14.74|7.4|3.74|1.89|0.96
 
 | Nemotron4 15b FP8 | 16x H100 GPUs  | 32x H100 GPUs  | 64x H100 GPUs  | 128x H100 GPUs  | 256x H100 GPUs  |  512x H100 GPUs  | 1024x H100 GPUs  | 2048x H100 GPUs  |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 Training step time (seconds per step)|1.98|1.98|1.98|1.99|2|2.02|2.03|2.09
 Throughput in tokens per second |132396|264792|529584|1053845|2097152|4152776|8264638|16054752
-Model flops utilization|44.35%|44.35%|44.35%|44.13%|43.91%|43.48%|43.26%|42.02%
+Model flops utilization|39.30%|39.30%|39.30%|39.10%|38.91%|38.52%|38.33%|37.23%
 Time to train 1T tokens in days|87.42|43.71|21.86|10.98|5.52|2.79|1.4|0.72
 
 | Nemotron4 340b BF16 | 256x H100 GPUs  |  512x H100 GPUs  | 1024x H100 GPUs  | 2048x H100 GPUs  |
 |---|:---:|:---:|:---:|:---:|
 Training step time (seconds per step)|4.36|4.39|4.41|4.43
 Throughput in tokens per second |60125|119428|237772|473398
-Model flops utilization|58.56%|58.16%|57.89%|57.63%
+Model flops utilization|49.98%|49.64%|49.42%|49.19%
 Time to train 1T tokens in days|192.5|96.91|48.68|24.45
 
 | Nemotron4 340b FP8 | 256x H100 GPUs  |  512x H100 GPUs  | 1024x H100 GPUs  | 2048x H100 GPUs  |
 |---|:---:|:---:|:---:|:---:|
 Training step time (seconds per step)|2.93|2.97|3|3.05
 Throughput in tokens per second |89469|176528|349525|687591
-Model flops utilization|43.55%|42.96%|42.53%|41.83%
+Model flops utilization|37.17%|36.67%|36.30%|35.71%
 Time to train 1T tokens in days|129.36|65.57|33.11|16.83
 
 # Prerequisites
@@ -320,18 +320,37 @@ To validate that checkpoint was loaded successfully look for the entry like belo
 model flops = (sequence length) * ((attention flops) + (mlp flops) + (embedding flops))
 
 model flops breakdown:
-    attention flops = (24 * (number of layers) * (hidden size)^2) + (12 * (number of layers) * (hidden size) * (sequence length))
-    mlp flops = 48 * (number of layers) * (hidden size)^2
-    embedding flops = 6 * (vocab size) * (hidden size)
+    attention flops = 12 * (number of layers) * (hidden size)^2 * (1 + (number of query groups) / (number of heads) + (sequence length) / (hidden size))
+    mlp flops = 12 * (number of layers) * (hidden size) * (ffn hidden size)
+    embedding flops = 6 * (vocab size) * (hidden size) 
 
 Nemotron4 15b calculation:
     sequence length = 4096
     number of layers = 32
     hidden size = 6144
+    ffn hidden size = 24576
+    number of heads = 48
+    number of query groups = 8
     vocab size = 256000 
-    attention flops = 24 * 32 * 6144^2 + 12 * 32 * 6144 * 4096 = 38666279738
-    mlp flops = 48 * 32 * 6144^2 = 57982058496
-    embedding flops = 6 * 256000 * 6144 = 9437184000
+    attention flops = 12 * 32 * 6144^2 + 12 * 32 * 6144^2 * 8 / 48 + 12 * 32 * 6144 * 4096 = 14,495,514,624 + 2,415,919,104 + 9,663,676,416 = 26,575,110,144
+    mlp flops = 12 * 32 * 6144 * 24576 = 57,982,058,496
+    embedding flops = 6 * 256000 * 6144 = 9,437,184,000
 
-    model flops = 4096 * (38666279738 + 57982058496 + 9437184000) = 434,526,299,070,464 = 434.5e12
+    model flops = 4096 * (26,575,110,144 + 57,982,058,496 + 9,437,184,000) = 4096 * 93,994,352,640 = 3.85e14
+
+Nemotron4 340b calculation:
+    sequence length = 4096
+    number of layers = 96
+    hidden size = 18432
+    vocab size = 256000 
+    ffn hidden size = 73728
+    number of heads = 96
+    number of query groups = 8
+    attention flops = 12 * 96 * 18432^2 + 12 * 96 * 18432^2 * 8 / 96 + 12 * 96 * 18432 * 4096 = 391,378,894,848 + 32,614,907,904 + 86,973,087,744 = 510,966,890,496
+    mlp flops = 12 * 96 * 18432 * 73728 = 1,565,515,579,392
+    embedding flops = 6 * 256000 * 18432 = 28,311,552,000
+
+    model flops = 4096 * (510,966,890,496 + 1,565,515,579,392 + 28,311,552,000) = 8.62124e15
+
 ```
+

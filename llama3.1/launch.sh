@@ -29,7 +29,7 @@ fi
 set -eu -o pipefail
 
 export FW_VERSION=25.02.01
-export GSW_VERSION=25.04
+export GSW_VERSION=25.04.01
 export LLMB_PATH=$PWD
 
 export IMAGE=${RUN_CONF_IMAGE:-$STAGE_PATH/nvidia+nemo+$FW_VERSION.sqsh}

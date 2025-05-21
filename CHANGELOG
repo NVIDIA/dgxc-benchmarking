@@ -1,3 +1,21 @@
+## [v25.04.01] - 2025-05-16
+
+### Changed
+  - Fixed MFU formula for Nemotron4 workload
+  - Fixed setup script for FineTuning workload
+
+## [v25.04] - 2025-04-30
+
+### Changed
+  - Llama3.1 and Nemotron4 benchmarks adopted 25.02.01 NeMo Framework and use NeMo2.0 interface
+  - Llama3.1 and Nemotron4 benchmarks support checkpointing restart functionality
+
+
+## [v25.03] - 2025-04-18
+
+### Added
+  - Deepseek R1 NIM inference benchmark
+
 ## [v25.02] - 2025-03-17
 
 ### Added

@@ -193,29 +193,10 @@ Monitor performance metrics to determine the optimal configuration for your spec
 
 
 # Release Notes
-## Performance Recipes collection version 25.02 
 
-Adds support for the following workloads:
-  * Pre-training: 
-      * Maxtext Llama 3 70B
-         * Precisions supported: FP8, BF16.
-  * Fine tuning:
-      * Supervised Fine-Tuning NeMo 24.12 Llama 3 8B, 70B. 
-         * Precisions supported: FP8, BF16
-      * LORA Fine-Tuning NeMo 24.12 Llama 3 8B, 70B FP8, BF16. 
-         * Precisions supported: FP8, BF16
-  * Inference
-      * Llama 3 70B, NVIDIA NIM llama-3-70B-instruct version 1.0.3 
-         * Precisions supported: FP8
-      * Enterprise RAG Pipeline, NVIDIA AI Blueprint
-
-The following workloads will no longer be maintained moving forward, starting in collection version 25.02: 
-  * Pre-training 
-      * Paxml GPT3 175B
-      * Maxtext Llama 2 70B
-  * Fine Tuning 
-      * Hugging Face Llama 2 70B
-      * Hugging Face Mistral 7x8B
+## Performance Recipes collection version 25.04.01
+  - Fixed MFU formula for Nemotron4 workload
+  - Fixed setup script for FineTuning workload
 
 
 # FAQ

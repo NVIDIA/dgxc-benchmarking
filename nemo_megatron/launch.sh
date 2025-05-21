@@ -44,7 +44,7 @@ source $LLMB_PATH/common/common-utils.sh
 export FRAMEWORK=nemo
 export MODEL=megatron
 export MODEL_SIZE=175b
-export GSW_VERSION=25.04
+export GSW_VERSION=25.04.01
 export FW_VERSION=24.12
 
 export IMAGE=${RUN_CONF_IMAGE:-$STAGE_PATH/nvidia+nemo+${FW_VERSION}.sqsh}
