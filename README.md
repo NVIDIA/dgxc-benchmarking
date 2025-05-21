@@ -16,6 +16,7 @@ Before you use the Performance Recipes, make sure you have installed the followi
 
 * Bash 4.2 or newer
 * Slurm 22.x or newer
+  * `task/affinity` plugin required for process pinning
 * [Enroot](https://github.com/NVIDIA/enroot/)
 * [NGC Registry Access](https://org.ngc.nvidia.com/setup)
 * Python 3.10.12 or newer
@@ -60,6 +61,7 @@ The following table lists each benchmark used to evaluate the model’s performa
 | NeMo | 24.12 | Llama 3 | 8B, 70B | Fine-Tuning (SFT, LORA) | 32 | FP8, BF16 | Yes |
 | NIM | instruct:1.3.3, rerank:1.3, embed:1.3.1 | Llama 3.1 and 3.2 | 70b, 1b | Inference | n/a | n/a | Yes 
 | NIM | 1.0.3 | Llama 3|  70B | Inference | 4 | FP8 | Yes |
+| NIM | 1.7.2 | DeepSeek R1 |  671B | Inference | 16 | FP8 | Yes |
 
 
 Baseline performance metrics were using workloads on the NVIDIA DGX H100 Reference Architecture. For more information see [DGX H100 Systems](https://blogs.nvidia.com/blog/dgx-h100-systems-shipping/).
@@ -150,6 +152,7 @@ srun --container-image ${IMAGE} \
    --no-container-mount-home
     <snip> ...
 ```
+
 
 # Release Notes
 ## Performance Recipes collection version 25.02 
