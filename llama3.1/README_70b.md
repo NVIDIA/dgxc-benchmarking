@@ -48,14 +48,14 @@ model flops = 3.94E+15
 MFU = 128 * 3.94E+15 / 11.31 / 64 / 1979E+12 = 35.21% 
 ```
 
-| Llama 3.1 70b 24.09 BF16 (TP=4, PP=4, CP=2, VP=5, MBS=1, GA=64) | Throughput on 64x H100 GPUs (GBS=128) | Throughput on 128x H100 GPUs (GBS=256) | Throughput on 256x H100 GPUs (GBS=512) | Throughput on 512x H100 GPUs (GBS=1024) | Throughput on 1024x H100 GPUs (GBS=2048) | Throughput on 2048x H100 GPUs (GBS=4096)
+| Llama 3.1 70b BF16 (TP=4, PP=4, CP=2, VP=5, MBS=1, GA=64) | Throughput on 64x H100 GPUs (GBS=128) | Throughput on 128x H100 GPUs (GBS=256) | Throughput on 256x H100 GPUs (GBS=512) | Throughput on 512x H100 GPUs (GBS=1024) | Throughput on 1024x H100 GPUs (GBS=2048) | Throughput on 2048x H100 GPUs (GBS=4096)
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 | Training step time (seconds per step) | 14.72  | 14.73  | 14.8   | 14.89  | 14.92   | 14.98
 | Throughput in tokens per second       | 71235  | 142373 | 283399 | 563372 | 1124478 | 2248957
 | Model flops utilization               | 54.10% | 54.06% | 53.81% | 53.48% | 53.38%  | 53.38%
 | Time to train 1T tokens in days       | 162.48 | 81.29  | 40.84  | 20.54  | 10.29   | 5.15
 
-| Llama 3.1 70b 24.09 FP8 (TP=4, PP=4, CP=2, VP=5, MBS=1, GA=64) | Throughput on 64x H100 GPUs (GBS=128) | Throughput on 128x H100 GPUs (GBS=256) | Throughput on 256x H100 GPUs (GBS=512) | Throughput on 512x H100 GPUs (GBS=1024) | Throughput on 1024x H100 GPUs (GBS=2048) | Throughput on 2048x H100 GPUs (GBS=4096)
+| Llama 3.1 70b FP8 (TP=4, PP=4, CP=2, VP=5, MBS=1, GA=64) | Throughput on 64x H100 GPUs (GBS=128) | Throughput on 128x H100 GPUs (GBS=256) | Throughput on 256x H100 GPUs (GBS=512) | Throughput on 512x H100 GPUs (GBS=1024) | Throughput on 1024x H100 GPUs (GBS=2048) | Throughput on 2048x H100 GPUs (GBS=4096)
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 | Training step time (seconds per step)   | 11.01  | 10.93  | 11.16  | 11.18  | 11.28   | 11.39
 | Throughput in tokens per second         | 95239  | 191871 | 375834 | 750323 | 1487342 | 2945955

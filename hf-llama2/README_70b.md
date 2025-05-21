@@ -15,7 +15,7 @@ grep train_samples_per_second log-hf_llama2_70b_32_652934.out
 {'train_runtime': 2577.7505, 'train_samples_per_second': 95.339, 'train_steps_per_second': 0.012, 'train_loss': 1.0156359354654947, 'epoch': 0.9}
 wandb: train_samples_per_second 95.339
 ```
-| LLAMA2 70b 24.02 BF16 | Train samples per second on 8x H100 GPUs | Train samples per second on 16x H100 GPUs  | Train samples per second on 32x H100 GPUs  | Train samples per second on 64x H100 GPUs  | Train samples per second on 128x H100 GPUs  | Train samples per second on 256x H100 GPUs  | Train samples per second on 512x H100 GPUs
+| LLAMA2 70b BF16 | Train samples per second on 8x H100 GPUs | Train samples per second on 16x H100 GPUs  | Train samples per second on 32x H100 GPUs  | Train samples per second on 64x H100 GPUs  | Train samples per second on 128x H100 GPUs  | Train samples per second on 256x H100 GPUs  | Train samples per second on 512x H100 GPUs
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | Training samples per second | 1.247 | 3.664 | 9.432 | 21.905 | 47.342 | 95.339 |154.931
 

@@ -42,14 +42,14 @@ model flops = 2.20E+15
 MFU = 256 * 2.20E+15 / 5.90 / 128 / 1979E+12 = 37.68%
 ```
 
-| NeMo Megatron 24.11 BF16 (TP=4,PP=8, MBS=1, VP=12, SEQ=2048) | 128x H100 GPUs (GBS=256) | 256x H100 GPUs (GBS=512) | 512x H100 GPUs (GBS=1024) | 1024x H100 GPUs (GBS=2048) | 2048x H100 GPUs (GBS=4096)
+| NeMo Megatron BF16 (TP=4,PP=8, MBS=1, VP=12, SEQ=2048) | 128x H100 GPUs (GBS=256) | 256x H100 GPUs (GBS=512) | 512x H100 GPUs (GBS=1024) | 1024x H100 GPUs (GBS=2048) | 2048x H100 GPUs (GBS=4096)
 |---|:---:|:---:|:---:|:---:|:---:|
 | Training step time (seconds per step) | 8.91   | 8.95   | 9.09  | 9.01  | 9.02 
 | Throughput in tokens per second | 58843 | 117159 | 230710 | 465517 | 930001 
 | Model flops utilization | 49.93% | 49.71% | 48.94% | 49.38% | 49.32% | 
 | Time to train 1T tokens in days | 197 | 99 | 50 | 25 | 12
 
-| NeMo Megatron 24.11 FP8 (TP=4,PP=8, MBS=1, VP=12, SEQ=2048) | 128x H100 GPUs (GBS=256) | 256x H100 GPUs (GBS=512) | 512x H100 GPUs (GBS=1024) | 1024x H100 GPUs (GBS=2048) | 2048x H100 GPUs (GBS=4096)
+| NeMo Megatron FP8 (TP=4,PP=8, MBS=1, VP=12, SEQ=2048) | 128x H100 GPUs (GBS=256) | 256x H100 GPUs (GBS=512) | 512x H100 GPUs (GBS=1024) | 1024x H100 GPUs (GBS=2048) | 2048x H100 GPUs (GBS=4096)
 |---|:---:|:---:|:---:|:---:|:---:|
 | Training step time (seconds per step) | 5.92   | 5.96   | 6.44  | 6.72  | 6.24
 | Throughput in tokens per second | 88562 | 175936 | 325645 | 624152 | 1344328

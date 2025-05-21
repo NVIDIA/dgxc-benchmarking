@@ -17,7 +17,7 @@
 
 # For each dataset a user elects to use, the user is responsible for
 # checking if the dataset license is fit for the intended purpose.
-set -e
+set -eu
 
 IMAGE=$STAGE_PATH/nvidia+nemo+24.05.sqsh
 NUM_NODES=2
@@ -32,7 +32,7 @@ python3 $STAGE_PATH/launcher_scripts/main.py \
   data_preparation.file_numbers='0-3' \
   data_preparation.rm_downloaded=True \
   data_preparation.rm_extracted=True \
-  cluster.gpus_per_node=$SLURM_GPUS_PER_NODE \
+  cluster.gpus_per_node=${SLURM_GPUS_ON_NODE:-} \
   cluster.account=$SLURM_JOB_ACCOUNT \
   cluster.partition=$SLURM_JOB_PARTITION \
   env_vars.TRANSFORMERS_OFFLINE=0 \

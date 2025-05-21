@@ -51,14 +51,14 @@ model flops = 434.5e12
 MFU = 256 * 434.5e12 / 2.86 / 64 / 989e+12 = 61%
 ```
 
-| Nemotron4 15b 24.11 BF16 (TP=4, PP=1, MBS=4, GA=4) | Throughput on 16x H100 GPUs (GBS=64) | Throughput on 32x H100 GPUs (GBS=128) | Throughput on 64x H100 GPUs (GBS=256) | Throughput on 128x H100 GPUs (GBS=512) | Throughput on 256x H100 GPUs (GBS=1024) | Throughput on 512x H100 GPUs (GBS=2048) | Throughput on 1024x H100 GPUs (GBS=4096) | Throughput on 2048x H100 GPUs (GBS=8192) |
+| Nemotron4 15b BF16 (TP=4, PP=1, MBS=4, GA=4) | Throughput on 16x H100 GPUs (GBS=64) | Throughput on 32x H100 GPUs (GBS=128) | Throughput on 64x H100 GPUs (GBS=256) | Throughput on 128x H100 GPUs (GBS=512) | Throughput on 256x H100 GPUs (GBS=1024) | Throughput on 512x H100 GPUs (GBS=2048) | Throughput on 1024x H100 GPUs (GBS=4096) | Throughput on 2048x H100 GPUs (GBS=8192) |
 |---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | Training step time (seconds per step) | 2.83 | 2.86 | 2.86 | 2.89 | 2.88 | 2.92 | 2.92 | 2.96 |
 | Throughput in tokens per second | 92630 | 183317 | 366635 | 725658 | 1456356 | 2872811 | 5745622 | 11335957 |
 | Model flops utilization | 62.10% | 61.45% | 61.45% | 60.81% | 61.02% | 60.18% | 60.18% | 59.37% |
 | Time to train 1T tokens in days | 124.95 | 63.14 | 31.57 | 15.95 | 7.95 | 4.03 | 2.01 | 1.02 |
 
-| Nemotron4 15b 24.11 FP8 (TP=4, PP=1, MBS=4, GA=4) | Throughput on 16x H100 GPUs (GBS=64) | Throughput on 32x H100 GPUs (GBS=128) | Throughput on 64x H100 GPUs (GBS=256) | Throughput on 128x H100 GPUs (GBS=512) | Throughput on 256x H100 GPUs (GBS=1024) | Throughput on 512x H100 GPUs (GBS=2048) | Throughput on 1024x H100 GPUs (GBS=4096) | Throughput on 2048x H100 GPUs (GBS=8192) |
+| Nemotron4 15b FP8 (TP=4, PP=1, MBS=4, GA=4) | Throughput on 16x H100 GPUs (GBS=64) | Throughput on 32x H100 GPUs (GBS=128) | Throughput on 64x H100 GPUs (GBS=256) | Throughput on 128x H100 GPUs (GBS=512) | Throughput on 256x H100 GPUs (GBS=1024) | Throughput on 512x H100 GPUs (GBS=2048) | Throughput on 1024x H100 GPUs (GBS=4096) | Throughput on 2048x H100 GPUs (GBS=8192) |
 |---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | Training step time (seconds per step) | 2.08 |  2.07 | 2.09 | 2.08  | 2.1 | 2.12 | 2.12 | 2.18 |
 | Throughput in tokens per second |126031 | 253279 | 501711 | 1008246 | 1997288 | 3956891 | 7913781|15391941|

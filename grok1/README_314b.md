@@ -61,14 +61,14 @@ model flops = 4.27E+15
 MFU = 4096 * 4.27E+15 / 22 / 2048 / 989E+12 = 39.3%
 ```
 
-| Grok 1 314b Dev BF16 | Throughput on 8x H100 GPUs | Throughput on 16x H100 GPUs | Throughput on 32x H100 GPUs | Throughput on 64x H100 GPUs | Throughput on 128x H100 GPUs | Throughput on 256 H100 GPUs | Throughput on 512 H100 GPUs | Throughput on 1024 H100 GPUs | Throughput on 2048 H100 GPUs |
+| Grok 1 314b BF16 | Throughput on 8x H100 GPUs | Throughput on 16x H100 GPUs | Throughput on 32x H100 GPUs | Throughput on 64x H100 GPUs | Throughput on 128x H100 GPUs | Throughput on 256 H100 GPUs | Throughput on 512 H100 GPUs | Throughput on 1024 H100 GPUs | Throughput on 2048 H100 GPUs |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | Training step time (seconds per step) | 24.03 | 21.52 | 10.64 | 20.64 | 20.64 | 20.7 | 20.83 | 21 | 21.09
 | Throughput in tokens per second       | 174544 | 194903 | 394202 | 406425 | 406425 | 405247 | 402718 | 798915 | 1591011
 | Model flops utilization               | 45.4% | 44.9% | 45.4% | 44.5% | 43.0% | 42.1% | 41.5% | 41.1% | 41.0%
 | Time to train 1T tokens in days       | NA | NA | NA | NA | NA | NA | 28.74 | 14.49 | 7.27
 
-| Grok 1 314b Dev FP8 | Throughput on 8x H100 GPUs | Throughput on 16x H100 GPUs | Throughput on 32x H100 GPUs | Throughput on 64x H100 GPUs | Throughput on 128x H100 GPUs | Throughput on 256 H100 GPUs | Throughput on 512 H100 GPUs | Throughput on 1024 H100 GPUs | Throughput on 2048 H100 GPUs |
+| Grok 1 314b FP8 | Throughput on 8x H100 GPUs | Throughput on 16x H100 GPUs | Throughput on 32x H100 GPUs | Throughput on 64x H100 GPUs | Throughput on 128x H100 GPUs | Throughput on 256 H100 GPUs | Throughput on 512 H100 GPUs | Throughput on 1024 H100 GPUs | Throughput on 2048 H100 GPUs |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | Training step time (seconds per step) | 19.89 | 17.08 | 8.3 | 16.21 | 16.48 | 16.55 | 16.69 | 16.89 | 17.04
 | Throughput in tokens per second       | 210875 | 245568 | 505338 | 517496 | 509017 | 506865 | 502613 | 993322 | 1969157

@@ -44,16 +44,15 @@ The overview page for each workload highlights target performance metrics for th
 The following table lists each benchmark used to evaluate the model’s performance, along with their specific configurations.
 
 
-| Workload      |    Type    | Description                 | Container Version | Dataset    | Max Scale (#GPUs) | DTYPE     |
-| --------------- | :-----------: | :---------------------------- | :-----------------: | :----------- | :---------- | :---------- |
-| Nemotron4     |  Training  | 15B and 340B benchmarks     |       24.09       | Synthetic  | 2048      | FP8, BF16 |
-| Nemo Megatron |  Training  | 175B benchmarks             |       24.05       | Pile       | 2048      | FP8, BF16 |
-| Llama 3.1     |  Training  | 8B, 70B and 405B benchmarks |       24.09       | Pile       | 2304      | FP8, BF16 |
-| PaXML         |  Training  | 5B and 175B benchmarks      |     24.03.04     | Synthetic  | 2048      | FP8, BF16 |
-| Maxtext       |  Training  | Llama2 70B benchmarks       |    2024.12.09    | Synthetic  | 2048      | FP8, BF16 |
-| Grok1         |  Training  | Grok1 314B benchmarks       |       24.09       | Synthetic  | 2048      | FP8, BF16 |
-| Llama 2       | Fine Tuning | Hugging Face 70B benchmarks |       24.02       | HF Llama2  | 512       | BF16      |
-| Mistral       | Fine Tuning | Hugging Face 7B benchmarks  |       24.02       | HF Mistral | 256       | BF16      |
+| Framework | Container Version | Model | Model Size | Type | Max Scale (# of GPUs) | Precision |
+| --------- | :---------------: | :---- | :--------: | :--- | :-------------------- | :-------- |
+| NeMo | 24.09 | Nemotron4 | 15B, 340B | Training | 2048 | FP8, BF16 |
+| NeMo | 24.05 | GPT3      | 175B      | Training | 2048 | FP8, BF16 |
+| NeMo | 24.09 | Llama 3.1 | 8B, 70B, 405B | Training | 2304 | FP8, BF16 |
+| Maxtext | 2024.12.09 | Llama2 | 70B | Training | 2048 | FP8, BF16 |
+| NeMo | 24.09 | Grok1 | 314B | Training  | 2048 | FP8, BF16 |
+| HuggingFace TRL | 0.8.2 based on 24.02-py3 | Llama2 | 70B | SFT | 512 | BF16 |
+| HuggingFace TRL | 0.8.2 based on 24.02-py3 | Mistral | 7B | SFT | 256 | BF16 |
 
 Baseline performance metrics were using workloads on the NVIDIA DGX H100 Reference Architecture. For more information see [DGX H100 Systems](https://blogs.nvidia.com/blog/dgx-h100-systems-shipping/).
 

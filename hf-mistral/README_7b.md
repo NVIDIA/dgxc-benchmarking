@@ -14,7 +14,7 @@ Performance for HF Mistral fine tuning is measured by train samples per second, 
 grep train_samples_per_second log-hf_mistral_7b_32_656947.out
 {'train_runtime': 2950.1412, 'train_samples_per_second': 555.363, 'train_steps_per_second': 0.034, 'train_loss': 1.0721950674057006, 'epoch': 6.25}
 ```
-| Mistral 7b 24.02 BF16 | Train samples per second on 8x H100 GPUs | Train samples per second on 16x H100 GPUs  | Train samples per second on 32x H100 GPUs  | Train samples per second on 64x H100 GPUs  | Train samples per second on 128x H100 GPUs  | Train samples per second on 256x H100 GPUs |
+| Mistral 7b BF16 | Train samples per second on 8x H100 GPUs | Train samples per second on 16x H100 GPUs  | Train samples per second on 32x H100 GPUs  | Train samples per second on 64x H100 GPUs  | Train samples per second on 128x H100 GPUs  | Train samples per second on 256x H100 GPUs |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 | Training samples per second | 16.287 | 37.895 | 81.626 | 161.273 | 308.95 | 555.363
 

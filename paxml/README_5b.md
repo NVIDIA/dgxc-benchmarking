@@ -135,10 +135,6 @@ ENABLE_PROFILE=true DTYPE=<fp8/bf16> MODEL_SIZE=5b sbatch -A ${SBATCH_ACCOUNT} -
 
 Additional settings for profile ranks, and cpu/gpu metrics are not currenty supported. 
 
-**Example customized profiling command:**
-```shell
-ENABLE_PROFILE=true RUN_CONF_PROFILE_GPU_METRICS=true RUN_CONF_PROFILE_RANKS="0" DTYPE=<fp8/bf16> MODEL_SIZE=5b sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N ${NUM_NODES} ./launch.sh
-```
 
 ### Troubleshooting:
 

@@ -49,14 +49,14 @@ model flops = 1.01e16
 MFU = 32 * 1.01e16 / 4.77 / 128 / 989e+12 = 53.52%
 ```
 
-| Nemotron4 340b 24.11 BF16 (TP=8, PP=8, MBS=1, GA=16, VP=12) | Throughput on 128x H100 GPUs (GBS=32) | Throughput on 256x H100 GPUs (GBS=64) | Throughput on 512x H100 GPUs (GBS=128) | Throughput on 1024x H100 GPUs (GBS=256) | Throughput on 2048x H100 GPUs (GBS=512) | 
+| Nemotron4 340b BF16 (TP=8, PP=8, MBS=1, GA=16, VP=12) | Throughput on 128x H100 GPUs (GBS=32) | Throughput on 256x H100 GPUs (GBS=64) | Throughput on 512x H100 GPUs (GBS=128) | Throughput on 1024x H100 GPUs (GBS=256) | Throughput on 2048x H100 GPUs (GBS=512) | 
 |---:|:---:|:---:|:---:|:---:|:---:|
 | Training step time (seconds per step) |  4.61 | 4.67 | 4.7 | 4.73 |  4.84 |
 | Throughput in tokens per second | 28432 | 56134 | 111551 | 221686 | 433296 |
 | Model flops utilization | 55.38% | 54.67% | 54.32% | 53.98% | 52.75% |
 | Time to train 1T tokens in days | 407 | 206 | 104 | 52 | 27 |
 
-| Nemotron4 340b 24.11 FP8 (TP=8, PP=8, MBS=1, GA=16, VP=12) | Throughput on 128x H100 GPUs (GBS=32) | Throughput on 256x H100 GPUs (GBS=64) | Throughput on 512x H100 GPUs (GBS=128) | Throughput on 1024x H100 GPUs (GBS=256) | Throughput on 2048x H100 GPUs (GBS=512) |
+| Nemotron4 340b FP8 (TP=8, PP=8, MBS=1, GA=16, VP=12) | Throughput on 128x H100 GPUs (GBS=32) | Throughput on 256x H100 GPUs (GBS=64) | Throughput on 512x H100 GPUs (GBS=128) | Throughput on 1024x H100 GPUs (GBS=256) | Throughput on 2048x H100 GPUs (GBS=512) |
 |---|:---:|:---:|:---:|:---:|:---:|
 | Training step time (seconds per step) | 3.16 | 3.21 | 3.26 | 3.34 | 3.49 |
 | Throughput in tokens per second | 41478 | 81665 | 160825 | 313945 | 600903 |
