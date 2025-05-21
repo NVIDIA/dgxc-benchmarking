@@ -20,14 +20,14 @@
 
 #SBATCH --exclusive
 #SBATCH --mem=0
-#SBATCH --time=00:20:00
+#SBATCH --time=00:45:00
 
 set -eu
 
 # create staging folder
-mkdir -p $STAGE_PATH/cfg
-cp -f nemotron4*.yaml nemotron*.model "${STAGE_PATH}/cfg"
-cp -f *.sh *.md "${STAGE_PATH}"
+mkdir -vp $STAGE_PATH/cfg
+cp -vf nemotron4*.yaml nemotron*.model "${STAGE_PATH}/cfg"
+cp -vf *.sh *.md "${STAGE_PATH}"
 
 # create the squash file 
-srun -N 1 -t 00:20:00 --pty bash -c "enroot import --output ${STAGE_PATH}/nvidia+nemo+24.09.sqsh docker://nvcr.io#nvidia/nemo:24.09"
+srun bash -c "enroot import --output ${STAGE_PATH}/nvidia+nemo+24.09.sqsh docker://nvcr.io#nvidia/nemo:24.09"

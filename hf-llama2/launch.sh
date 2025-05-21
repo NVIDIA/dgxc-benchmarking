@@ -33,19 +33,20 @@ fi
 # bash strict mode: http://redsymbol.net/articles/unofficial-bash-strict-mode/
 set -eu -o pipefail
 
-export GSW_VERSION=24.11
 export FRAMEWORK=hf
 export MODEL=llama2
 export MODEL_SIZE=70b
+export GSW_VERSION=25.01
 export FW_VERSION=24.02
 
 export IMAGE=$STAGE_PATH/nvidia+pytorch+${FW_VERSION}.sqsh
 
-export SLURM_NTASKS_PER_NODE=${RUN_CONF_GPU_PER_NODE:-8}
+# Workload requires 1 task per node during launch.
+export NTASKS_PER_NODE=${RUN_CONF_GPU_PER_NODE:-8}
 # Only BF16 supported.
 export DTYPE=bf16
 
-export JOB_TOTAL_GPUS=${SBATCH_GPUS:-$(( ${SLURM_JOB_NUM_NODES} * ${SLURM_NTASKS_PER_NODE} ))}
+export JOB_TOTAL_GPUS=${SBATCH_GPUS:-$(( ${SLURM_JOB_NUM_NODES} * ${NTASKS_PER_NODE} ))}
 
 export RESULT_DIR=$STAGE_PATH/results/$GSW_VERSION/$DTYPE/$MODEL_SIZE/$JOB_TOTAL_GPUS
 export RESULT_FILES_NAME=log-${FRAMEWORK}_${MODEL}_${MODEL_SIZE}_${JOB_TOTAL_GPUS}

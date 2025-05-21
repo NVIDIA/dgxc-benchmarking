@@ -33,7 +33,7 @@ python3 $STAGE_PATH/launcher_scripts/main.py \
   data_preparation.rm_downloaded=True \
   data_preparation.rm_extracted=True \
   cluster.gpus_per_node=$SLURM_GPUS_PER_NODE \
-  cluster.account=$SLURM_ACCOUNT \
-  cluster.partition=$SLURM_PARTITION \
+  cluster.account=$SLURM_JOB_ACCOUNT \
+  cluster.partition=$SLURM_JOB_PARTITION \
   env_vars.TRANSFORMERS_OFFLINE=0 \
   container=$IMAGE

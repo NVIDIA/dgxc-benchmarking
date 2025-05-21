@@ -20,16 +20,16 @@
 
 #SBATCH --exclusive
 #SBATCH --mem=0
-#SBATCH --time=00:25:00
+#SBATCH --time=00:45:00
 
 set -eu -o pipefail
 
 # create staging folder
-mkdir -p $STAGE_PATH/cfg
+mkdir -vp $STAGE_PATH/cfg
 
-cp -f launch.sh *.md "${STAGE_PATH}"
-cp -f configure.sh "$STAGE_PATH/cfg"
+cp -vf launch.sh *.md "${STAGE_PATH}"
+cp -vf configure.sh "$STAGE_PATH/cfg"
 
 # create the squash file 
-srun -N 1 -t 00:25:00 --pty bash -c "enroot import --output ${STAGE_PATH}/nvidia+jax+maxtext-2024.12.09.sqsh docker://ghcr.io#nvidia/jax:maxtext-2024-12-09"
+srun bash -c "enroot import --output ${STAGE_PATH}/nvidia+jax+maxtext-2024.12.09.sqsh docker://ghcr.io#nvidia/jax:maxtext-2024-12-09"
 

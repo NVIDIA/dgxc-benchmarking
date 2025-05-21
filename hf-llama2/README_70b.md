@@ -25,19 +25,31 @@ This recipe requires access to Hugging Face Llama 2. Instructions are below if n
 
 # Prepare Environment
 
+## Slurm
+
+We reference a number of Slurm commands and parameters in this document. A brief summary is included below. It's important to note these are a guide and might not be applicable to all environments. Please consult with your system administrator for the parameters that are specific to your system.
+
+**Common parameters:**
+- `SBATCH_PARTITION` or `-p` - Partition (or queue) to use.
+- `SBATCH_ACCOUNT` or `-A` - Slurm account to associate with your job, different from your user. Meant for accounting purposes.
+- `SBATCH_GPUS_PER_NODE` or `--gres=gpu:<num gpus>` - If your cluster is configured with GRES this should be set to all GPUs in a node. Ignore if not configured.
+	- Encountering errors such as 'GPUs not found' or 'Cannot submit to this partition without GPU resources' means this setting is required.
+
+These parameters can be set either by exporting the environment variable or using the corresponding `sbatch` flag.
+
+## Workload Setup
 Create a staging area by running the setup.sh script. The script converts the docker image from nvcr.io/nvidia/pytorch:24.02-py3 to the nvidia+pytorch+24.02.sqsh file under the $STAGE_PATH folder and downloads DHS-LLM workshop source code.
 
 ```shell
 # Set the path where all artifacts will be downloaded
-export STAGE_PATH=<path to your shared file system folder> (e.g. /lustre/myproject/<userid>)
-# Set the Slurm partition to use
-export SLURM_PARTITION="batch"
-# Set the Slurm account to use
-export SLURM_ACCOUNT="account_name"
+export STAGE_PATH=<path to your shared file system folder> (e.g. /lustre/myproject/nemo)
 
 # Run the setup
-bash ./setup.sh
+sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N 1 ./setup.sh
 ```
+Check the corresponding `slurm-<job_id>.out` file for status information.
+
+**Important:** `STAGE_PATH` used in this step must be used when running the workload.
 
 # Request Access
 Access to Llama 2 must be requested through [Meta's website](https://llama.meta.com/llama-downloads/) then requested on the [Hugging Face Llama](https://huggingface.co/meta-llama/Llama-2-70b-hf) page. The approval process is not automatic and could take a day or more.
@@ -80,16 +92,19 @@ More information on the model and dataset can be found https://huggingface.co/me
 
 # Run Training
 
-Once the environment has been prepared, it is time to train a model. Run the launch_70b.sh script with sbatch for launching Hugging Face LLAMA2 70b model training on 1 to 64 nodes with BF16 precision.
+Once the environment has been prepared, it is time to train a model. Run the launch.sh script with sbatch for launching Hugging Face LLAMA2 70b model training on 1 to 64 nodes with BF16 precision.
 Log files will be located under `${STAGE_PATH}/results/$GSW_VERSION/bf16/70b/$JOB_TOTAL_GPUS`.
 
 ```shell
-sbatch -A ${SLURM_ACCOUNT} -p ${SLURM_PARTITION} -N ${NUM_NODES} ./launch_70b.sh
+sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N ${NUM_NODES} ./launch.sh
 ```
 Where:
 - `NUM_NODES` can be calculate by `N_GPUS / N_GPUS_PER_NODE`, `N_GPUS_PER_NODE` is 8 for DGX H100, therefore for 256 GPUs scale, `NUM_NODES` should be `256 / 8 = 32`
+- [Slurm Settings](#slurm) for more information on Slurm parameters.
 
-**Note:** that it might be necessary to pass `--gres=gpu:8` to sbatch for certain clusters on encountering errors like GPU not found. See https://slurm.schedmd.com/gres.html
+# Profiling
+
+We do not expose profiling options for this workload at this time.
 
 # Notes
 

@@ -35,10 +35,11 @@ set -eu -o pipefail
 export FRAMEWORK=nemo
 export MODEL=nemotron4
 export MODEL_SIZE=${MODEL_SIZE:-15b}
-export GSW_VERSION=24.11
+export GSW_VERSION=25.01
 export FW_VERSION=24.09
 
 export IMAGE=$STAGE_PATH/nvidia+nemo+${FW_VERSION}.sqsh
+export NCCL_TRACE_ENABLED=${ENABLE_NCCL_TRACE:-false}
 
 export OPTIMIZATION_NAME=${OPTIMIZATION_NAME-""}
 export OPTIMIZATION_CODE=${OPTIMIZATION_CODE-""}
@@ -50,10 +51,17 @@ else
   export FP8_ENABLED=false
 fi
 
-export SLURM_NTASKS_PER_NODE=${SLURM_GPUS_PER_NODE:-8}
+export SLURM_NTASKS_PER_NODE=${RUN_CONF_GPU_PER_NODE:-8}
 export JOB_TOTAL_GPUS=${SBATCH_GPUS:-$(( ${SLURM_JOB_NUM_NODES} * ${SLURM_NTASKS_PER_NODE} ))}
 
-export RESULT_DIR=$STAGE_PATH/results/$GSW_VERSION/$DTYPE/$MODEL_SIZE/$JOB_TOTAL_GPUS
+GSW_VERSION_SUFFIX=""
+if [[ "${NCCL_TRACE_ENABLED,,}" = true ]]; then
+  echo "NCCL tracing enabled. Large log files will be stored in a dedicated folder"
+  GSW_VERSION_SUFFIX="-nccl-trace"
+fi
+
+export RESULT_DIR=${RUN_CONF_RESULT_DIR:-$STAGE_PATH/results/${GSW_VERSION}${GSW_VERSION_SUFFIX}/$DTYPE/$MODEL_SIZE/$JOB_TOTAL_GPUS}
+
 export INDEX_MAPPING_DIR=$STAGE_PATH/index_mapping
 export RESULT_FILES_NAME=log-${FRAMEWORK}_${MODEL}_${MODEL_SIZE}_${JOB_TOTAL_GPUS}
 
@@ -65,13 +73,10 @@ export SLURM_MPI_TYPE=${SLURM_MPI_TYPE:-"pmix"}
 export SRUN_OUTPUT=${SRUN_OUTPUT-${RESULT_DIR}/${RESULT_FILES_NAME}_%j.out}
 export SRUN_ERROR=${SRUN_ERROR-${RESULT_DIR}/${RESULT_FILES_NAME}_%j.err}
 
-# Workload specific configuration
-source ./configure.sh
-
 srun \
   --container-image "$IMAGE" \
-  --container-mounts "$RESULT_DIR,$INDEX_MAPPING_DIR,$STAGE_PATH/cfg:/cfg" \
+  --container-mounts "$RESULT_DIR,$INDEX_MAPPING_DIR,$STAGE_PATH/cfg:/cfg,$STAGE_PATH/configure.sh:/gsw/configure.sh" \
   --container-writable \
-  --no-container-mount-home bash -c "$COMMAND_LINE"
+  --no-container-mount-home bash -c "source /gsw/configure.sh && launch"
 
 

@@ -52,6 +52,8 @@ if [[ $MODEL_SIZE = 5b ]]; then
 	FSDP=1
 	MAX_STEPS=500
 	XLA_PYTHON_CLIENT_MEM_FRACTION=0.9
+	RUN_CONF_PROFILE_DELAY=${RUN_CONF_PROFILE_DELAY:-120}
+	RUN_CONF_PROFILE_DURATION=${RUN_CONF_PROFILE_DURATION:-10}
 elif [[ $MODEL_SIZE = 175b ]]; then
 	# 175b
 	MBS=2
@@ -118,3 +120,7 @@ export COMMAND_LINE="echo $INFO_STR;
 	--num_hosts=\${SLURM_NTASKS} \
 	--host_idx=\${SLURM_PROCID} \
 	--alsologtostderr"
+
+function launch() {
+  eval $COMMAND_LINE
+}

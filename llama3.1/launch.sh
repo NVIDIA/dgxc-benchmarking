@@ -34,13 +34,14 @@ fi
 
 set -eu -o pipefail
 
-export GSW_VERSION=24.11
+export GSW_VERSION=25.01
 export FRAMEWORK=nemo
 export MODEL=llama3.1
 export FW_VERSION=24.09
 export SYNTHETIC_DATA_ENABLED=False # 405b is true
 
 export IMAGE=${RUN_CONF_IMAGE:-$STAGE_PATH/nvidia+nemo+${FW_VERSION}.sqsh}
+export NCCL_TRACE_ENABLED=${ENABLE_NCCL_TRACE:-false}
 
 export DTYPE=${DTYPE:-fp8}
 export DTYPE=${DTYPE,,}
@@ -52,7 +53,13 @@ fi
 
 export JOB_TOTAL_GPUS=${SBATCH_GPUS:-$(( ${SLURM_JOB_NUM_NODES} * ${SLURM_NTASKS_PER_NODE} ))}
 
-export RESULT_DIR=$STAGE_PATH/results/$GSW_VERSION/$DTYPE/$MODEL_SIZE/$JOB_TOTAL_GPUS
+GSW_VERSION_SUFFIX=""
+if [[ "${NCCL_TRACE_ENABLED,,}" = true ]]; then
+  echo "NCCL tracing enabled. Large log files will be stored in a dedicated folder"
+  GSW_VERSION_SUFFIX="-nccl-trace"
+fi
+
+export RESULT_DIR=${RUN_CONF_RESULT_DIR:-$STAGE_PATH/results/${GSW_VERSION}${GSW_VERSION_SUFFIX}/$DTYPE/$MODEL_SIZE/$JOB_TOTAL_GPUS}
 export RESULT_FILES_NAME=log-${FRAMEWORK}_${MODEL}_${MODEL_SIZE}_${JOB_TOTAL_GPUS}
 
 export DATA_DIR=$STAGE_PATH/llama3.1-dataset
@@ -66,11 +73,8 @@ export SLURM_MPI_TYPE=${SLURM_MPI_TYPE:-"pmix"}
 export SRUN_OUTPUT=${SRUN_OUTPUT-${RESULT_DIR}/${RESULT_FILES_NAME}_%j.out}
 export SRUN_ERROR=${SRUN_ERROR-${RESULT_DIR}/${RESULT_FILES_NAME}_%j.err}
 
-# Workload specific configuration
-source ./configure.sh
-
 srun \
   --container-image "$IMAGE" \
-  --container-mounts $RESULT_DIR,$INDEX_MAPPING_DIR,$DATA_DIR:/dataset,$STAGE_PATH/cfg:/cfg \
+  --container-mounts $RESULT_DIR,$INDEX_MAPPING_DIR,$DATA_DIR:/dataset,$STAGE_PATH/cfg:/cfg,$STAGE_PATH/configure.sh:/gsw/configure.sh \
   --container-writable \
-  --no-container-mount-home bash -c "$COMMAND_LINE"
+  --no-container-mount-home bash -c "source /gsw/configure.sh && launch"

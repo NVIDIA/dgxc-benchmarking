@@ -20,22 +20,22 @@
 
 #SBATCH --exclusive
 #SBATCH --mem=0
-#SBATCH --time=00:30:00
+#SBATCH --time=00:45:00
 
 set -eu
 
 # create staging folder
-mkdir -p $STAGE_PATH/cfg
+mkdir -vp $STAGE_PATH/cfg
 
-cp -f check*.sh gen*.sh launch.sh "${STAGE_PATH}"
-cp -f *.yaml "${STAGE_PATH}/cfg"
+cp -vf *.sh "${STAGE_PATH}"
+cp -vf *.yaml "${STAGE_PATH}/cfg"
 
 # create the squash file 
-srun -N 1 -t 00:20:00 --pty bash -c "enroot import --output ${STAGE_PATH}/nvidia+nemo+24.05.sqsh docker://nvcr.io#nvidia/nemo:24.05"
+srun bash -c "enroot import --output ${STAGE_PATH}/nvidia+nemo+24.05.sqsh docker://nvcr.io#nvidia/nemo:24.05"
 
 # copy out the configuration from the container to the $STAGE_PATH
 # this is required for data set generation
-srun -N 1 -t 00:10:00 --pty --container-mounts=$STAGE_PATH:/workspace/mount_dir --container-image=$STAGE_PATH/nvidia+nemo+24.05.sqsh bash -c "cp -r /opt/NeMo-Framework-Launcher/launcher_scripts /workspace/mount_dir/; cp /opt/NeMo-Framework-Launcher/requirements.txt /workspace/mount_dir/"
+srun --container-mounts=$STAGE_PATH:/workspace/mount_dir --container-image=$STAGE_PATH/nvidia+nemo+24.05.sqsh bash -c "cp -r /opt/NeMo-Framework-Launcher/launcher_scripts /workspace/mount_dir/; cp /opt/NeMo-Framework-Launcher/requirements.txt /workspace/mount_dir/"
 
 # install required Python modules
 pip install -r $STAGE_PATH/requirements.txt

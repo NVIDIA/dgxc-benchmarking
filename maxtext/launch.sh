@@ -32,7 +32,7 @@ fi
 
 set -eu -o pipefail
 
-export GSW_VERSION=24.11
+export GSW_VERSION=25.01
 export FRAMEWORK=maxtext
 export MODEL=llama2
 export MODEL_SIZE=70b

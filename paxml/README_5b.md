@@ -60,22 +60,31 @@ MFU = 64 * 6.69E+13 / 0.47 / 16 / 1979E+12 = 28.77%
 
 # Prepare Environment
 
-Create a staging area by running the setup.sh script. The script saves the container image from the registry in the $STAGE_PATH folder and copies copies config file paxml_mod_configs.py to the $STAGE_PATH directory. 
+## Slurm
 
+We reference a number of Slurm commands and parameters in this document. A brief summary is included below. It's important to note these are a guide and might not be applicable to all environments. Please consult with your system administrator for the parameters that are specific to your system.
+
+**Common parameters:**
+- `SBATCH_PARTITION` or `-p` - Partition (or queue) to use.
+- `SBATCH_ACCOUNT` or `-A` - Slurm account to associate with your job, different from your user. Meant for accounting purposes.
+- `SBATCH_GPUS_PER_NODE` or `--gres=gpu:<num gpus>` - If your cluster is configured with GRES this should be set to all GPUs in a node. Ignore if not configured.
+	- Encountering errors such as 'GPUs not found' or 'Cannot submit to this partition without GPU resources' means this setting is required.
+
+These parameters can be set either by exporting the environment variable or using the corresponding `sbatch` flag.
+
+## Workload Setup
+Create a staging area by running the setup.sh script. The script saves the container image from the registry in the $STAGE_PATH folder and copies copies config file paxml_mod_configs.py to the $STAGE_PATH directory. 
 
 ```shell
 # Set the path where all artifacts will be downloaded
 export STAGE_PATH=<path to your shared file system folder> (e.g. /lustre/myproject/nemo)
-# Set the Slurm partition to launch against
-export SLURM_PARTITION="batch"
-# Set the Slurm account to launch against
-export SLURM_ACCOUNT="account_name"
-# Set the number of GPUs per node according to Slurm's gres, this is usually 8 or null - https://slurm.schedmd.com/gres.html
-export SLURM_GPUS_PER_NODE=null
 
 # Run the setup
-bash ./setup.sh
+sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N 1 ./setup.sh
 ```
+Check the corresponding `slurm-<job_id>.out` file for status information.
+
+**Important:** `STAGE_PATH` used in this step must be used when running the workload.
 
 # Prepare Dataset
 Since Paxml GPT training can be run using synthetic datasets, this step is omitted.
@@ -87,15 +96,57 @@ Training is run for 500 steps and will stop afterwards. Log files and results wi
 
 Below is a command template for launching Paxml model training.
 ```shell
-DTYPE=<fp8/bf16> MODEL_SIZE=5b sbatch -A ${SLURM_ACCOUNT} -p ${SLURM_PARTITION} -N ${NUM_NODES} ./launch.sh
+DTYPE=<fp8/bf16> MODEL_SIZE=5b sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N ${NUM_NODES} ./launch.sh
 ```
 Where:
 - `DTYPE` and `MODEL_SIZE` are **required** environment variables.
 	- `DTYPE` can be either `fp8` or `bf16`.
 	- `MODEL_SIZE` should be `5b` in this case.
 - `NUM_NODES` can be calculate by `N_GPUS / N_GPUS_PER_NODE`, `N_GPUS_PER_NODE` is 8 for DGX H100, therefore for 128 GPUs scale, `NUM_NODES` should be `128 / 8 = 16`.
+- [Slurm Settings](#slurm) for more information on Slurm parameters.
 
-**Note:** that it might be necessary to pass `--gres=gpu:8` to sbatch for certain clusters on encountering errors like GPU not found. See https://slurm.schedmd.com/gres.html
+# Profiling
+We have one profiling method supported: Nsight.
+
+Due to overhead while profiling: the results generated with these settings is not valid for comparison. 'Performance' and 'Profiling' runs should be done separately.
+
+## Run Nsight Profiling
+
+Nsight Systems is included in our containers. To enable profiling with Nsight Systems set variable `ENABLE_PROFILE=true` when submitting your job.
+
+In order to view the resulting profiles, ensure you have the latest version of Nsight Systems installed. For more information visit: [Nsight Systems](https://docs.nvidia.com/nsight-systems/)
+
+### Default Profiling Settings:
+* **MPI Ranks:** 0-8
+* **Duration:** 10 seconds with a 120 second delay at job start.
+* **Output Location:** .nsys-rep files are saved in the nsys folder within the existing results directory.
+* **Filename format:** `${MODEL}-${MODEL_SIZE}-${DTYPE}_${NUM_GPUS}g_${SLURM_JOB_ID}_${SLURM_NODEID}_${SLURM_LOCALID}.nsys-rep`
+
+**Example command:**
+```shell
+ENABLE_PROFILE=true DTYPE=<fp8/bf16> MODEL_SIZE=5b sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N ${NUM_NODES} ./launch.sh
+```
+### Customizing profiling behavior:
+* Specify job steps to profile:
+	* `RUN_CONF_PROFILE_DELAY`: start profiling after this many seconds after job start.
+	  Default: 120
+	* `RUN_CONF_PROFILE_DURATION`: run profiling for this duration in seconds.
+	  Default: 10
+
+Additional settings for profile ranks, and cpu/gpu metrics are not currenty supported. 
+
+**Example customized profiling command:**
+```shell
+ENABLE_PROFILE=true RUN_CONF_PROFILE_GPU_METRICS=true RUN_CONF_PROFILE_RANKS="0" DTYPE=<fp8/bf16> MODEL_SIZE=5b sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N ${NUM_NODES} ./launch.sh
+```
+
+### Troubleshooting:
+
+If you encounter issues, try the defaults `ENABLE_PROFILE=true` first as these should be broadly applicable to most systems.
+
+### Viewing results
+
+[How to consume Nsight profiling results](../common/nsys-profile.md)
 
 # Notes
 

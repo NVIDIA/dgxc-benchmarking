@@ -1,3 +1,11 @@
+## [v25.01] - 2025-02-11
+
+### Changed
+  - added profiling instructions and how to consume profile traces
+  - improved setup scripts to fix sporadic enroot failures
+  - updated README instructions to address user's feedback
+
+
 ## [v24.11] - 2024-12-13
 
 ### Added

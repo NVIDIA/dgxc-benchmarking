@@ -20,16 +20,16 @@
 
 #SBATCH --exclusive
 #SBATCH --mem=0
-#SBATCH --time=00:30:00
+#SBATCH --time=00:45:00
 
 set -eu -o pipefail
 
 # create staging folder
-mkdir -p "$STAGE_PATH/cfg"
+mkdir -vp "$STAGE_PATH/cfg"
 
-cp -f *.yaml $STAGE_PATH/cfg/
+cp -vf *.yaml $STAGE_PATH/cfg/
 
-cp -f configure.sh launch.sh $STAGE_PATH/
+cp -vf configure.sh launch.sh $STAGE_PATH/
 
 # create the squash file 
-srun -N 1 -t 00:30:00 --pty bash -c "enroot import --output ${STAGE_PATH}/nvidia+nemo+dev.sqsh docker://nvcr.io#nvidia/nemo:sha256:9c876dce0621f954d1733063e2af642682b188d757fb280cc55755fb8e194400"
+srun bash -c "enroot import --output ${STAGE_PATH}/nvidia+nemo+dev.sqsh docker://nvcr.io#nvidia/nemo:sha256:9c876dce0621f954d1733063e2af642682b188d757fb280cc55755fb8e194400"

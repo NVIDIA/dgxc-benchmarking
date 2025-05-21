@@ -4,7 +4,7 @@ Once the training job has finished successfully it's performance measurement met
 
 The example below is taken from the end of the output log file - see `$STAGE_PATH/results/$GSW_VERSION/$DTYPE/175b/$JOB_TOTAL_GPUS/*.out`, where NUM_NODES=16, the training step time was measured as **5.9** seconds during step number 50.
 ```shell
-grep train_step_timing results/fp8/175b/16/*.out
+grep train_step_timing results/$GSW_VERSION/fp8/175b/128/*.out
 Epoch 0: : 100%|██████████| 50/50 [31:51<00:00, reduced_train_loss=6.130, global_step=50.0, consumed_samples=76800.0, train_step_timing in s=5.900, val_loss=6.250]
 ```
 
@@ -59,35 +59,45 @@ MFU = 256 * 2.20E+15 / 5.90 / 128 / 1979E+12 = 37.68%
 
 # Prepare Environment
 
+## Slurm
+
+We reference a number of Slurm commands and parameters in this document. A brief summary is included below. It's important to note these are a guide and might not be applicable to all environments. Please consult with your system administrator for the parameters that are specific to your system.
+
+**Common parameters:**
+- `SBATCH_PARTITION` or `-p` - Partition (or queue) to use.
+- `SBATCH_ACCOUNT` or `-A` - Slurm account to associate with your job, different from your user. Meant for accounting purposes.
+- `SBATCH_GPUS_PER_NODE` or `--gres=gpu:<num gpus>` - If your cluster is configured with GRES this should be set to all GPUs in a node. Ignore if not configured.
+	- Encountering errors such as 'GPUs not found' or 'Cannot submit to this partition without GPU resources' means this setting is required.
+
+These parameters can be set either by exporting the environment variable or using the corresponding `sbatch` flag.
+
+## Workload Setup
 Create a staging area by running the setup.sh script. The script saves the container image from the registry in the $STAGE_PATH folder and copies the NeMo Launcher code from the container to the staging directory. 
 
-``` shell
+```shell
 # Set the path where all artifacts will be downloaded
 export STAGE_PATH=<path to your shared file system folder> (e.g. /lustre/myproject/nemo)
-# Set the Slurm partition to launch against
-export SLURM_PARTITION="batch"
-# Set the Slurm account to launch against
-export SLURM_ACCOUNT="account_name"
-# Set the number of GPUs per node according to Slurm's gres, this is usually 8 or null - https://slurm.schedmd.com/gres.html
-export SLURM_GPUS_PER_NODE=null
 
 # Run the setup
-bash ./setup.sh
+sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N 1 ./setup.sh
 ```
+Check the corresponding `slurm-<job_id>.out` file for status information.
+
+**Important:** `STAGE_PATH` used in this step must be used when running the workload.
 
 # Prepare Dataset
 Pre-training a GPT-3 model requires a text-based dataset to be downloaded and pre-processed for the NeMo Framework to ingest the data optimally. [The Pile](https://pile.eleuther.ai/) is often used as the dataset for pre-training models. The NeMo Framework contains helper scripts to download and pre-process the dataset. The following steps outline how to download and pre-process the dataset on DGX Cloud with an explanation of key points after.
 
-Run the generate_dataset.sh script. The script launches several Slurm jobs that will download the dataset from The Pile, pre-process it and save it in a form suitable for subsequent training. The resulting dataset files will be saved under the $STAGE_PATH/gpt3-dataset folder. The dataset creation may use up to 250GB. Make sure you have sufficient disk space available.
+Submit the generate_dataset.sh script. The script launches several Slurm jobs that will download the dataset from The Pile, pre-process it and save it in a form suitable for subsequent training. The resulting dataset files will be saved under the $STAGE_PATH/gpt3-dataset folder. The dataset creation may use up to 250GB. Make sure you have sufficient disk space available.
 
 
-``` shell
-bash ./generate_dataset.sh
+```shell
+sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N 1 ./generate_dataset.sh
 ```
 
 If the dataset generation step was successful there should be 4 idx and 4 bin files in the $STAGE_PATH/gpt3-dataset folder.
 
-``` shell
+```shell
 my-gpt3_00_text_document.bin
 my-gpt3_00_text_document.idx
 my-gpt3_01_text_document.bin
@@ -99,13 +109,12 @@ my-gpt3_03_text_document.idx
 ```
 
 You can run check_dataset.sh script to perform initial checks of the generated dataset state:
-``` shell
+```shell
 bash ./check_dataset.sh
 Dataset generation completed successfully at: <$STAGE_PATH/gpt3-dataset>
 ```
 
-If that is not the case, check the log files under: $STAGE_PATH/results.data_preparation 
-
+If that is not the case, check the log files under: `$STAGE_PATH/results.data_preparation`
 
 
 # Run Training
@@ -117,14 +126,13 @@ Run the launch.sh script to start NeMo Megatron 175b model training. Minimum req
 
 Below is a command template for launching NeMo Megatron model training.
 ```shell
-DTYPE=<fp8/bf16> sbatch -A ${SLURM_ACCOUNT} -p ${SLURM_PARTITION} -N ${NUM_NODES} ./launch.sh
+DTYPE=<fp8/bf16> sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N ${NUM_NODES} ./launch.sh
 ```
 Where:
 - `DTYPE` is a **required** environment variable.
     - `DTYPE` can be either `fp8` or `bf16`.
 - `NUM_NODES` can be calculate by `N_GPUS / N_GPUS_PER_NODE`, `N_GPUS_PER_NODE` is 8 for DGX H100, therefore for 256 GPUs scale, `NUM_NODES` should be `256 / 8 = 32`.
-
-**Note:** it might be necessary to pass ` --gres=gpu:8 ` to sbatch for certain clusters on encountering errors like GPU not found. See https://slurm.schedmd.com/gres.html
+- [Slurm Settings](#slurm) for more information on Slurm parameters.
 
 It is important to maintain these values for model parallelism settings in order to accurately assess performance results for completed jobs against expected baseline, which can be seen in the gpt3_175b_hydra.yaml:
 * training.model.tensor_model_parallel_size=4
@@ -133,6 +141,76 @@ It is important to maintain these values for model parallelism settings in order
 * training.model.virtual_pipeline_model_parallel_size=12
 
 Global batch size ( training.model.global_batch_size) value should be set to ```<number of nodes> * 16. E.g., 16 * 16 = 256 (in the example above).```
+
+# Profiling
+We have two profiling methods supported: Nsight, and NCCL Trace.
+
+Due to overhead while profiling: the results generated with these settings is not valid for comparison. 'Performance' and 'Profiling' runs should be done separately.
+
+**Note:** Profiling and NCCL Trace are currently mutually exclusive.
+
+## Run Nsight Profiling
+
+Nsight Systems is included in our containers. To enable profiling with Nsight Systems set variable `ENABLE_PROFILE=true` when submitting your job.
+
+In order to view the resulting profiles, ensure you have the latest version of Nsight Systems installed. For more information visit: [Nsight Systems](https://docs.nvidia.com/nsight-systems/)
+
+### Default Profiling Settings:
+* **MPI Ranks:** 0-8
+* **Job Steps:** 20-30
+* **Output Location:** .nsys-rep files are saved in the nsys folder within the existing results directory.
+* **Filename format:** `${MODEL}-${MODEL_SIZE}-${DTYPE}_${NUM_GPUS}g_${SLURM_JOB_ID}_${SLURM_NODEID}_${SLURM_LOCALID}.nsys-rep`
+
+**Example command:**
+```shell
+ENABLE_PROFILE=true DTYPE=<fp8/bf16> sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N ${NUM_NODES} ./launch.sh
+```
+### Customizing profiling behavior:
+* Specify job steps to profile:
+	* `RUN_CONF_PROFILE_START_STEP`: start profiling on this job step.
+	  Default: 20
+	* `RUN_CONF_PROFILE_STOP_STEP`: stop profiling on this job step.
+	  Default: 30
+* Select MPI ranks to profile:
+	* `RUN_CONF_PROFILE_RANKS`: Comma-separated list of MPI ranks to profile.
+	  Example: "0,1,2,3"
+	  Default: "0,1,2,3,4,5,7"
+* Enable GPU device metrics capture:
+	* `RUN_CONF_PROFILE_GPU_METRICS`: boolean, set to 'true' to capture device metrics.
+	- Default: false
+	- **Note:** Additional system configuration is required for GPU device metrics to work.
+* Enable CPU metrics capture:
+	* `RUN_CONF_PROFILE_CPU`: boolean, set to 'true' to capture CPU metrics.
+	- Default: false
+
+**Example customized profiling command:**
+```
+ENABLE_PROFILE=true RUN_CONF_PROFILE_GPU_METRICS=true RUN_CONF_PROFILE_RANKS="0" DTYPE=<fp8/bf16> sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N ${NUM_NODES} ./launch.sh
+```
+
+### Troubleshooting:
+
+If you encounter issues, try the defaults `ENABLE_PROFILE=true` first as these should be broadly applicable to most systems.
+
+### Viewing results
+
+[How to consume Nsight profiling results](../common/nsys-profile.md)
+
+## Run NCCL Trace
+
+NCCL traces provide a breakdown of the communication pattern outlining both the type of NCCL calls being made and their message sizes.
+
+To collect NCCL Trace information, set variable `ENABLE_NCCL_TRACE=true` when submitting your job.
+
+**Defaults:**
+* File Size: NCCL Trace generates large files, therefore profiling is limited to the first 10 steps.
+* Output Location: Trace files are saved to a separate directory with nccl-trace appended to the version string.
+* Output Directory: `$STAGE_PATH/results/$GSW_VERSION-nccl-trace/$DTYPE/${MODEL_SIZE}/$JOB_TOTAL_GPUS`
+
+**Example command:**
+```shell
+ENABLE_NCCL_TRACE=true DTYPE=<fp8/bf16> sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N ${NUM_NODES} ./launch.sh
+```
 
 # Notes
 

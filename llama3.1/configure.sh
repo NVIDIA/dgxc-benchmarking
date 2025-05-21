@@ -65,6 +65,12 @@ export CONFIG_OVERRIDES=""
 
 MAX_STEPS=${MAX_STEPS:-50}
 
+if [[ "${NCCL_TRACE_ENABLED,,}" = true ]]; then
+  export NCCL_DEBUG_SUBSYS="COLL,P2P,NET"
+  export NCCL_DEBUG=INFO
+  MAX_STEPS=10
+fi
+
 if [[ "$MODEL_SIZE" = "8b" ]]; then
   DEFAULT_PROFILE_RANKS="0,1,2,3,4,5,6,7"
   CONFIG_OVERRIDES+=" model.tokenizer.type=/dataset/llama"
@@ -166,3 +172,7 @@ export COMMAND_LINE="$ENV_VARS \
   --config-path=/cfg \
   --config-name=llama3.1_${MODEL_SIZE}.yaml \
   $CONFIG_OVERRIDES $PROFILE_CFG"
+
+function launch() {
+  eval $COMMAND_LINE
+}

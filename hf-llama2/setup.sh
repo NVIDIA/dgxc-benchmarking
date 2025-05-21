@@ -20,17 +20,18 @@
 
 #SBATCH --exclusive
 #SBATCH --mem=0
-#SBATCH --time=00:30:00
+#SBATCH --time=00:45:00
 
 set -eu
 
 # create staging folder
-mkdir -p $STAGE_PATH
-cp -f launch*.sh *.txt $STAGE_PATH
+mkdir -vp $STAGE_PATH
+cp -vf launch*.sh *.txt $STAGE_PATH
 
 # create squash file based on the container image pytorch:24.02-py3
-srun -N 1 -t 00:20:00 --pty bash -c "enroot import --output ${STAGE_PATH}/nvidia+pytorch+24.02.sqsh docker://nvcr.io#nvidia/pytorch:24.02-py3"
+srun bash -c "enroot import --output ${STAGE_PATH}/nvidia+pytorch+24.02.sqsh docker://nvcr.io#nvidia/pytorch:24.02-py3"
 
 # clone DHS-LLM repo
-cd $STAGE_PATH
+pushd $STAGE_PATH
 git clone https://github.com/pacman100/DHS-LLM-Workshop.git
+popd

@@ -45,6 +45,12 @@ export CONFIG_OVERRIDES=""
 
 export MAX_STEPS=50
 
+if [[ "${NCCL_TRACE_ENABLED,,}" = true ]]; then
+  export NCCL_DEBUG_SUBSYS="COLL,P2P,NET"
+  export NCCL_DEBUG=INFO
+  MAX_STEPS=10
+fi
+
 # Defaults
 NUM_LAYERS=64
 TP=4
@@ -178,3 +184,6 @@ export COMMAND_LINE="$ENV_VARS \
   --config-name=${MODEL}_${MODEL_SIZE}.yaml \
   $CONFIG_OVERRIDES $PROFILE_CFG"
 
+function launch() {
+  eval $COMMAND_LINE
+}

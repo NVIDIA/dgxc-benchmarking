@@ -20,27 +20,26 @@
 
 #SBATCH --exclusive
 #SBATCH --mem=0
-#SBATCH --time=00:40:00
+#SBATCH --time=00:45:00
 
 set -eu -o pipefail
 
 export HF_TOKEN=${HF_TOKEN?"Required variable HF_TOKEN"}
 
 # create staging folder
-mkdir -p $STAGE_PATH
-mkdir -p $STAGE_PATH/cfg
+mkdir -vp $STAGE_PATH/cfg
 
 # copy configs to stagepath
-cp -f llama3*.yaml "${STAGE_PATH}/cfg"
+cp -vf llama3*.yaml "${STAGE_PATH}/cfg"
 
-cp -f gen*.sh configure.sh launch.sh $STAGE_PATH
+cp -vf gen*.sh configure.sh launch.sh $STAGE_PATH
 
 # create the squash file
-srun -N 1 -t 00:30:00 --pty bash -c "enroot import --output ${STAGE_PATH}/nvidia+nemo+24.09.sqsh docker://nvcr.io#nvidia/nemo:24.09"
+srun bash -c "enroot import --output ${STAGE_PATH}/nvidia+nemo+24.09.sqsh docker://nvcr.io#nvidia/nemo:24.09"
 
 # copy out the configuration from the container to the $STAGE_PATH
 # this is required for data set generation.
-srun -N 1 -t 00:10:00 --container-mounts=$STAGE_PATH --container-image="$STAGE_PATH/nvidia+nemo+24.09.sqsh" bash -c "cp -r /opt/NeMo-Framework-Launcher/launcher_scripts $STAGE_PATH; cp /opt/NeMo-Framework-Launcher/requirements.txt $STAGE_PATH"
+srun --container-mounts=$STAGE_PATH --container-image="$STAGE_PATH/nvidia+nemo+24.09.sqsh" bash -c "cp -r /opt/NeMo-Framework-Launcher/launcher_scripts $STAGE_PATH; cp /opt/NeMo-Framework-Launcher/requirements.txt $STAGE_PATH"
 
 # install required Python modules for generating dataset
 pip install -r "$STAGE_PATH/requirements.txt"

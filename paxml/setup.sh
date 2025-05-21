@@ -20,14 +20,14 @@
 
 #SBATCH --exclusive
 #SBATCH --mem=0
-#SBATCH --time=0:20:00
+#SBATCH --time=0:45:00
 
 set -eu -o pipefail
 
 # create staging folder and copy config file
-mkdir -p ${STAGE_PATH}/cfg
-cp -f paxml_mod_configs.py ${STAGE_PATH}/cfg
-cp -f launch.sh configure.sh ${STAGE_PATH}
+mkdir -vp ${STAGE_PATH}/cfg
+cp -vf paxml_mod_configs.py ${STAGE_PATH}/cfg
+cp -vf launch.sh configure.sh ${STAGE_PATH}
 
 # create squash file based on the container image
-srun -N 1 -t 00:20:00 --pty bash -c "enroot import --output ${STAGE_PATH}/ghcr.io+nvidia+jax+pax-2024.03.04.sqsh docker://ghcr.io#nvidia/jax:pax-2024-03-04"
+srun bash -c "enroot import --output ${STAGE_PATH}/ghcr.io+nvidia+jax+pax-2024.03.04.sqsh docker://ghcr.io#nvidia/jax:pax-2024-03-04"

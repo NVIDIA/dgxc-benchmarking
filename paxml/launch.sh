@@ -32,7 +32,7 @@ fi
 
 set -eu -o pipefail
 
-export GSW_VERSION=24.11
+export GSW_VERSION=25.01
 export FRAMEWORK=paxml
 export MODEL=gpt3
 export MODEL_SIZE=${MODEL_SIZE:-5b}
@@ -64,13 +64,10 @@ export SLURM_MPI_TYPE=${SLURM_MPI_TYPE:-"pmix"}
 # !Breaking convention! - Paxml outputs the timing info into stderr. Keeping one combined paxml.out file.
 export SRUN_OUTPUT=${SRUN_OUTPUT-${RESULT_DIR}/${RESULT_FILES_NAME}_%j.out}
 
-# Workload specific configuration
-source ./configure.sh
-
 srun \
   --container-image "$IMAGE" \
-  --container-mounts $RESULT_DIR,$STAGE_PATH/cfg:/opt/paxml/workspace \
+  --container-mounts $RESULT_DIR,$STAGE_PATH/cfg:/opt/paxml/workspace,$STAGE_PATH/configure.sh:/gsw/configure.sh \
   --container-writable \
   --no-container-mount-home \
   --container-env=XLA_FLAGS,JAX_SHARE_AUTOTUNE_CONFIG_BETWEEN_HOSTS,JAX_SHARE_BINARY_BETWEEN_HOSTS \
-  bash -c "$COMMAND_LINE"
+  bash -c "source /gsw/configure.sh && launch"

@@ -41,7 +41,7 @@ python3 "$STAGE_PATH/launcher_scripts/main.py" \
     data_preparation.tokenizer_library=huggingface \
     +data_preparation.tokenizer_type="$TOKENIZER_PATH" \
     cluster.gpus_per_node="${SLURM_GPUS_PER_NODE:-null}" \
-    cluster.account="$SLURM_ACCOUNT" \
-    cluster.partition="$SLURM_PARTITION" \
+    cluster.account="$SLURM_JOB_ACCOUNT" \
+    cluster.partition="$SLURM_JOB_PARTITION" \
     "cluster.srun_args=[\"--container-writable\",\"--no-container-mount-home\"]" \
     container="$IMAGE"

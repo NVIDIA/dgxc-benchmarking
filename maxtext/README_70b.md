@@ -63,23 +63,33 @@ MFU = 128 * 1.82E+15 / 7.908 / 64 / 989E+12 = 46.54%
 | Time to train 1T tokens in days | 95.46 | 50.29 | 27.37 | 13.92 | 6.98 | 3.40 |
 
 
-# Prepare Slurm Environment
+# Prepare Environment
 
+## Slurm
+
+We reference a number of Slurm commands and parameters in this document. A brief summary is included below. It's important to note these are a guide and might not be applicable to all environments. Please consult with your system administrator for the parameters that are specific to your system.
+
+**Common parameters:**
+- `SBATCH_PARTITION` or `-p` - Partition (or queue) to use.
+- `SBATCH_ACCOUNT` or `-A` - Slurm account to associate with your job, different from your user. Meant for accounting purposes.
+- `SBATCH_GPUS_PER_NODE` or `--gres=gpu:<num gpus>` - If your cluster is configured with GRES this should be set to all GPUs in a node. Ignore if not configured.
+	- Encountering errors such as 'GPUs not found' or 'Cannot submit to this partition without GPU resources' means this setting is required.
+
+These parameters can be set either by exporting the environment variable or using the corresponding `sbatch` flag.
+
+## Workload Setup
 Create a staging area by running the attached setup.sh. The script converts the docker image from `ghcr.io/nvidia/jax:maxtext-2024-12-09` to the `nvidia+jax+maxtext-2024.12.09.sqsh` file under the $STAGE_PATH folder. 
 
 ```shell
 # Set the path where all artifacts will be downloaded
 export STAGE_PATH=<path to your shared file system folder> (e.g. /lustre/myproject/nemo)
-# Set the Slurm partition to launch against
-export SLURM_PARTITION="batch"
-# Set the Slurm account to launch against
-export SLURM_ACCOUNT="account_name"
-# Set the number of GPUs per node according to Slurm's gres, this is usually 8 or null - https://slurm.schedmd.com/gres.html
-export SLURM_GPUS_PER_NODE=null
 
 # Run the setup
-bash ./setup.sh
+sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N 1 ./setup.sh
 ```
+Check the corresponding `slurm-<job_id>.out` file for status information.
+
+**Important:** `STAGE_PATH` used in this step must be used when running the workload.
 
 # Prepare Dataset
 Since Maxtext Llama training only uses synthetic datasets, this step is omitted.
@@ -89,19 +99,35 @@ Once the environment has been prepared, it is time to train a model.
 
 The training will run for the first 50 steps and will stop afterwards. Log files and results will be located under the `$STAGE_PATH/results/$GSW_VERSION/$DTYPE/70b/$JOB_TOTAL_GPUS` folder.
 
-Below is a slurm command template for launching Maxtext Llama2 70b model training. 
-
+Below is a slurm command template for launching Maxtext Llama2 70b model training.
 ```shell
-DTYPE=<fp8/bf16> sbatch -A ${SLURM_ACCOUNT} -p ${SLURM_PARTITION} -N ${NUM_NODES} $STAGE_PATH/launch.sh
+DTYPE=<fp8/bf16> sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N ${NUM_NODES} $STAGE_PATH/launch.sh
 ```
 Where:
 - `DTYPE` is a **required** environment variable.
 	- `DTYPE` can be either `fp8` or `bf16`.
 - `NUM_NODES` can be calculated by `N_GPUS / N_GPUS_PER_NODE`, `N_GPUS_PER_NODE` is 8 for DGX H100, therefore for 256 GPUs scale, `NUM_NODES` should be `256 / 8 = 32`.
-
-**Note:** that it might be necessary to pass `--gres=gpu:8` to sbatch for certain clusters on encountering errors like GPU not found. See https://slurm.schedmd.com/gres.html
+- [Slurm Settings](#slurm) for more information on Slurm parameters.
 
 Global batch size ( training.model.global_batch_size) value should be set to `<number of nodes> * <gpus per node> * <mbs> . E.g., 8 * 8 * 2 = 128 (in the example above)` since we are using FSDP+DP.
+
+# Profiling
+
+Nsight profiling is used as part of this benchmark. See [Run Nsight Profiling](#run-nsight-profiling) for more info.
+
+## Run Nsight Profiling
+
+The workload uses [PGLE](See https://github.com/google/paxml?tab=readme-ov-file#run-pgle-workflow-on-gpu) and turns on Nsight profiling by default. The profiles are located at `$STAGE_PATH/results/$GSW_VERSION/${DTYPE}/70b/$JOB_TOTAL_GPUS/nsys`.
+
+Each job generates two nsys-rep files:
+- `*-prof.nsys-rep` is the PGLE profiling run at the start of the benchmark.
+- `*-perf.nsys-rep` is the profile taken during the performace run. Use **this** profile when debugging performance issues.
+
+Options to customize profiling behaviour are not currently available for this workload. GPU device metrics capture is not currently supported for this workload.
+
+### Viewing results
+
+[How to consume Nsight profiling results](../common/nsys-profile.md)
 
 # Notes
 
