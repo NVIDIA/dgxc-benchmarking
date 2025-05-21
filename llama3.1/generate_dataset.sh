@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,7 +20,7 @@
 
 set -eu -o pipefail
 
-IMAGE=${IMAGE:-$STAGE_PATH/nvidia+nemo+24.09.sqsh}
+IMAGE=${IMAGE:-$STAGE_PATH/nvidia+nemo+24.12.sqsh}
 TOKENIZER_PATH=$STAGE_PATH/llama3.1-dataset/llama
 NUM_NODES=2
 

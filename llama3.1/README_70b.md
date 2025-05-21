@@ -22,13 +22,13 @@ To obtain throughput as a tokens per second measurement, follow this formula:
 (sequence length) * (global batch size) / (training_step_timing) = (throughput in tokens per second)
 ```
 
-E.g. 8192 * 128 / 11.31 = 92712
+E.g. 8192 * 128 / 11.20 = 93623
 
 To calculate time to train estimate:
 ```shell
 (total tokens) / (throughput in tokens per second) / (number of seconds in a day) = (time to train in days) 
 ```
-E.g. 1e12 / 92712 / 86400 = 124.84 days 
+E.g. 1e12 / 93623 / 86400 = 123.62 days 
 
 
 To calculate the model flops utilization (MFU):
@@ -43,24 +43,24 @@ The model flops for Llama 3.1 70b for GBS=1 is 3.94E+15. Calculation shown [here
 E.g. Llama 3.1 70b FP8 on 64x H100 GPUs (GBS=128)
 ```shell
 peak FLOPS for H100 = 1979 TFLOPS 
-training step time = 11.31
+training step time = 11.20
 model flops = 3.94E+15
-MFU = 128 * 3.94E+15 / 11.31 / 64 / 1979E+12 = 35.21% 
+MFU = 128 * 3.94E+15 / 11.20 / 64 / 1979E+12 = 35.55% 
 ```
 
 | Llama 3.1 70b BF16 (TP=4, PP=4, CP=2, VP=5, MBS=1, GA=64) | Throughput on 64x H100 GPUs (GBS=128) | Throughput on 128x H100 GPUs (GBS=256) | Throughput on 256x H100 GPUs (GBS=512) | Throughput on 512x H100 GPUs (GBS=1024) | Throughput on 1024x H100 GPUs (GBS=2048) | Throughput on 2048x H100 GPUs (GBS=4096)
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
-| Training step time (seconds per step) | 14.72  | 14.73  | 14.8   | 14.89  | 14.92   | 14.98
-| Throughput in tokens per second       | 71235  | 142373 | 283399 | 563372 | 1124478 | 2248957
-| Model flops utilization               | 54.10% | 54.06% | 53.81% | 53.48% | 53.38%  | 53.38%
-| Time to train 1T tokens in days       | 162.48 | 81.29  | 40.84  | 20.54  | 10.29   | 5.15
+| Training step time (seconds per step) | 14.61  | 14.70  | 14.72   | 14.80  | 14.86   | 14.84
+| Throughput in tokens per second       | 71756  | 142663 | 284881  | 566797 | 1129246 | 2260623
+| Model flops utilization               | 54.52% | 54.20% | 54.12%  | 53.84% | 53.63%  | 53.68%
+| Time to train 1T tokens in days       | 161.26 | 81.13  | 40.62   | 20.42  | 10.25   | 5.12
 
 | Llama 3.1 70b FP8 (TP=4, PP=4, CP=2, VP=5, MBS=1, GA=64) | Throughput on 64x H100 GPUs (GBS=128) | Throughput on 128x H100 GPUs (GBS=256) | Throughput on 256x H100 GPUs (GBS=512) | Throughput on 512x H100 GPUs (GBS=1024) | Throughput on 1024x H100 GPUs (GBS=2048) | Throughput on 2048x H100 GPUs (GBS=4096)
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
-| Training step time (seconds per step)   | 11.01  | 10.93  | 11.16  | 11.18  | 11.28   | 11.39
-| Throughput in tokens per second         | 95239  | 191871 | 375834 | 750323 | 1487342 | 2945955
-| Model flops utilization                 | 36.17% | 36.43% | 35.68% | 35.62% | 35.30%  | 34.96%
-| Time to train 1T tokens in days         | 121.53 | 60.32  | 30.80  | 15.43  | 7.78    | 3.93
+| Training step time (seconds per step)   | 10.46  | 10.52  | 10.75  | 10.76  | 10.83   | 10.99
+| Throughput in tokens per second         | 100275 | 199292 | 390167 | 779393 | 1549142 | 3053178
+| Model flops utilization                 | 38.08% | 37.84% | 37.04% | 37.00% | 36.77%  | 36.23%
+| Time to train 1T tokens in days         | 115.46 | 58.06  | 29.66  | 14.85  | 7.47    | 3.79
 
 # Prerequisites
 
@@ -81,12 +81,12 @@ We reference a number of Slurm commands and parameters in this document. A brief
 - `SBATCH_PARTITION` or `-p` - Partition (or queue) to use.
 - `SBATCH_ACCOUNT` or `-A` - Slurm account to associate with your job, different from your user. Meant for accounting purposes.
 - `SBATCH_GPUS_PER_NODE` or `--gres=gpu:<num gpus>` - If your cluster is configured with GRES this should be set to all GPUs in a node. Ignore if not configured.
-	- Encountering errors such as 'GPUs not found' or 'Cannot submit to this partition without GPU resources' means this setting is required.
+  - Encountering errors such as 'GPUs not found' or 'Cannot submit to this partition without GPU resources' means this setting is required.
 
 These parameters can be set either by exporting the environment variable or using the corresponding `sbatch` flag.
 
 ## Workload Setup
-Create a staging area by running the attached setup.sh. The script converts the docker image from `nvcr.io/nvidia/nemo:24.09` to the `nvidia+nemo+24.09.sqsh` file under the $STAGE_PATH folder and copies NeMo Launcher code from the container. The setup script also downloads Llama3 tokenizer related files from HuggingFace [meta-llama/Meta-Llama-3-8B](https://huggingface.co/meta-llama/Meta-Llama-3-8B) repo using `HF_TOKEN` obtained in the previous step.
+Create a staging area by running the attached setup.sh. The script converts the docker image from `nvcr.io/nvidia/nemo:24.12` to the `nvidia+nemo+24.12.sqsh` file under the $STAGE_PATH folder and copies NeMo Launcher code from the container. The setup script also downloads Llama3 tokenizer related files from HuggingFace [meta-llama/Meta-Llama-3-8B](https://huggingface.co/meta-llama/Meta-Llama-3-8B) repo using `HF_TOKEN` obtained in the previous step.
 
 **Note:** Llama3.1 8B and 70B use the same Llama3 tokenizer.
 
@@ -152,8 +152,8 @@ DTYPE=<fp8/bf16> MODEL_SIZE=70b sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITIO
 
 Where:
 - `DTYPE` and `MODEL_SIZE` are **required** environment variables.
-	- `DTYPE` can be either `fp8` or `bf16`.
-	- `MODEL_SIZE` should be `70b` in this case.
+  - `DTYPE` can be either `fp8` or `bf16`.
+  - `MODEL_SIZE` should be `70b` in this case.
 - `NUM_NODES` can be calculate by `N_GPUS / N_GPUS_PER_NODE`, `N_GPUS_PER_NODE` is 8 for DGX H100, therefore for 128 GPUs scale, `NUM_NODES` should be `128 / 8 = 16`.
 - [Slurm Settings](#slurm) for more information on Slurm parameters.
 
@@ -190,21 +190,21 @@ ENABLE_PROFILE=true DTYPE=<fp8/bf16> MODEL_SIZE=70b sbatch -A ${SBATCH_ACCOUNT} 
 ```
 ### Customizing profiling behavior:
 * Specify job steps to profile:
-	* `RUN_CONF_PROFILE_START_STEP`: start profiling on this job step.
-	  Default: 20
-	* `RUN_CONF_PROFILE_STOP_STEP`: stop profiling on this job step.
-	  Default: 30
+  * `RUN_CONF_PROFILE_START_STEP`: start profiling on this job step.
+    Default: 20
+  * `RUN_CONF_PROFILE_STOP_STEP`: stop profiling on this job step.
+    Default: 30
 * Select MPI ranks to profile:
-	* `RUN_CONF_PROFILE_RANKS`: Comma-separated list of MPI ranks to profile.
-	  Example: "0,1,2,3"
-	  Default: "0,1,2,3,4,5,7,8,9,10,11,12,13,14,15"
+  * `RUN_CONF_PROFILE_RANKS`: Comma-separated list of MPI ranks to profile.
+    Example: "0,1,2,3"
+    Default: "0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15"
 * Enable GPU device metrics capture:
-	* `RUN_CONF_PROFILE_GPU_METRICS`: boolean, set to 'true' to capture device metrics.
-	- Default: false
-	- **Note:** Additional system configuration is required for GPU device metrics to work.
+  * `RUN_CONF_PROFILE_GPU_METRICS`: boolean, set to 'true' to capture device metrics.
+  - Default: false
+  - **Note:** Additional system configuration is required for GPU device metrics to work.
 * Enable CPU metrics capture:
-	* `RUN_CONF_PROFILE_CPU`: boolean, set to 'true' to capture CPU metrics.
-	- Default: false
+  * `RUN_CONF_PROFILE_CPU`: boolean, set to 'true' to capture CPU metrics.
+  - Default: false
 
 **Example customized profiling command:**
 ```shell
@@ -217,7 +217,15 @@ If you encounter issues, try the defaults `ENABLE_PROFILE=true` first as these s
 
 ### Viewing results
 
-[How to consume Nsight profiling results](../common/nsys-profile.md)
+In order to view the profile traces (*.nsys-rep files) interactively:
+- Install the latest [Nsight Systems client](https://developer.nvidia.com/nsight-systems/get-started) on your preferred system
+- Copy the generated .nsys-rep files to a folder on your preferred system. E.g., /home/nsight-traces/
+- Open Nsight Systems client, then click "File | Open" and select one or more .nsys-rep files from /home/nsight-systems folder. For more details, see [Reading Your Report in GUI guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#opening-an-existing-report).
+- Once loaded you can analyze the workload behavior to learn about any performance bottlenecks associated with the job run. 
+
+Since most of the benchmarking jobs run on multiple GPUs, there will be multiple .nsys-rep files generated for each run. [Multi-Report Analysis Guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#multi-report-analysis) will be very helpful to automate the analysis and get to results quicker by using Nsight recipes.
+
+**See** these [tutorials](https://developer.nvidia.com/nsight-systems/get-started#tutorials) to get a quick start if you are new to Nsight profiling.
 
 ## Run NCCL Trace
 
@@ -251,6 +259,6 @@ Llama 3.1 70b calculation:
     mlp flops = 18 * 80 * 28672 * 8192 = 338,228,674,560
     embedding flops = 6 * 128256 * 8192 = 6,304,038,912
 
-    model flops = 8129 * (136,902,082,560 + 338,228,674,560 + 6,304,038,912) = 3.94E+15
+    model flops = 8192 * (136,902,082,560 + 338,228,674,560 + 6,304,038,912) = 3.94E+15
 ```
 

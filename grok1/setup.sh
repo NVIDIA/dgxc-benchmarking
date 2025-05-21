@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,6 +22,8 @@
 #SBATCH --mem=0
 #SBATCH --time=00:45:00
 
+export FW_VERSION=24.12
+
 set -eu -o pipefail
 
 # create staging folder
@@ -32,4 +34,4 @@ cp -vf *.yaml $STAGE_PATH/cfg/
 cp -vf configure.sh launch.sh $STAGE_PATH/
 
 # create the squash file 
-srun bash -c "enroot import --output ${STAGE_PATH}/nvidia+nemo+dev.sqsh docker://nvcr.io#nvidia/nemo:sha256:9c876dce0621f954d1733063e2af642682b188d757fb280cc55755fb8e194400"
+srun bash -c "enroot import --output ${STAGE_PATH}/nvidia+nemo+${FW_VERSION}.sqsh docker://nvcr.io#nvidia/nemo:${FW_VERSION}"

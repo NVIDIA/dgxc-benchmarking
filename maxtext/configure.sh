@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -38,7 +38,7 @@ dcn_TP=1
 dcn_FSDP=${SLURM_JOB_NUM_NODES}
 dcn_DP=1
 MEM_FRACTION=0.94
-POLICY=""
+POLICY="save_qkv_proj"
 AR_MULTIPLE=""
 AG_MULTIPLE=""
 RS_MULTIPLE=""
@@ -52,24 +52,16 @@ fi
 
 if [[ "${DTYPE}" = fp8 ]]; then
   QUANTIZATION="fp8"
-  POLICY="save_dot_except_mlp"
-  AR_MULTIPLE=8
-  AG_MULTIPLE=16
+  AR_MULTIPLE=4
+  AG_MULTIPLE=4
   if [[ ${SLURM_JOB_NUM_NODES} -ge 64 ]]; then
-    RS_MULTIPLE=2048
+    RS_MULTIPLE=256
   else
-    RS_MULTIPLE=1024
+    RS_MULTIPLE=128
   fi
-  CONFIG_OVERRIDES+="remat_policy=custom \
-    query_proj=device \
-    value_proj=device \
-    key_proj=device \
-    qkv_proj=device \
-    out_proj=device \
-  "
+
 elif [[ "${DTYPE}" = bf16 ]]; then
   QUANTIZATION=""
-  POLICY="save_dot_except_mlpwi"
   AR_MULTIPLE=4
   AG_MULTIPLE=4
   if [[ ${SLURM_JOB_NUM_NODES} -ge 64 ]]; then
@@ -78,20 +70,12 @@ elif [[ "${DTYPE}" = bf16 ]]; then
     RS_MULTIPLE=256
   fi
 
-  CONFIG_OVERRIDES+="remat_policy=custom \
-    query_proj=device \
-    value_proj=device \
-    key_proj=device \
-    qkv_proj=device \
-    out_proj=device \
-    mlpwo=device \
-  "
 else
   echo "Unsupported precision ($DTYPE) selected"
   exit 1
 fi
 
-RUN_NAME="${FRAMEWORK}_${MODEL}_${MODEL_SIZE}_${SLURM_JOB_NUM_NODES}n_${DTYPE}_${POLICY}"
+RUN_NAME="${FRAMEWORK}_${MODEL}_${MODEL_SIZE}_${SLURM_JOB_NUM_NODES}n_${DTYPE}_${POLICY}_${SLURM_JOB_ID}"
 
 BASE_THRESHOLD=$((8*1073741824)) # 8GB
 AR_THRESHOLD=$((BASE_THRESHOLD/AR_MULTIPLE))
@@ -132,7 +116,7 @@ BASE_CONFIG="use_iota_embed=true \
   dataset_type=synthetic \
   attention=cudnn_flash_te \
   tokenizer_path=/opt/maxtext/assets/tokenizer.llama2 \
-  max_target_length=4096 \
+  max_target_length=8192 \
   quantization=${QUANTIZATION} \
   hardware=gpu_multiprocess \
   dcn_fsdp_parallelism=${dcn_FSDP} \
@@ -155,7 +139,7 @@ export INFO_STR="GSW: MODEL=${MODEL} FRAMEWORK=${FRAMEWORK} MODEL_SIZE=${MODEL_S
 echo $INFO_STR
 
 export XLA_PYTHON_CLIENT_MEM_FRACTION=${MEM_FRACTION}
-export CUDA_DEVICE_MAX_CONNECTIONS=1
+export CUDA_DEVICE_MAX_CONNECTIONS=16
 export NVTE_FUSED_ATTN=1
 export NCCL_IB_SL=1
 eval $ENV_VARS

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -85,6 +85,8 @@ elif [[ "$MODEL_SIZE" = "405b" ]]; then
   DEFAULT_PROFILE_RANKS="0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15"
   export SYNTHETIC_DATA_ENABLED=true
   export NCCL_P2P_NET_CHUNKSIZE=262144
+  CONFIG_OVERRIDES+=" model.tokenizer.library=huggingface"
+  CONFIG_OVERRIDES+=" model.tokenizer.type=/megatron-gpt2-345m"
   CONFIG_OVERRIDES+=" model.data.data_impl=\"mock\""
   CONFIG_OVERRIDES+=" model.data.data_prefix=\"\""
   CONFIG_OVERRIDES+=" model.ub_tp_comm_overlap_cfg.proj_fprop.fp8_buf=$FP8_ENABLED"

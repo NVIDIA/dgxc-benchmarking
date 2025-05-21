@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,8 +35,15 @@ set -eu -o pipefail
 export FRAMEWORK=nemo
 export MODEL=nemotron4
 export MODEL_SIZE=${MODEL_SIZE:-15b}
-export GSW_VERSION=25.01
-export FW_VERSION=24.09
+export MODEL_SIZE=${MODEL_SIZE,,}
+export GSW_VERSION=25.02
+
+if [[ $MODEL_SIZE = 15b ]]; then
+  export FW_VERSION=24.12
+else 
+  # for 340b
+  export FW_VERSION=24.09
+fi
 
 export IMAGE=$STAGE_PATH/nvidia+nemo+${FW_VERSION}.sqsh
 export NCCL_TRACE_ENABLED=${ENABLE_NCCL_TRACE:-false}

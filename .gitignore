@@ -6,3 +6,4 @@ paxml/*.out
 grok1/*.out
 maxtext/*.out
 *.swp
+.DS_Store

@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,10 +35,10 @@ set -eu -o pipefail
 export FRAMEWORK=nemo
 export MODEL=megatron
 export MODEL_SIZE=175b
-export GSW_VERSION=25.01
-export FW_VERSION=24.05
+export GSW_VERSION=25.02
+export FW_VERSION=24.12
 
-export IMAGE=${RUN_CONF_IMAGE:-$STAGE_PATH/nvidia+nemo+24.05.sqsh}
+export IMAGE=${RUN_CONF_IMAGE:-$STAGE_PATH/nvidia+nemo+24.12.sqsh}
 export NCCL_TRACE_ENABLED=${ENABLE_NCCL_TRACE:-false}
 
 export SLURM_NTASKS_PER_NODE=${RUN_CONF_GPU_PER_NODE:-8}

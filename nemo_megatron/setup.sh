@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -31,11 +31,11 @@ cp -vf *.sh "${STAGE_PATH}"
 cp -vf *.yaml "${STAGE_PATH}/cfg"
 
 # create the squash file 
-srun bash -c "enroot import --output ${STAGE_PATH}/nvidia+nemo+24.05.sqsh docker://nvcr.io#nvidia/nemo:24.05"
+srun bash -c "enroot import --output ${STAGE_PATH}/nvidia+nemo+24.12.sqsh docker://nvcr.io#nvidia/nemo:24.12"
 
 # copy out the configuration from the container to the $STAGE_PATH
 # this is required for data set generation
-srun --container-mounts=$STAGE_PATH:/workspace/mount_dir --container-image=$STAGE_PATH/nvidia+nemo+24.05.sqsh bash -c "cp -r /opt/NeMo-Framework-Launcher/launcher_scripts /workspace/mount_dir/; cp /opt/NeMo-Framework-Launcher/requirements.txt /workspace/mount_dir/"
+srun --container-mounts=$STAGE_PATH:/workspace/mount_dir --container-image=$STAGE_PATH/nvidia+nemo+24.12.sqsh bash -c "cp -r /opt/NeMo-Framework-Launcher/launcher_scripts /workspace/mount_dir/; cp /opt/NeMo-Framework-Launcher/requirements.txt /workspace/mount_dir/"
 
 # install required Python modules
 pip install -r $STAGE_PATH/requirements.txt

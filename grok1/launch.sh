@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,13 +35,13 @@ fi
 # bash strict mode: http://redsymbol.net/articles/unofficial-bash-strict-mode/
 set -eu -o pipefail
 
-export GSW_VERSION=25.01
+export GSW_VERSION=25.02
 export FRAMEWORK=nemo
 export MODEL=grok1
 export MODEL_SIZE=314b
-export FW_VERSION=24.09
+export FW_VERSION=24.12
 
-export IMAGE=${RUN_CONF_IMAGE:-$STAGE_PATH/nvidia+nemo+dev.sqsh}
+export IMAGE=${RUN_CONF_IMAGE:-$STAGE_PATH/nvidia+nemo+${FW_VERSION}.sqsh}
 export NCCL_TRACE_ENABLED=${ENABLE_NCCL_TRACE:-false}
 
 export OPTIMIZATION_NAME=${OPTIMIZATION_NAME-""}

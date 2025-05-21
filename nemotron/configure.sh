@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -60,6 +60,7 @@ if [[ $MODEL_SIZE = 15b ]]; then
   export NVTE_FUSED_ATTN=1
   TP=4
   PP=1
+  CP=1
   MP=$(( TP * PP ))
   VP=null
   MBS=4
@@ -70,6 +71,10 @@ else
   export NVTE_FUSED_ATTN=0
   TP=8
   PP=8
+  CP=1
+  if [[ $DTYPE = bf16 ]]; then
+    CP=2
+  fi
   MP=$(( TP * PP ))
   VP=12
   MBS=1
@@ -93,6 +98,7 @@ export CONFIG_OVERRIDES+=" model.global_batch_size=$GBS \
   model.tokenizer.model=/cfg/nemotron_2_256k.model \
   model.tensor_model_parallel_size=$TP \
   model.pipeline_model_parallel_size=$PP \
+  model.context_parallel_size=$CP \
   model.virtual_pipeline_model_parallel_size=$VP \
   model.fp8=${FP8_ENABLED^} \
   trainer.enable_checkpointing=${CHECKPOINT_ENABLED^} \

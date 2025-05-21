@@ -43,10 +43,10 @@ The model flops for NeMoTron4 340b for GBS=1 is 1.01e16. Calculation shown [here
 E.g. NeMotron4 340b BF16 on 128x H100 GPUs (GBS=32)
 ```shell
 peak FLOPS for H100 BF16 = 989 TFLOPS
-training step time = 4.77 s
+training step time = 4.61 s
 model flops = 1.01e16
 
-MFU = 32 * 1.01e16 / 4.77 / 128 / 989e+12 = 53.52%
+MFU = 32 * 1.01e16 / 4.61 / 128 / 989e+12 = 55.38%
 ```
 
 | Nemotron4 340b BF16 (TP=8, PP=8, MBS=1, GA=16, VP=12) | Throughput on 128x H100 GPUs (GBS=32) | Throughput on 256x H100 GPUs (GBS=64) | Throughput on 512x H100 GPUs (GBS=128) | Throughput on 1024x H100 GPUs (GBS=256) | Throughput on 2048x H100 GPUs (GBS=512) | 
@@ -64,6 +64,10 @@ MFU = 32 * 1.01e16 / 4.77 / 128 / 989e+12 = 53.52%
 | Time to train 1T tokens in days | 279 | 142 | 72 | 37 | 19 |
 
 
+# Request Access
+
+No special pre-requisites or access required for this recipe.
+
 # Prepare Environment
 
 ## Slurm
@@ -79,7 +83,7 @@ We reference a number of Slurm commands and parameters in this document. A brief
 These parameters can be set either by exporting the environment variable or using the corresponding `sbatch` flag.
 
 ## Workload Setup
-Create a staging area by running the attached setup.sh. The script converts the docker image from nvcr.io/nvidia/nemo:24.09 to the nvidia+nemo+24.09.sqsh file under the $STAGE_PATH folder and copies NeMo Launcher code from the container. 
+Create a staging area by running the setup.sh script. The script saves the container image from the registry in the $STAGE_PATH folder.
 
 ```shell
 # Set the path where all artifacts will be downloaded
@@ -105,7 +109,7 @@ The training will run for the first 50 steps and will stop afterwards. Log files
 
 Below is a slurm command template for launching Nemotron 4 340b model training.
 ```shell
-DTYPE=<fp8/bf16> MODEL_SIZE=340b sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N ${NUM_NODES} $STAGE_PATH/launch.sh
+DTYPE=<fp8/bf16> MODEL_SIZE=340b sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N ${NUM_NODES} ./launch.sh
 ```
 Where:
 - `DTYPE` and `MODEL_SIZE` are **required** environment variables.
@@ -120,7 +124,7 @@ It is important to maintain these values for model parallelism settings in order
 * training.model.micro_batch_size=1
 * training.model.virtual_pipeline_model_parallel_size=12
 
-Global batch size ( training.model.global_batch_size) value should be set to ```<number of nodes> * 2. E.g., 128 * 2 = 256 (in the example above)```.
+Global batch size ( training.model.global_batch_size) value should be set to ```<number of nodes> * 2. E.g., 16 * 2 = 32 (in the example above)```.
 
 # Profiling
 We have two profiling methods supported: Nsight, and NCCL Trace.
@@ -154,7 +158,7 @@ ENABLE_PROFILE=true DTYPE=<fp8/bf16> MODEL_SIZE=340b sbatch -A ${SBATCH_ACCOUNT}
 * Select MPI ranks to profile:
 	* `RUN_CONF_PROFILE_RANKS`: Comma-separated list of MPI ranks to profile.
 	  Example: "0,1,2,3"
-	  Default: "0,1,2,3,4,5,7"
+	  Default: "0,1,2,3,4,5,6,7"
 * Enable GPU device metrics capture:
 	* `RUN_CONF_PROFILE_GPU_METRICS`: boolean, set to 'true' to capture device metrics.
 	- Default: false
@@ -174,7 +178,15 @@ If you encounter issues, try the defaults `ENABLE_PROFILE=true` first as these s
 
 ### Viewing results
 
-[How to consume Nsight profiling results](../common/nsys-profile.md)
+In order to view the profile traces (*.nsys-rep files) interactively:
+- Install the latest [Nsight Systems client](https://developer.nvidia.com/nsight-systems/get-started) on your preferred system
+- Copy the generated .nsys-rep files to a folder on your preferred system. E.g., /home/nsight-traces/
+- Open Nsight Systems client, then click "File | Open" and select one or more .nsys-rep files from /home/nsight-systems folder. For more details, see [Reading Your Report in GUI guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#opening-an-existing-report).
+- Once loaded you can analyze the workload behavior to learn about any performance bottlenecks associated with the job run. 
+
+Since most of the benchmarking jobs run on multiple GPUs, there will be multiple .nsys-rep files generated for each run. [Multi-Report Analysis Guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#multi-report-analysis) will be very helpful to automate the analysis and get to results quicker by using Nsight recipes.
+
+**See** these [tutorials](https://developer.nvidia.com/nsight-systems/get-started#tutorials) to get a quick start if you are new to Nsight profiling.
 
 ## Run NCCL Trace
 

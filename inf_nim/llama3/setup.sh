@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,12 +25,6 @@
 set -eu
 
 mkdir -vp $STAGE_PATH
-cp -vf launch*.sh *.txt $STAGE_PATH
-
-# create squash file based on the container image pytorch:24.02-py3
-srun bash -c "enroot import --output ${STAGE_PATH}/nvidia+pytorch+24.02.sqsh docker://nvcr.io#nvidia/pytorch:24.02-py3"
-
-# clone DHS-LLM repo
-pushd $STAGE_PATH
-git clone https://github.com/pacman100/DHS-LLM-Workshop.git
-popd
+# create squash file based on containers
+srun bash -c "enroot import --output ${STAGE_PATH}/nvidia+tritonserver+25.01.sqsh docker://nvcr.io#nvidia/tritonserver:25.01-py3-sdk"
+srun bash -c "enroot import --output ${STAGE_PATH}/nim+meta+llama3-70b-instruct+1.0.3.sqsh  docker://nvcr.io#nim/meta/llama3-70b-instruct:1.0.3"

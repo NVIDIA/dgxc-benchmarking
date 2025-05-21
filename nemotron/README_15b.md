@@ -45,28 +45,32 @@ The model flops for NeMoTron4 15b for GBS=1 is 434.5e12. Calculation shown [here
 E.g. NeMotron4 15b BF16 on 64x H100 GPUs (GBS=256)
 ```shell
 peak FLOPS for H100 BF16 = 989 TFLOPS
-training step time = 2.86 s
+training step time = 2.812 s
 model flops = 434.5e12
 
-MFU = 256 * 434.5e12 / 2.86 / 64 / 989e+12 = 61%
+MFU = 256 * 434.5e12 / 2.812 / 64 / 989e+12 = 62.49%
 ```
 
 | Nemotron4 15b BF16 (TP=4, PP=1, MBS=4, GA=4) | Throughput on 16x H100 GPUs (GBS=64) | Throughput on 32x H100 GPUs (GBS=128) | Throughput on 64x H100 GPUs (GBS=256) | Throughput on 128x H100 GPUs (GBS=512) | Throughput on 256x H100 GPUs (GBS=1024) | Throughput on 512x H100 GPUs (GBS=2048) | Throughput on 1024x H100 GPUs (GBS=4096) | Throughput on 2048x H100 GPUs (GBS=8192) |
 |---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| Training step time (seconds per step) | 2.83 | 2.86 | 2.86 | 2.89 | 2.88 | 2.92 | 2.92 | 2.96 |
-| Throughput in tokens per second | 92630 | 183317 | 366635 | 725658 | 1456356 | 2872811 | 5745622 | 11335957 |
-| Model flops utilization | 62.10% | 61.45% | 61.45% | 60.81% | 61.02% | 60.18% | 60.18% | 59.37% |
-| Time to train 1T tokens in days | 124.95 | 63.14 | 31.57 | 15.95 | 7.95 | 4.03 | 2.01 | 1.02 |
+| Training step time (seconds per step) | 2.812 | 2.824 | 2.845 | 2.859 | 2.852 | 2.875 | 2.895 | 2.887
+| Throughput in tokens per second | 93223 | 185654 | 368568 | 733526 | 1470654 | 2917777 | 5795239 | 11622595
+| Model flops utilization | 62.49% | 62.23% | 61.77% | 61.47% | 61.62% | 61.12% | 60.70% | 60.87%
+| Time to train 1T tokens in days | 124.15 | 62.34 | 31.40 | 15.78 | 7.87 | 3.97 | 2.00 | 1.00
 
 | Nemotron4 15b FP8 (TP=4, PP=1, MBS=4, GA=4) | Throughput on 16x H100 GPUs (GBS=64) | Throughput on 32x H100 GPUs (GBS=128) | Throughput on 64x H100 GPUs (GBS=256) | Throughput on 128x H100 GPUs (GBS=512) | Throughput on 256x H100 GPUs (GBS=1024) | Throughput on 512x H100 GPUs (GBS=2048) | Throughput on 1024x H100 GPUs (GBS=4096) | Throughput on 2048x H100 GPUs (GBS=8192) |
 |---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| Training step time (seconds per step) | 2.08 |  2.07 | 2.09 | 2.08  | 2.1 | 2.12 | 2.12 | 2.18 |
-| Throughput in tokens per second |126031 | 253279 | 501711 | 1008246 | 1997288 | 3956891 | 7913781|15391941|
-| Model flops utilization | 42.22% | 42.43% | 42.02% | 42.22% | 41.82% | 41.43% | 41.43% | 40.29% |
-| Time to train 1T tokens in days | 91.84 | 45.70 | 23.07 | 11.48 | 5.79 | 2.93 | 1.46 | 0.75 |
+| Training step time (seconds per step) | 2.039 | 2.046 | 2.048 | 2.059 | 2.075 | 2.12 | 2.094 | 2.12
+| Throughput in tokens per second | 128565 | 256250 | 512000 | 1018529 | 2021351 | 3956891 | 8012042 | 15827562
+| Model flops utilization | 43.07% | 42.92% | 42.88% | 42.65% | 42.32% | 41.43% | 41.94% | 41.43% 
+| Time to train 1T tokens in days | 90.03 | 45.17 | 22.61 | 11.36 | 5.73 | 2.93 | 1.44 | 0.73
 
 
-# Prepare Slurm Environment
+# Request Access
+
+No special pre-requisites or access required for this recipe.
+
+# Prepare Environment
 
 ## Slurm
 
@@ -81,7 +85,7 @@ We reference a number of Slurm commands and parameters in this document. A brief
 These parameters can be set either by exporting the environment variable or using the corresponding `sbatch` flag.
 
 ## Workload Setup
-Create a staging area by running the attached setup.sh. The script converts the docker image from nvcr.io/nvidia/nemo:24.09 to the nvidia+nemo+24.09.sqsh file under the $STAGE_PATH folder and copies NeMo Launcher code from the container. 
+Create a staging area by running the setup.sh script. The script saves the container image from the registry in the $STAGE_PATH folder.
 
 ```shell
 # Set the path where all artifacts will be downloaded
@@ -99,7 +103,7 @@ Since Nemotron training only uses synthetic datasets, this step is omitted.
 
 # Run Slurm Training
 
-Once the environment has been prepared, it is time to train a model. NeMo Framework contains many predefined configuration files for various models including the 15 billion parameter Nemotron 4 model. This section will demonstrate how to initiate training the model. You can see the [default configuration for Nemotron 15b](https://github.com/NVIDIA/NeMo-Framework-Launcher/blob/24.05/launcher_scripts/conf/training/nemotron/nemotron_15b.yaml) in the NeMo-Framework-Launcher Github repository. We will modify some of these parameters with our launch command.
+Once the environment has been prepared, it is time to train a model. NeMo Framework contains many predefined configuration files for various models including the 15 billion parameter Nemotron 4 model. This section will demonstrate how to initiate training the model. You can see the [default configuration for Nemotron 15b](https://github.com/NVIDIA/NeMo-Framework-Launcher/blob/24.12/launcher_scripts/conf/training/nemotron/nemotron_15b.yaml) in the NeMo-Framework-Launcher Github repository. We will modify some of these parameters with our launch command.
 
 NeMo Launcher is using the Hydra framework to process command line arguments and pass them down as hyper parameters to a multi-node job performing the training.
 
@@ -107,7 +111,7 @@ The training will run for the first 50 steps and will stop afterwards. Log files
 
 Below is a slurm command template for launching Nemotron 4 15b model training.
 ```shell
-DTYPE=<fp8/bf16> MODEL_SIZE=15b sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N ${NUM_NODES} $STAGE_PATH/launch.sh
+DTYPE=<fp8/bf16> MODEL_SIZE=15b sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N ${NUM_NODES} ./launch.sh
 ```
 Where:
 - `DTYPE` and `MODEL_SIZE` are **required** environment variables.
@@ -155,7 +159,7 @@ ENABLE_PROFILE=true DTYPE=<fp8/bf16> MODEL_SIZE=15b sbatch -A ${SBATCH_ACCOUNT} 
 * Select MPI ranks to profile:
 	* `RUN_CONF_PROFILE_RANKS`: Comma-separated list of MPI ranks to profile.
 	  Example: "0,1,2,3"
-	  Default: "0,1,2,3,4,5,7"
+	  Default: "0,1,2,3,4,5,6,7"
 * Enable GPU device metrics capture:
 	* `RUN_CONF_PROFILE_GPU_METRICS`: boolean, set to 'true' to capture device metrics.
 	- Default: false
@@ -175,7 +179,15 @@ If you encounter issues, try the defaults `ENABLE_PROFILE=true` first as these s
 
 ### Viewing results
 
-[How to consume Nsight profiling results](../common/nsys-profile.md)
+In order to view the profile traces (*.nsys-rep files) interactively:
+- Install the latest [Nsight Systems client](https://developer.nvidia.com/nsight-systems/get-started) on your preferred system
+- Copy the generated .nsys-rep files to a folder on your preferred system. E.g., /home/nsight-traces/
+- Open Nsight Systems client, then click "File | Open" and select one or more .nsys-rep files from /home/nsight-systems folder. For more details, see [Reading Your Report in GUI guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#opening-an-existing-report).
+- Once loaded you can analyze the workload behavior to learn about any performance bottlenecks associated with the job run. 
+
+Since most of the benchmarking jobs run on multiple GPUs, there will be multiple .nsys-rep files generated for each run. [Multi-Report Analysis Guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#multi-report-analysis) will be very helpful to automate the analysis and get to results quicker by using Nsight recipes.
+
+**See** these [tutorials](https://developer.nvidia.com/nsight-systems/get-started#tutorials) to get a quick start if you are new to Nsight profiling.
 
 ## Run NCCL Trace
 

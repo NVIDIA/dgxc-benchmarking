@@ -1,3 +1,28 @@
+## [v25.02] - 2025-03-17
+
+### Added
+  - SFT/LoRA fine-tuning workload added based on 24.12 NeMo Framework
+  - Maxtext Llama 3 70b added based on 25.01 Maxtext Framework
+  - Llama 3 NIM inference benchmark
+  - RAG pipeline blueprint benchmark
+
+### Changed
+  - Nemotron 15b updated to 24.12 NeMo Framework
+  - Llama 3.1 8b, 70b, 405b updated to 24.12 NeMo Framework
+  - Grok1 314b updated to 24.12 NeMo Framework
+
+### Removed
+  - HuggingFace Mistral fine-tuning
+  - HuggingFace Llama fine-tuning
+  - PaXML 175b training
+  - Maxtext Llama 2 70b training
+
+## [v25.01.1] - 2025-02-13
+
+### Changed
+  - Readme fixes
+  - Fixed dataset generation on CSP clusters
+
 ## [v25.01] - 2025-02-11
 
 ### Changed
@@ -18,7 +43,7 @@
 ### Changed
 
   - Updated launch scripts and READMEs to align recipes:
-    - HuggingFace Mixtral and Llama
+    - HuggingFace Mistral and Llama
     - Nemo Megatron
     - Paxml
 
@@ -31,7 +56,7 @@
 
 ### Added
 
-  - HuggingFace Mixtral 7x8b fine tuning
+  - HuggingFace Mistral 7x8b fine tuning
   - HuggingFace Llama 70b LoRA fine tuning
 
 ### Changed

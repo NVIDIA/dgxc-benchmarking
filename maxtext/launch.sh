@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,11 +32,11 @@ fi
 
 set -eu -o pipefail
 
-export GSW_VERSION=25.01
+export GSW_VERSION=25.02
 export FRAMEWORK=maxtext
-export MODEL=llama2
+export MODEL=llama3
 export MODEL_SIZE=70b
-export FW_VERSION=2024.12.09
+export FW_VERSION=25.01
 
 export IMAGE=${RUN_CONF_IMAGE:-$STAGE_PATH/nvidia+jax+maxtext-${FW_VERSION}.sqsh}
 

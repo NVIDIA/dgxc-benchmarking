@@ -15,22 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# For each dataset a user elects to use, the user is responsible for
-# checking if the dataset license is fit for the intended purpose.
+mkdir -vp $STAGE_PATH
 
-#SBATCH --exclusive
-#SBATCH --mem=0
-#SBATCH --time=00:45:00
-
-set -eu
-
-# create staging folder
-mkdir -vp $STAGE_PATH/cfg
-cp -vf nemotron4*.yaml nemotron*.model "${STAGE_PATH}/cfg"
-cp -vf *.sh *.md "${STAGE_PATH}"
-
-# create the squash file for 340b
-srun bash -c "enroot import --output ${STAGE_PATH}/nvidia+nemo+24.09.sqsh docker://nvcr.io#nvidia/nemo:24.09"
-
-# create the squash file for 15b
-srun bash -c "enroot import --output ${STAGE_PATH}/nvidia+nemo+24.12.sqsh docker://nvcr.io#nvidia/nemo:24.12"
+ngc registry model download-version nim/meta/llama3-70b-instruct:hf --dest $STAGE_PATH
+ngc registry model download-version nim/meta/llama3-70b-instruct:0.10.0+cbc614f5-h100x4-fp8-throughput --dest $STAGE_PATH/llama3-70b-instruct_vhf/
+mv $STAGE_PATH/llama3-70b-instruct_vhf/llama3-70b-instruct_v0.10.0+cbc614f5-h100x4-fp8-throughput $STAGE_PATH/llama3-70b-instruct_vhf/trtllm_engine

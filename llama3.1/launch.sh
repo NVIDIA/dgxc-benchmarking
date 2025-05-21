@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -34,15 +34,16 @@ fi
 
 set -eu -o pipefail
 
-export GSW_VERSION=25.01
+export GSW_VERSION=25.02
 export FRAMEWORK=nemo
 export MODEL=llama3.1
-export FW_VERSION=24.09
+export FW_VERSION=24.12
 export SYNTHETIC_DATA_ENABLED=False # 405b is true
 
 export IMAGE=${RUN_CONF_IMAGE:-$STAGE_PATH/nvidia+nemo+${FW_VERSION}.sqsh}
 export NCCL_TRACE_ENABLED=${ENABLE_NCCL_TRACE:-false}
 
+export MODEL_SIZE=${MODEL_SIZE,,}
 export DTYPE=${DTYPE:-fp8}
 export DTYPE=${DTYPE,,}
 if [[ "${DTYPE}" = fp8 ]]; then
@@ -75,6 +76,6 @@ export SRUN_ERROR=${SRUN_ERROR-${RESULT_DIR}/${RESULT_FILES_NAME}_%j.err}
 
 srun \
   --container-image "$IMAGE" \
-  --container-mounts $RESULT_DIR,$INDEX_MAPPING_DIR,$DATA_DIR:/dataset,$STAGE_PATH/cfg:/cfg,$STAGE_PATH/configure.sh:/gsw/configure.sh \
+  --container-mounts $RESULT_DIR,$INDEX_MAPPING_DIR,$DATA_DIR:/dataset,$STAGE_PATH/cfg:/cfg,$STAGE_PATH/configure.sh:/gsw/configure.sh,$STAGE_PATH/megatron-gpt2-345m:/megatron-gpt2-345m \
   --container-writable \
   --no-container-mount-home bash -c "source /gsw/configure.sh && launch"

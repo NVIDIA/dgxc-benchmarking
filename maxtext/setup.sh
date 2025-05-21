@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -31,5 +31,5 @@ cp -vf launch.sh *.md "${STAGE_PATH}"
 cp -vf configure.sh "$STAGE_PATH/cfg"
 
 # create the squash file 
-srun bash -c "enroot import --output ${STAGE_PATH}/nvidia+jax+maxtext-2024.12.09.sqsh docker://ghcr.io#nvidia/jax:maxtext-2024-12-09"
+srun bash -c "enroot import --output ${STAGE_PATH}/nvidia+jax+maxtext-25.01.sqsh docker://nvcr.io#nvidia/jax:25.01-maxtext-py3"
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,8 +28,13 @@ export TORCH_NCCL_AVOID_RECORD_STREAMS=1
 export NCCL_NVLS_ENABLE=0
 export NVTE_DP_AMAX_REDUCE_INTERVAL=0
 export NVTE_ASYNC_AMAX_REDUCTION=1
-export NVTE_FUSED_ATTN=0
 export HYDRA_FULL_ERROR=1
+
+export NVTE_FUSED_ATTN=1
+export PYTHONUNBUFFERED=1
+export SLURM_UNBUFFEREDIO=1
+export TORCHX_MAX_RETRIES=0
+export TOKENIZERS_PARALLELISM=False
 
 export PRE_CMD="
   cd /opt/NeMo;
