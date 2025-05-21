@@ -1,30 +1,24 @@
 #!/bin/bash
-
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: MIT
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
 #
-# http://www.apache.org/licenses/LICENSE-2.0
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-# For each dataset a user elects to use, the user is responsible for
-# checking if the dataset license is fit for the intended purpose.
-
-# Parameters
-#SBATCH --job-name=nemo_llama3.1
-#SBATCH --dependency=singleton
-#SBATCH --exclusive
-#SBATCH --mem=0
-#SBATCH --ntasks-per-node=8
-#SBATCH --time=1:00:00
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
 
 if [ ${BASH_VERSION:0:1} -lt 4 ] || [ ${BASH_VERSION:0:1} -eq 4 -a ${BASH_VERSION:2:1} -lt 2 ]; then
     printf "Unsupported %s version: %s\n" "${BASH}" "${BASH_VERSION}" >&2
@@ -34,48 +28,53 @@ fi
 
 set -eu -o pipefail
 
-export GSW_VERSION=25.02
-export FRAMEWORK=nemo
-export MODEL=llama3.1
-export FW_VERSION=24.12
-export SYNTHETIC_DATA_ENABLED=False # 405b is true
+export FW_VERSION=25.02.01
+export GSW_VERSION=25.04
+export LLMB_PATH=$PWD
 
-export IMAGE=${RUN_CONF_IMAGE:-$STAGE_PATH/nvidia+nemo+${FW_VERSION}.sqsh}
-export NCCL_TRACE_ENABLED=${ENABLE_NCCL_TRACE:-false}
+export IMAGE=${RUN_CONF_IMAGE:-$STAGE_PATH/nvidia+nemo+$FW_VERSION.sqsh}
+export HF_TOKEN=${HF_TOKEN?"Required variable HF_TOKEN"}
+export NEMO_HOME=${NEMO_HOME:-$STAGE_PATH}
+export NEMORUN_HOME=${NEMORUN_HOME:-$STAGE_PATH}
+export HF_HOME=${HF_HOME:-$STAGE_PATH}
 
-export MODEL_SIZE=${MODEL_SIZE,,}
-export DTYPE=${DTYPE:-fp8}
-export DTYPE=${DTYPE,,}
-if [[ "${DTYPE}" = fp8 ]]; then
-  export FP8_ENABLED=true
-else
-  export FP8_ENABLED=false
+export MAX_STEPS=${MAX_STEPS:-50}
+export DTYPE=${DTYPE:-bf16}
+export MODEL_SIZE=${MODEL_SIZE:-8b}
+export JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:-8}
+export GPUS_PER_NODE=${GPUS_PER_NODE:-8}
+export TIME_LIMIT=${TIME_LIMIT:-"00:30:00"}
+
+export DISABLE_PERFRUN=${DISABLE_PERFRUN:-false}
+export ENABLE_PROFILE=${ENABLE_PROFILE:-false}
+export ENABLE_NCCLTRACE=${ENABLE_NCCLTRACE:-false}
+export ENABLE_CHECKPOINT=${ENABLE_CHECKPOINT:-false}
+export ENABLE_CHECKPOINT=${ENABLE_CHECKPOINT,,}
+
+export PROFILE_START_STEP=${PROFILE_START_STEP:-20}
+export PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-25}
+
+
+export OPTIMIZATION_NAME=${OPTIMIZATION_NAME:-""}
+export OPTIMIZATION_CODE=${OPTIMIZATION_CODE:-""}
+
+if [[ -n ${LOAD_CHECKPOINT_PATH-} ]]; then
+  MAX_STEPS=1
 fi
 
-export JOB_TOTAL_GPUS=${SBATCH_GPUS:-$(( ${SLURM_JOB_NUM_NODES} * ${SLURM_NTASKS_PER_NODE} ))}
-
-GSW_VERSION_SUFFIX=""
-if [[ "${NCCL_TRACE_ENABLED,,}" = true ]]; then
-  echo "NCCL tracing enabled. Large log files will be stored in a dedicated folder"
-  GSW_VERSION_SUFFIX="-nccl-trace"
+EXTRAS=""
+if [[ $DISABLE_PERFRUN = true ]]; then EXTRAS+="-dp "; fi
+if [[ $ENABLE_PROFILE = true ]]; then 
+  EXTRAS+="-ns "
+  EXTRAS+="--profiling_start_step=$PROFILE_START_STEP "
+  EXTRAS+="--profiling_stop_step=$PROFILE_STOP_STEP "
+  MAX_STEPS=$PROFILE_STOP_STEP
 fi
+if [[ $ENABLE_NCCLTRACE = true ]]; then EXTRAS+="-nt "; fi
+if [[ $OPTIMIZATION_NAME != "" ]]; then EXTRAS+="-on \"${OPTIMIZATION_NAME}\" -oc \"${OPTIMIZATION_CODE}\" "; fi
 
-export RESULT_DIR=${RUN_CONF_RESULT_DIR:-$STAGE_PATH/results/${GSW_VERSION}${GSW_VERSION_SUFFIX}/$DTYPE/$MODEL_SIZE/$JOB_TOTAL_GPUS}
-export RESULT_FILES_NAME=log-${FRAMEWORK}_${MODEL}_${MODEL_SIZE}_${JOB_TOTAL_GPUS}
+#run command
+pushd $LLMB_PATH/NeMo
+python3 -m scripts.performance.llm.pretrain_llama31 -a $SBATCH_ACCOUNT -p $SBATCH_PARTITION -t $TIME_LIMIT -l $NEMORUN_HOME -i $IMAGE -m $MODEL_SIZE -c $DTYPE -ms $MAX_STEPS -ng $JOB_TOTAL_GPUS -gn $GPUS_PER_NODE -hf $HF_TOKEN -fw $FW_VERSION -gsw $GSW_VERSION ${EXTRAS}
 
-export DATA_DIR=$STAGE_PATH/llama3.1-dataset
-export INDEX_MAPPING_DIR=${RUN_CONF_INDEX_DIR:-$STAGE_PATH}/index_mapping
-
-mkdir -p "$RESULT_DIR"
-mkdir -p $INDEX_MAPPING_DIR
-
-# SRUN_OUTPUT and SRUN_ERROR are Slurm environment variables to control output/error file locations.
-export SLURM_MPI_TYPE=${SLURM_MPI_TYPE:-"pmix"}
-export SRUN_OUTPUT=${SRUN_OUTPUT-${RESULT_DIR}/${RESULT_FILES_NAME}_%j.out}
-export SRUN_ERROR=${SRUN_ERROR-${RESULT_DIR}/${RESULT_FILES_NAME}_%j.err}
-
-srun \
-  --container-image "$IMAGE" \
-  --container-mounts $RESULT_DIR,$INDEX_MAPPING_DIR,$DATA_DIR:/dataset,$STAGE_PATH/cfg:/cfg,$STAGE_PATH/configure.sh:/gsw/configure.sh,$STAGE_PATH/megatron-gpt2-345m:/megatron-gpt2-345m \
-  --container-writable \
-  --no-container-mount-home bash -c "source /gsw/configure.sh && launch"
+popd

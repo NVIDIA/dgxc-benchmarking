@@ -1,51 +1,63 @@
 #!/bin/bash
-
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: MIT
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
 #
-# http://www.apache.org/licenses/LICENSE-2.0
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
 
-# For each dataset a user elects to use, the user is responsible for
-# checking if the dataset license is fit for the intended purpose.
-
-#SBATCH --exclusive
-#SBATCH --mem=0
-#SBATCH --time=00:45:00
-
+# Parameters
+#SBATCH --time=1:00:00
 set -eu -o pipefail
 
-export HF_TOKEN=${HF_TOKEN?"Required variable HF_TOKEN"}
-export FW_VERSION=24.12
-# create staging folder
-mkdir -vp $STAGE_PATH/cfg
+if [ ${BASH_VERSION:0:1} -lt 4 ] || [ ${BASH_VERSION:0:1} -eq 4 -a ${BASH_VERSION:2:1} -lt 2 ]; then
+    printf "Unsupported %s version: %s\n" "${BASH}" "${BASH_VERSION}" >&2
+    echo "Requires Bash 4.2 or greater." >&2
+    exit 1
+fi
 
-# copy configs to stagepath
-cp -vf llama3*.yaml "${STAGE_PATH}/cfg"
 
-cp -vf gen*.sh configure.sh launch.sh $STAGE_PATH
+export FW_VERSION=25.02.01
 
-# create the squash file
+export NEMO_DIR="NeMo"
+export NEMO_COMMIT="d2b21556f2455b52ad7217f334bb66eaa13c0f83"
+export MEGATRON_COMMIT="ee6737da824b18f945946b4c798adf2328374cb7"
+export NEMO_RUN_COMMIT="fb550a3738768fbf1100e1579f3ca0e2207c6487"
+
+LLM_REPO=$PWD
+
+# 1. Clone the NeMo source code
+#Setup NeMo 
+if [ ! -d "$NEMO_DIR" ]; then
+    git clone https://github.com/NVIDIA/NeMo
+    cd $NEMO_DIR
+    git checkout $NEMO_COMMIT
+    git apply $LLM_REPO/gsw_nemo.patch
+    ./reinstall.sh
+fi
+
+# Copy launch scripts to NeMo performance scripts directory
+cp $LLM_REPO/*.py $LLM_REPO/NeMo/scripts/performance/llm/
+
+# 2. Install dependencies
+pip install 'scipy<1.13.0' # a workaround for compatibility issue
+pip install megatron-core@git+https://github.com/NVIDIA/Megatron-LM.git@$MEGATRON_COMMIT
+pip install nemo_run@git+https://github.com/NVIDIA/NeMo-Run.git@$NEMO_RUN_COMMIT
+
+# 3. Squash image file
 srun bash -c "enroot import --output ${STAGE_PATH}/nvidia+nemo+${FW_VERSION}.sqsh docker://nvcr.io#nvidia/nemo:${FW_VERSION}"
 
-# copy out the configuration from the container to the $STAGE_PATH
-# this is required for data set generation.
-srun --container-mounts=$STAGE_PATH --container-image="$STAGE_PATH/nvidia+nemo+24.12.sqsh" bash -c "cp -r /opt/NeMo-Framework-Launcher/launcher_scripts $STAGE_PATH; cp /opt/NeMo-Framework-Launcher/requirements.txt $STAGE_PATH"
-
-# install required Python modules for generating dataset
-pip install -r "$STAGE_PATH/requirements.txt"
-
-# download Llama 3 tokenizer files from huggingface meta-llama/Meta-Llama-3-8B for data prep and training
-huggingface-cli download --force-download --local-dir "$STAGE_PATH/llama3.1-dataset/llama" meta-llama/Meta-Llama-3-8B config.json special_tokens_map.json tokenizer.json tokenizer_config.json generation_config.json
-
-mkdir -vp $STAGE_PATH/megatron-gpt2-345m
-huggingface-cli download --force-download --local-dir "$STAGE_PATH/megatron-gpt2-345m" nvidia/megatron-gpt2-345m tokenizer.json vocab.json merges.txt

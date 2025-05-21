@@ -96,7 +96,7 @@ We reference a number of Slurm commands and parameters in this document. A brief
 These parameters can be set either by exporting the environment variable or using the corresponding `sbatch` flag.
 
 ## Workload Setup
-Create a staging area by running the attached setup.sh. The script converts the docker image from nvcr.io/nvidia/nemo:24.12 to the nvidia+nemo+24.12.sqsh file under the $STAGE_PATH folder and copies NeMo Launcher code from the container.
+Create a staging area by running the attached setup.sh. The script converts the docker image from the registry to a sqsh file under the $STAGE_PATH folder and copies NeMo Launcher code from the container.
 
 ```shell
 # Set the path where all artifacts will be downloaded
@@ -136,13 +136,13 @@ Due to overhead while profiling: the results generated with these settings is no
 
 ## Run Nsight Profiling
 
-Nsight Systems is included in our containers. To enable profiling with Nsight Systems set variable `ENABLE_PROFILE=true` when submitting your job.
+To enable profiling with Nsight Systems set variable `ENABLE_PROFILE=true` when submitting your job. The job will run for a total of 25 steps where steps 20-25 will be profiled.
 
 In order to view the resulting profiles, ensure you have the latest version of Nsight Systems installed. For more information visit: [Nsight Systems](https://docs.nvidia.com/nsight-systems/)
 
 ### Default Profiling Settings:
 * **MPI Ranks:** 0-8
-* **Job Steps:** 20-30
+* **Job Steps:** 20-25
 * **Output Location:** .nsys-rep files are saved in the nsys folder within the existing results directory.
 * **Filename format:** `${MODEL}-${MODEL_SIZE}-${DTYPE}_${NUM_GPUS}g_${SLURM_JOB_ID}_${SLURM_NODEID}_${SLURM_LOCALID}.nsys-rep`
 
@@ -155,7 +155,7 @@ ENABLE_PROFILE=true DTYPE=<fp8/bf16> sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PAR
   * `RUN_CONF_PROFILE_START_STEP`: start profiling on this job step.
     Default: 20
   * `RUN_CONF_PROFILE_STOP_STEP`: stop profiling on this job step.
-    Default: 30
+    Default: 25
 * Select MPI ranks to profile:
   * `RUN_CONF_PROFILE_RANKS`: Comma-separated list of MPI ranks to profile.
     Example: "0,1,2,3"

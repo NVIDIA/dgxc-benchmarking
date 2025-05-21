@@ -115,10 +115,10 @@ Follow the steps below on your Slurm login node
       ```
 
 ## Run Inference
-1. Run sbatch.sh script 
+1. Run launch.sh script 
       
       ```shell
-      sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N 1 sbatch.sh
+      sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N 1 launch.sh
       ```
       You should then see
       

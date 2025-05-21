@@ -6,6 +6,19 @@ This variant of the workload is best-suited for GPU clusters with:
 * At least 128 GPUs with at least 80 GB memory each. Training of this 70-billion parameter variant of the workload will not fit on fewer GPUs with less memory.
 * This workload runs with BF16 or FP8 precision. FP8 is only supported by H100 GPUs. BF16 recipes are suitable for both A100 and H100 GPUs.
 
+| Size | Precision | GPUs | SeqLen | Layers | dcn_TP | dcn_FSDP | dcn_DP | ici_TP | ici_FSDP | ici_DP | per_device_batch_size | GBS  | GA  |
+|------|:---------:|:----:|:------:|:------:|:------:|:--------:|:------:|:------:|:--------:|:------:|:---------------------:|:----:|:---:|
+| 70b  | BF16      | 128  | 8192   | 80     | 1   | 16  | 1   | 1   | 8   | 1   | 2   | 256  | 1 |
+| 70b  | BF16      | 256  | 8192   | 80     | 1   | 32  | 1   | 1   | 8   | 1   | 2   | 512  | 1 |
+| 70b  | BF16      | 512  | 8192   | 80     | 1   | 16  | 4   | 1   | 8   | 1   | 2   | 1024 | 1 |
+| 70b  | BF16      | 1024 | 8192   | 80     | 1   | 16  | 8   | 1   | 8   | 1   | 2   | 2048 | 1 |
+| 70b  | BF16      | 2048 | 8192   | 80     | 1   | 16  | 16  | 1   | 8   | 1   | 2   | 4096 | 1 |
+| 70b  | FP8       | 128  | 8192   | 80     | 1   | 16  | 1   | 1   | 8   | 1   | 2   | 256  | 1 |
+| 70b  | FP8       | 256  | 8192   | 80     | 1   | 32  | 1   | 1   | 8   | 1   | 2   | 512  | 1 |
+| 70b  | FP8       | 512  | 8192   | 80     | 1   | 16  | 4   | 1   | 8   | 1   | 2   | 1024 | 1 |
+| 70b  | FP8       | 1024 | 8192   | 80     | 1   | 16  | 8   | 1   | 8   | 1   | 2   | 2048 | 1 |
+| 70b  | FP8       | 2048 | 8192   | 80     | 1   | 16  | 16  | 1   | 8   | 1   | 2   | 4096 | 1 |
+
 # Expected Performance
 
 Performance for Maxtext Llama3 training is measured by seconds per iteration, or in other words seconds per training step. This metric is logged for every training step in a .out file which is generated inside of the `$STAGE_PATH/results/$GSW_VERSION/$DTYPE/70b/$JOB_TOTAL_GPUS` folder. 
@@ -48,14 +61,14 @@ MFU = 256 * 3.94E+15 / 15.570 / 128 / 989E+12 = 51.17%
 ```
 
 
-| Maxtext Llama3 70b BF16 (FSDP+DP MBS=2) | Throughput on 128x H100 GPUs (FSDP=128 GBS=256) | Throughput on 256x H100 GPUs (FSDP=256 GBS=512) | Throughput on 512x H100 GPUs (FSDP=128 GBS=1024) | Throughput on 1024x H100 GPUs (FSDP=128 GBS=2048) | Throughput on 2048x H100 GPUs (FSDP=128 GBS=4096) | 
+| Maxtext Llama3 70b BF16 | Throughput on 128x H100 GPUs | Throughput on 256x H100 GPUs | Throughput on 512x H100 GPUs | Throughput on 1024x H100 GPUs | Throughput on 2048x H100 GPUs | 
 |---:|:---:|:---:|:---:|:---:|:---:|
 | Training step time (seconds per step) | 15.563 | 15.444 | 15.519 | 15.603 | 15.898 |
 | Throughput in tokens per second | 134752.43 | 271581.46 | 540537.92 | 1075255.78 | 2110607.12 |
 | Model flops utilization | 51.20% | 51.59% | 51.34% | 51.06% | 50.12% |
 | Time to train 1T tokens in days | 85.89 | 42.62 | 21.41 | 10.76 | 5.48 |
 
-| Maxtext Llama3 70b FP8 (FSDP+DP MBS=2) | Throughput on 128x H100 GPUs (FSDP=128 GBS=256) | Throughput on 256x H100 GPUs (FSDP=256 GBS=512) | Throughput on 512x H100 GPUs (FSDP=128 GBS=1024) | Throughput on 1024x H100 GPUs (FSDP=128 GBS=2048) | Throughput on 2048x H100 GPUs (FSDP=128 GBS=4096) | 
+| Maxtext Llama3 70b FP8 | Throughput on 128x H100 GPUs | Throughput on 256x H100 GPUs | Throughput on 512x H100 GPUs | Throughput on 1024x H100 GPUs | Throughput on 2048x H100 GPUs | 
 |---:|:---:|:---:|:---:|:---:|:---:|
 | Training step time (seconds per step) | 9.074 | 9.488 | 9.244 | 9.483 | 9.339 |
 | Throughput in tokens per second  | 231116.60 | 442064.08 | 907465.17 | 1769188.65 | 3592936.29 |
@@ -123,10 +136,33 @@ Nsight profiling is used as part of this benchmark. See [Run Nsight Profiling](#
 The workload uses [PGLE](See https://github.com/google/paxml?tab=readme-ov-file#run-pgle-workflow-on-gpu) and turns on Nsight profiling by default. The profiles are located at `$STAGE_PATH/results/$GSW_VERSION/${DTYPE}/70b/$JOB_TOTAL_GPUS/nsys`.
 
 Each job generates two nsys-rep files:
-- `*-prof.nsys-rep` is the PGLE profiling run at the start of the benchmark.
-- `*-perf.nsys-rep` is the profile taken during the performace run. Use **this** profile when debugging performance issues.
+-  PGLE profiling run at the start of the benchmark. 
+-  Profile taken during the performace run. Use **this** profile when debugging performance issues.
 
-Options to customize profiling behaviour are not currently available for this workload. GPU device metrics capture is not currently supported for this workload.
+Profiling for performance runs in MaxText is performed **only on Global Rank 0**. This is intentional, as MaxText enables profiling exclusively for Global Rank 0, as detailed in the [profiler source code](https://github.com/AI-Hypercomputer/maxtext/blob/63c0c278f882469feebd3926fca82a8a6ff853d2/MaxText/profiler.py#L48).
+
+### Profiling Details
+- **Ranks Profiled:** 0 (Global Rank 0 only)
+- **Job Steps Profiled:** 10–15
+- **Output Location:**
+  PGLE profiling run files are saved in the `pgle` folder within the existing results directory.
+  Performance run files are saved in the `nsys` folder within the existing results directory.
+* **Filename format:** `${MODEL}-${MODEL_SIZE}-${DTYPE}_${JOB_TOTAL_GPUS}g_${SLURM_JOB_ID}_%q{SLURM_NODEID}_%q{SLURM_PROCID}.nsys-rep`
+
+### Customizing profiling behavior:
+* Specify job steps to profile:
+	* `RUN_CONF_PROFILE_START_STEP`: start profiling on this job step. Default: 10
+	* `RUN_CONF_PROFILE_STOP_STEP`: stop profiling on this job step. Default: 15
+* Enable GPU device metrics capture:
+	* `RUN_CONF_PROFILE_GPU_METRICS`: boolean, set to 'false' to capture device metrics.
+	- Default: false
+	- **Note:** Additional system configuration is required for GPU device metrics to work.
+
+**Example customized profiling command:**
+```shell
+ENABLE_PROFILE=true RUN_CONF_PROFILE_GPU_METRICS=true DTYPE=<fp8/bf16> sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N ${NUM_NODES} ./launch.sh
+```
+
 
 ### Viewing results
 

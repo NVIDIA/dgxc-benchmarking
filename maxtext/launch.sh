@@ -1,24 +1,27 @@
 #!/bin/bash
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: MIT
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
 #
-# http://www.apache.org/licenses/LICENSE-2.0
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-# For each dataset a user elects to use, the user is responsible for
-# checking if the dataset license is fit for the intended purpose.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
 
 # Parameters
-#SBATCH --job-name=maxtext_llama2
+#SBATCH --job-name=maxtext_llama3
 #SBATCH --dependency=singleton
 #SBATCH --exclusive
 #SBATCH --mem=0
@@ -32,11 +35,17 @@ fi
 
 set -eu -o pipefail
 
-export GSW_VERSION=25.02
+LAUNCH_PATH="$PWD" # dir of this script
+LLMB_PATH="${LAUNCH_PATH%/*}" # parent dir
+
+# common functions
+source $LLMB_PATH/common/common-utils.sh
+
 export FRAMEWORK=maxtext
 export MODEL=llama3
 export MODEL_SIZE=70b
 export FW_VERSION=25.01
+export GSW_VERSION=25.04
 
 export IMAGE=${RUN_CONF_IMAGE:-$STAGE_PATH/nvidia+jax+maxtext-${FW_VERSION}.sqsh}
 
@@ -46,26 +55,36 @@ export OPTIMIZATION_CODE=${OPTIMIZATION_CODE-""}
 export DTYPE=${DTYPE:-fp8}
 export DTYPE=${DTYPE,,}
 
+# only synthetic data is supported by the benchmark currently
+SYNTHETIC_DATA_ENABLED=true
+
+# `eval` is needed to expand shell vars that might be in RUN_CONF_RESULT_DIR, such as `$SLURM_JOB_ID`
+# otherwise, using RUN_CONF_RESULT_DIR=/path/to/results/${SLURM_JOB_ID} might create a directory named as such verbatim,
+# instead of /path/to/results/12345/
+RUN_CONF_RESULT_DIR=$(eval echo "${RUN_CONF_RESULT_DIR:-}")
+
 export JOB_TOTAL_GPUS=${SBATCH_GPUS:-$(( ${SLURM_JOB_NUM_NODES} * ${SLURM_NTASKS_PER_NODE} ))}
 
-export RESULT_DIR=$STAGE_PATH/results/$GSW_VERSION/$DTYPE/$MODEL_SIZE/$JOB_TOTAL_GPUS
+export RESULT_DIR=${RUN_CONF_RESULT_DIR:-$STAGE_PATH/results/${GSW_VERSION}/$DTYPE/$MODEL_SIZE/$JOB_TOTAL_GPUS}
 export RESULT_FILES_NAME=log-${FRAMEWORK}_${MODEL}_${MODEL_SIZE}_${JOB_TOTAL_GPUS}
 
 mkdir -p $RESULT_DIR
+
+CONTAINER_MOUNTS="$LAUNCH_PATH/configure.sh:/gsw/configure.sh,$LLMB_PATH/common:/gsw/common,$RESULT_DIR"
+if [[ -n "${RUN_CONF_EXTRA_MOUNTS:-""}" ]]; then
+  CONTAINER_MOUNTS+=",${RUN_CONF_EXTRA_MOUNTS}"
+fi
 
 # SRUN_OUTPUT and SRUN_ERROR are Slurm environment variables to control output/error file locations.
 export SLURM_MPI_TYPE=${SLURM_MPI_TYPE:-"pmix"}
 export SRUN_OUTPUT=${SRUN_OUTPUT-${RESULT_DIR}/${RESULT_FILES_NAME}_%j.out}
 export SRUN_ERROR=${SRUN_ERROR-${RESULT_DIR}/${RESULT_FILES_NAME}_%j.err}
 
+configure_pinning
+
 srun \
   --container-image "$IMAGE" \
-  --container-mounts "$RESULT_DIR,$STAGE_PATH/cfg:/cfg" \
+  --container-mounts "$CONTAINER_MOUNTS" \
+  "${SRUN_PIN_ARGS[@]}" \
   --container-writable \
-  --no-container-mount-home bash -c " \
-  source /cfg/configure.sh && \
-  set_profile_environment && \
-  run_profiling && \
-  generate_pbtxt && \
-  set_performance_environment && \
-  run_performance"
+  --no-container-mount-home bash -c "source /gsw/configure.sh && launch"

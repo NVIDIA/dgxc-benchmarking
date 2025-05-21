@@ -1,0 +1,26 @@
+diff --git a/nemo/collections/llm/recipes/llama3_70b.py b/nemo/collections/llm/recipes/llama3_70b.py
+index 8b61bff80..68ff1f0fc 100644
+--- a/nemo/collections/llm/recipes/llama3_70b.py
++++ b/nemo/collections/llm/recipes/llama3_70b.py
+@@ -358,7 +358,7 @@ def finetune_performance_optimizations(
+         It may not be suitable for all hardware configurations or use cases.
+     """
+ 
+-    if not hasattr(recipe.trainer, "callbacks"):
++    if not hasattr(recipe.trainer, "callbacks") or recipe.trainer.callbacks is None:
+         recipe.trainer.callbacks = []
+ 
+     if peft_scheme is None or peft_scheme.lower() == 'none':
+diff --git a/nemo/collections/llm/recipes/llama3_8b.py b/nemo/collections/llm/recipes/llama3_8b.py
+index 36b20c12d..65b5b94f5 100644
+--- a/nemo/collections/llm/recipes/llama3_8b.py
++++ b/nemo/collections/llm/recipes/llama3_8b.py
+@@ -338,7 +338,7 @@ def finetune_performance_optimizations(
+     """
+     recipe.trainer.strategy.tensor_model_parallel_size = 1
+ 
+-    if not hasattr(recipe.trainer, "callbacks"):
++    if not hasattr(recipe.trainer, "callbacks") or recipe.trainer.callbacks is None:
+         recipe.trainer.callbacks = []
+ 
+     if peft_scheme is None or peft_scheme.lower() == 'none':

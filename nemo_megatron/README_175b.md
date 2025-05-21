@@ -6,6 +6,13 @@ This variant of the workload is best-suited for GPU clusters with:
 * At least 128 GPUs with at least 80 GB memory each. Training of this 175-billion parameter variant of the workload will not fit on fewer GPUs with less memory.
 * This workload runs with BF16 or FP8 precision. 
 
+| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
+|------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
+| 175b | BF16/FP8  | 128  | 2048   | 96     | 4   | 8   | 1   | NA  | 4   | 6   | 1   | 256  | 64  |
+| 175b | BF16/FP8  | 256  | 2048   | 96     | 4   | 8   | 1   | NA  | 8   | 6   | 1   | 512  | 64  |
+| 175b | BF16/FP8  | 512  | 2048   | 96     | 4   | 8   | 1   | NA  | 16  | 6   | 1   | 1204 | 64  |
+| 175b | BF16/FP8  | 1024 | 2048   | 96     | 4   | 8   | 1   | NA  | 32  | 6   | 1   | 2048 | 64  |
+| 175b | BF16/FP8  | 2048 | 2048   | 96     | 4   | 8   | 1   | NA  | 64  | 6   | 1   | 4096 | 64  |
 
 # Expected Performance
 
@@ -51,14 +58,14 @@ model flops = 2.20E+15
 MFU = 256 * 2.20E+15 / 5.90 / 128 / 1979E+12 = 37.68%
 ```
 
-| NeMo Megatron BF16 (TP=4,PP=8, MBS=1, VP=12, SEQ=2048) | 128x H100 GPUs (GBS=256) | 256x H100 GPUs (GBS=512) | 512x H100 GPUs (GBS=1024) | 1024x H100 GPUs (GBS=2048) | 2048x H100 GPUs (GBS=4096)
+| NeMo Megatron BF16 | 128x H100 GPUs | 256x H100 GPUs | 512x H100 GPUs | 1024x H100 GPUs | 2048x H100 GPUs 
 |---|:---:|:---:|:---:|:---:|:---:|
 | Training step time (seconds per step) | 8.309 | 8.408 | 8.42 | 8.453 | 8.49
 | Throughput in tokens per second | 63099 | 124712 | 249068 | 496191 | 988057 
 | Model flops utilization | 53.54% | 52.91% | 52.84% | 52.63% | 52.40% 
 | Time to train 1T tokens in days | 183 | 93 | 46 | 23 | 12
 
-| NeMo Megatron FP8 (TP=4,PP=8, MBS=1, VP=12, SEQ=2048) | 128x H100 GPUs (GBS=256) | 256x H100 GPUs (GBS=512) | 512x H100 GPUs (GBS=1024) | 1024x H100 GPUs (GBS=2048) | 2048x H100 GPUs (GBS=4096)
+| NeMo Megatron FP8  | 128x H100 GPUs | 256x H100 GPUs | 512x H100 GPUs | 1024x H100 GPUs | 2048x H100 GPUs 
 |---|:---:|:---:|:---:|:---:|:---:|
 | Training step time (seconds per step) | 5.626 | 5.725 | 5.774 | 5.82 | 5.96
 | Throughput in tokens per second | 93190 | 183157 | 363206 | 720671 | 1407485
@@ -106,6 +113,9 @@ Submit the generate_dataset.sh script. The script launches several Slurm jobs th
 
 
 ```shell
+# this has been tested with python 3.9. If you are using conda for virtual environment you can run
+# conda create -n py39 python=3.9 && conda activate py39
+pip install -r $STAGE_PATH/requirements.txt
 sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} -N 1 ./generate_dataset.sh
 ```
 
@@ -165,13 +175,13 @@ Due to overhead while profiling: the results generated with these settings is no
 
 ## Run Nsight Profiling
 
-Nsight Systems is included in our containers. To enable profiling with Nsight Systems set variable `ENABLE_PROFILE=true` when submitting your job.
+To enable profiling with Nsight Systems set variable `ENABLE_PROFILE=true` when submitting your job. The job will run for a total of 25 steps where steps 20-25 will be profiled.
 
 In order to view the resulting profiles, ensure you have the latest version of Nsight Systems installed. For more information visit: [Nsight Systems](https://docs.nvidia.com/nsight-systems/)
 
 ### Default Profiling Settings:
 * **MPI Ranks:** 0-8
-* **Job Steps:** 20-30
+* **Job Steps:** 20-25
 * **Output Location:** .nsys-rep files are saved in the nsys folder within the existing results directory.
 * **Filename format:** `${MODEL}-${MODEL_SIZE}-${DTYPE}_${NUM_GPUS}g_${SLURM_JOB_ID}_${SLURM_NODEID}_${SLURM_LOCALID}.nsys-rep`
 
@@ -184,7 +194,7 @@ ENABLE_PROFILE=true DTYPE=<fp8/bf16> sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PAR
 	* `RUN_CONF_PROFILE_START_STEP`: start profiling on this job step.
 	  Default: 20
 	* `RUN_CONF_PROFILE_STOP_STEP`: stop profiling on this job step.
-	  Default: 30
+	  Default: 25
 * Select MPI ranks to profile:
 	* `RUN_CONF_PROFILE_RANKS`: Comma-separated list of MPI ranks to profile.
 	  Example: "0,1,2,3"

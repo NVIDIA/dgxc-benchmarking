@@ -1,21 +1,24 @@
 #!/bin/bash
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: MIT
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
 #
-# http://www.apache.org/licenses/LICENSE-2.0
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-# For each dataset a user elects to use, the user is responsible for
-# checking if the dataset license is fit for the intended purpose.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
 
 # Parameters
 #SBATCH --job-name=nemo_megatron
@@ -32,14 +35,19 @@ fi
 
 set -eu -o pipefail
 
+LAUNCH_PATH="$PWD" # dir of this script
+LLMB_PATH="${LAUNCH_PATH%/*}" # parent dir
+
+# common functions
+source $LLMB_PATH/common/common-utils.sh
+
 export FRAMEWORK=nemo
 export MODEL=megatron
 export MODEL_SIZE=175b
-export GSW_VERSION=25.02
+export GSW_VERSION=25.04
 export FW_VERSION=24.12
 
-export IMAGE=${RUN_CONF_IMAGE:-$STAGE_PATH/nvidia+nemo+24.12.sqsh}
-export NCCL_TRACE_ENABLED=${ENABLE_NCCL_TRACE:-false}
+export IMAGE=${RUN_CONF_IMAGE:-$STAGE_PATH/nvidia+nemo+${FW_VERSION}.sqsh}
 
 export SLURM_NTASKS_PER_NODE=${RUN_CONF_GPU_PER_NODE:-8}
 export OPTIMIZATION_NAME=${OPTIMIZATION_NAME-""}
@@ -59,6 +67,7 @@ RUN_CONF_RESULT_DIR=$(eval echo "${RUN_CONF_RESULT_DIR:-}")
 
 export JOB_TOTAL_GPUS=${SBATCH_GPUS:-$(( ${SLURM_JOB_NUM_NODES} * ${SLURM_NTASKS_PER_NODE} ))}
 
+export NCCL_TRACE_ENABLED=${ENABLE_NCCL_TRACE:-false}
 GSW_VERSION_SUFFIX=""
 if [[ "${NCCL_TRACE_ENABLED,,}" = true ]]; then
   echo "NCCL tracing enabled. Large log files will be stored in a dedicated folder"
@@ -75,7 +84,7 @@ mkdir -p $RESULT_DIR
 mkdir -p $INDEX_MAPPING_DIR
 mkdir -p $DATA_DIR
 
-CONTAINER_MOUNTS="$STAGE_PATH/cfg:/cfg,$STAGE_PATH/configure.sh:/gsw/configure.sh,$RESULT_DIR,$INDEX_MAPPING_DIR,${DATA_DIR}:/datasets/"
+CONTAINER_MOUNTS="$LAUNCH_PATH/cfg:/cfg,$LAUNCH_PATH/configure.sh:/gsw/configure.sh,$LLMB_PATH/common:/gsw/common,$RESULT_DIR,$INDEX_MAPPING_DIR,${DATA_DIR}:/datasets/"
 if [[ -n "${RUN_CONF_EXTRA_MOUNTS:-""}" ]]; then
   CONTAINER_MOUNTS+=",${RUN_CONF_EXTRA_MOUNTS}"
 fi
@@ -85,8 +94,11 @@ export SLURM_MPI_TYPE=${SLURM_MPI_TYPE:-"pmix"}
 export SRUN_OUTPUT=${SRUN_OUTPUT-${RESULT_DIR}/${RESULT_FILES_NAME}_%j.out}
 export SRUN_ERROR=${SRUN_ERROR-${RESULT_DIR}/${RESULT_FILES_NAME}_%j.err}
 
+configure_pinning
+
 srun \
   --container-image "$IMAGE" \
   --container-mounts "$CONTAINER_MOUNTS" \
+  "${SRUN_PIN_ARGS[@]}" \
   --container-writable \
   --no-container-mount-home bash -c "source /gsw/configure.sh && launch"

@@ -1,25 +1,31 @@
 #!/bin/bash
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: MIT
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
 #
-# http://www.apache.org/licenses/LICENSE-2.0
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-# For each dataset a user elects to use, the user is responsible for
-# checking if the dataset license is fit for the intended purpose.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
 
 set -eu -o pipefail
 
-export GSW_VERSION=${GSW_VERSION?"Required variable GSW_VERSION is not set in the container. Aborting"}
+# common functions
+source /gsw/common/common-utils.sh
+source /gsw/common/nemo/nemo-utils.sh
+export GSW_VERSION=${GSW_VERSION?"Required variable GSW_VERSION is not set. Aborting"}
 
 # disabled checkpointing
 export CHECKPOINT_ENABLED=false
@@ -27,8 +33,9 @@ export CHECKPOINT_ENABLED=false
 # only synthetic data is supported by the benchmark currently
 export SYNTHETIC_DATA_ENABLED=true
 
-# only profiling enabled is supported by the benchmark currently due to PGLE
-export PROFILE_ENABLED=true
+# This option configures whether profiling is run during the benchmark section of code.
+# Profiling is always enabled at the beginning to support PGLE.
+export PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 
 MBS=2
 ici_TP=1
@@ -88,6 +95,8 @@ HLO_DUMP_PATH="${RESULT_DIR}/hlo_logs/${HLO_NAME}"
 
 PGLE_PROFILE_PATH="${RESULT_DIR}/lhs_pbtxt/${RUN_NAME}.pbtxt"
 
+inject_optimizations
+
 BASE_XLA_FLAGS="--xla_gpu_enable_triton_gemm=false \
   --xla_gpu_graph_level=0 \
   --xla_gpu_enable_highest_priority_async_stream=true \
@@ -129,14 +138,16 @@ BASE_CONFIG="use_iota_embed=true \
   enable_goodput_recording=False \
   profiler=nsys \
   skip_first_n_steps_for_profiler=9 \
-  profiler_steps=3 \
-  ${CONFIG_OVERRIDES}"
+  profiler_steps=5 "
 
 export MAX_STEPS=${RUN_CONF_MAX_STEPS:-50}
 
 export INFO_STR="GSW: MODEL=${MODEL} FRAMEWORK=${FRAMEWORK} MODEL_SIZE=${MODEL_SIZE} JOB_NUM_NODES=${SLURM_JOB_NUM_NODES} GPUS_PER_NODE=${SLURM_NTASKS_PER_NODE} DTYPE=${DTYPE} SYNTHETIC_DATA=${SYNTHETIC_DATA_ENABLED^} GSW_VERSION=${GSW_VERSION} FW_VERSION=${FW_VERSION} IMAGE='${IMAGE}' JOB_ID=${SLURM_JOB_ID} JOB_MODE=training OPTIMIZATION_NAME='${OPTIMIZATION_NAME}' OPTIMIZATION_CODE='${OPTIMIZATION_CODE}' BASE_CONFIG='${BASE_CONFIG}'  MBS=$MBS ici_TP=$ici_TP ici_FSDP=$ici_FSDP ici_DP=$ici_DP dcn_TP=$dcn_TP dcn_FSDP=$dcn_FSDP dcn_DP=$dcn_DP AR_THRESHOLD=$AR_THRESHOLD AG_THRESHOLD=$AG_THRESHOLD RS_THRESHOLD=$RS_THRESHOLD MEM_FRACTION=$MEM_FRACTION POLICY=$POLICY QUANTIZATION=$QUANTIZATION"
 
 echo $INFO_STR
+
+#Updating the BASE_CONFIG with the CONFIG_OVERRIDE after printing the INFO_STR
+BASE_CONFIG+=" "$CONFIG_OVERRIDES
 
 export XLA_PYTHON_CLIENT_MEM_FRACTION=${MEM_FRACTION}
 export CUDA_DEVICE_MAX_CONNECTIONS=16
@@ -146,6 +157,7 @@ eval $ENV_VARS
 
 set_profile_environment() {
   mkdir -p ${RESULT_DIR}/nsys/
+  mkdir -p ${RESULT_DIR}/pgle/
   mkdir -p ${HLO_DUMP_PATH}
 
   # three false
@@ -163,7 +175,7 @@ run_profiling() {
   PROFILE_RUN_SETTINGS="/opt/maxtext/MaxText/train.py /opt/maxtext/MaxText/configs/base.yml run_name=${RUN_NAME}-prof \
     steps=15 ${BASE_CONFIG}"
 
-  NSYS_OUTPUT_FILE="${RESULT_DIR}/nsys/${RUN_NAME}-prof"
+  NSYS_OUTPUT_FILE="${RESULT_DIR}/pgle/${SLURM_JOB_ID}/${MODEL}-${MODEL_SIZE}-${DTYPE}_${JOB_TOTAL_GPUS}g_${SLURM_JOB_ID}_%q{SLURM_NODEID}_%q{SLURM_PROCID}"
 
   NSYS_CMD="nsys profile -s none -o ${NSYS_OUTPUT_FILE} --force-overwrite true --capture-range=cudaProfilerApi --capture-range-end=stop"
 
@@ -191,17 +203,43 @@ set_performance_environment() {
 }
 
 run_performance() {
+  NSYS_CMD=""
+  PERF_PROFILE_OVERRIDE=""
+  #Aligning profiling options with the rest of the workloads
+  export PROFILE_START_STEP=${RUN_CONF_PROFILE_START_STEP:-10}
+  export PROFILE_STOP_STEP=${RUN_CONF_PROFILE_STOP_STEP:-15}
+  export PROFILE_GPU_METRICS=${RUN_CONF_PROFILE_GPU_METRICS:-false}
+
+  if [[ "${PROFILE_ENABLED,,}" = true ]] && [[ "${SLURM_PROCID}" -eq 0 ]]; then
+    NSYS_EXTRA_OPTIONS=""
+    if  [[ "${PROFILE_GPU_METRICS,,}" = true ]]; then
+      NSYS_EXTRA_OPTIONS="--gpu-metrics-device=all"
+    fi
+
+    PERF_PROFILE_OVERRIDE="skip_first_n_steps_for_profiler=$((RUN_CONF_PROFILE_START_STEP - 1)) \
+    profiler_steps=$((PROFILE_STOP_STEP - PROFILE_START_STEP))"
+
+    NSYS_OUTPUT_FILE="${RESULT_DIR}/nsys/${SLURM_JOB_ID}/${MODEL}-${MODEL_SIZE}-${DTYPE}_${JOB_TOTAL_GPUS}g_${SLURM_JOB_ID}_%q{SLURM_NODEID}_%q{SLURM_PROCID}"
+
+    NSYS_CMD="nsys profile -s none -o ${NSYS_OUTPUT_FILE} --force-overwrite true --capture-range=cudaProfilerApi --capture-range-end=stop ${NSYS_EXTRA_OPTIONS}"
+
+    MAX_STEPS=$PROFILE_STOP_STEP
+  fi
+
   PERF_RUN_SETTINGS="/opt/maxtext/MaxText/train.py /opt/maxtext/MaxText/configs/base.yml run_name=${RUN_NAME}-perf \
-  steps=${MAX_STEPS} ${BASE_CONFIG}"
-
-
-  NSYS_OUTPUT_FILE="${RESULT_DIR}/nsys/${RUN_NAME}-perf"
-
-  NSYS_CMD="nsys profile -s none -o ${NSYS_OUTPUT_FILE} --force-overwrite true --capture-range=cudaProfilerApi --capture-range-end=stop"
+    steps=${MAX_STEPS} ${BASE_CONFIG} ${PERF_PROFILE_OVERRIDE}"
 
   echo "Command: ${NSYS_CMD} python3 ${PERF_RUN_SETTINGS}"
 
   ${NSYS_CMD} python3 ${PERF_RUN_SETTINGS}
 }
 
+function launch() {
+	capture_env
 
+	set_profile_environment
+	run_profiling
+	generate_pbtxt
+	set_performance_environment
+	run_performance
+}

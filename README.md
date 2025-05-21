@@ -51,17 +51,17 @@ The overview page for each workload highlights target performance metrics for th
 
 The following table lists each benchmark used to evaluate the model’s performance, along with their specific configurations.
 
-| Framework | Container Version | Model | Model Size | Type | Max Scale (# of GPUs) | Precision | Model Access Required |
+| Framework | Model | Container Version | Model Size | Type | Max Scale (# of GPUs) | Precision | Model Access Required |
 | --------- | :---------------: | :---- | :--------: | :--- | :-------------------- | :-------- | :-------------------- |
-| NeMo | 24.12, 24.09 | Nemotron4 | 15B, 340B | Pretrain | 2048 | FP8, BF16 | No |
-| NeMo | 24.12 | GPT3      | 175B      | Pretrain | 2048 | FP8, BF16 | No |
-| NeMo | 24.12 | Llama 3.1 | 8B, 70B, 405B | Pretrain | 2304 | FP8, BF16 | Yes |
-| Maxtext | 25.01 | Llama3 | 70B | Pretrain | 2048 | FP8, BF16 | No |
-| NeMo | 24.12 | Grok1 | 314B | Pretrain  | 2048 | FP8, BF16 | No |
-| NeMo | 24.12 | Llama 3 | 8B, 70B | Fine-Tuning (SFT, LORA) | 32 | FP8, BF16 | Yes |
-| NIM | instruct:1.3.3, rerank:1.3, embed:1.3.1 | Llama 3.1 and 3.2 | 70b, 1b | Inference | n/a | n/a | Yes 
-| NIM | 1.0.3 | Llama 3|  70B | Inference | 4 | FP8 | Yes |
-| NIM | 1.7.2 | DeepSeek R1 |  671B | Inference | 16 | FP8 | Yes |
+| NeMo | Nemotron4 | 25.02.01 | 15B, 340B | Pretrain | 2048 | FP8, BF16 | No |
+| NeMo | GPT3      | 24.12 | 175B      | Pretrain | 2048 | FP8, BF16 | No |
+| NeMo | Llama 3.1 | 25.02.01 | 8B, 70B, 405B | Pretrain | 2304 | FP8, BF16 | Yes |
+| Maxtext | Llama3 |  25.01 |70B | Pretrain | 2048 | FP8, BF16 | No |
+| NeMo | Grok1 | 24.12 | 314B | Pretrain  | 2048 | FP8, BF16 | No |
+| NeMo | Llama 3 | 24.12 | 8B, 70B | Fine-Tuning (SFT, LORA) | 32 | FP8, BF16 | Yes |
+| NIM | Llama 3.1 and 3.2 | instruct:1.3.3, rerank:1.3, embed:1.3.1 | 70b, 1b | Inference | n/a | n/a | Yes 
+| NIM | Llama 3 | 1.0.3 | 70B | Inference | 4 | FP8 | Yes |
+| NIM | DeepSeek R1 | 1.7.2 | 671B | Inference | 16 | FP8 | Yes |
 
 
 Baseline performance metrics were using workloads on the NVIDIA DGX H100 Reference Architecture. For more information see [DGX H100 Systems](https://blogs.nvidia.com/blog/dgx-h100-systems-shipping/).
@@ -104,14 +104,6 @@ For optimal performance, users should leverage the correct implementation for th
 ### AWS
 Enable Elastic Fabric Adapter (EFA) support by following the [step-by-step guide](https://docs.aws.amazon.com/sagemaker/latest/dg/your-algorithms-training-efa.html#your-algorithms-training-efa-install). Use the [reference NCCL tests Dockerfile with EFA support](https://github.com/aws-samples/awsome-distributed-training/blob/main/micro-benchmarks/nccl-tests/nccl-tests.Dockerfile). 
 
-  Additionally CPU pinning has been found to improve performance. To enable set these three Slurm flags:
-  1. --cpu-bind=verbose
-     * Displays the pin mask used
-  2. --cpus-per-task=12
-     * How many cores to allocate with each MPI process
-  3. --hint=nomultithread
-     * Do not use any SMT cores. *Note:* these settings are an example based on a dual socket 48 core system. Please adjust for your specific environment.
-
   If you need to build a new docker image, use **setup.sh** script from corresponding benchmark folder to determine the exact base image. The setup.sh will include commands for importing docker image used by the workload: e.g., nemotron/setup.sh includes `"enroot import --output ${STAGE_PATH}/nvidia+nemo+24.12.sqsh docker://nvcr.io#nvidia/nemo:24.12"` which translates into `nvcr.io/nvidia/nemo:24.12` as the base image.
 
 ### GCP
@@ -152,6 +144,52 @@ srun --container-image ${IMAGE} \
    --no-container-mount-home
     <snip> ...
 ```
+
+## Process Pinning
+Process pinning has been found to improve performance for most workloads. We have set defaults that should be broadly applicable. Depending on your exact system configuration these may need to be adjusted to provide optimal performance.
+
+**Prerequisite:** The Slurm `task/affinity` plugin must be configured on your cluster.
+
+For more information on Slurm affinity options see: [Slurm Multi-Core Support README](https://slurm.schedmd.com/mc_support.html)
+
+
+### Default Configuration
+
+The default process pinning configuration uses three key Slurm parameters in our launch scripts:
+
+```shell
+# Calculate cores per task based on available resources
+CPUS_PER_TASK=$(( SLURM_CPUS_ON_NODE / SLURM_NTASKS_PER_NODE ))
+
+# Slurm parameters for process pinning
+--cpus-per-task=$CPUS_PER_TASK  # Allocates unique CPU cores to each task
+--cpu-bind=verbose              # Bind and show the CPU binding mask used
+-m "*:block"                    # Uses block distribution across NUMA nodes
+```
+
+### Customization Options
+
+You can customize the process pinning behavior by modifying these parameters:
+
+1. **CPU Allocation**
+   - Adjust `CPUS_PER_TASK` to change how many cores each process gets
+
+1. **Binding Strategy**
+   - `--cpu-bind=verbose`: Bind and show binding information (recommended)
+   - `--cpu-bind=quiet`: Bind and don't print binding information
+
+1. **Process Distribution**
+   - `-m "*:block"` : Allocates consecutive tasks to the same socket (recipe default)
+   - `-m "*:cyclic"` : Round robin placement of tasks between sockets
+
+
+### Platform-Specific Considerations
+
+Different platforms may require specific tuning, for example if SMT (Simultaneous Multithreading) is not desired:
+- Add `--hint=nomultithread`
+- Adjust CPUS_PER_TASK to be (Number of Physical Cores / Processes per Node).
+
+Monitor performance metrics to determine the optimal configuration for your specific hardware and workload.
 
 
 # Release Notes
@@ -221,11 +259,20 @@ JobID           JobName  Partition    Account  AllocCPUS      State ExitCode
 ```
 
 ### Solution
-You can find log files associated with this run under `$STAGE_PATH/results/$GSW_VERSION/$DTYPE/15b/$JOB_TOTAL_GPUS` folder. The folder will contain `log-nemo_nemotron4_*.out` and `log-nemo_nemotron4_*.err` files that will have a root cause error message.
 
-E.g., for the job failure above and assuming the nemotron 15b job ran on 16 GPUs, used version 25.02, and with precision bf16 the path will be under `$STAGE_PATH/results/25.02/bf16/15b/16/log-nemo_nemotron4_15b_16_2041792.*`
+#### NeMo1 (e.g., Grok1, GPT3, Maxtext) 
+You can find log files associated with this run under `$STAGE_PATH/results/$GSW_VERSION/$DTYPE/$MODEL_SIZE/$JOB_TOTAL_GPUS` folder.
 
-Search for errors in the `log-nemo_nemotron4_15b_16_2041792.err` or `log-nemo_nemotron4_15b_16_2041792.out` files.
+E.g., for the job failure above and assuming the gpt3 175b job ran on 128 GPUs, used version 25.02, and with precision bf16 the path will be under `$STAGE_PATH/results/25.02/bf16/175b/128/log-nemo_megatron_175b_128_2041792.*`
+
+Search for errors in the `log-nemo_megatron_175b_128_2041792.err` or `log-nemo_megatron_175b_128_2041792.out` files.
+
+#### NeMo2 (e.g., Nemotron4, Llama3.1)
+You can find log files associated with this run under `$STAGE_PATH/experiments/pretrain_nemotron4_${MODEL_SIZE}_${DTYPE}_${JOB_TOTAL_GPUS}` folder. The folder will have subfolders that will contain `log-nemo_nemotron4_*.out` files with a root cause error message.
+
+E.g., for the job failure above and assuming the nemotron 15b job ran on 16 GPUs, used version 25.04, and with precision bf16 the path will be under `$STAGE_PATH/experiments/pretrain_nemotron4_15b_bf16_16/pretrain_nemotron4_15b_bf16_16_<timestamp>/pretrain_nemotron4_15b_bf16_16/`
+
+Search for errors in the `log-myaccount.pretrain_nemotron4_15b_bf16_16_2041792_0.out` file. 
 
 ## 3. Unable to use venv required by benchmark
 
