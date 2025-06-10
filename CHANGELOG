@@ -1,3 +1,24 @@
+## [v25.05] - 2025-06-10
+
+### Added
+  - GB200 support for the following recipes
+    - Llama3.1 405B
+    - Grok1 314B
+    - Nemotron4 15B/340B
+    - Deepseek v3
+    - Llama 4 Maverick
+  - Nemotron-H 56B model training recipe for H100 GPUs
+  - End to end installer and launcher for all recipes
+
+### Changed
+  - Recipes collection moved from [NGC Collection](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/dgxc-benchmarking/collections/dgxc-benchmarking) to [GitHub](https://github.com/NVIDIA/dgxc-benchmarking).
+
+### Removed
+  - NeMo GPT3 175b training recipe in favor of Nemotron4
+  - Maxtext Llama 3 training recipe
+  - Llama 3 SFT/LoRa fine tuning recipes
+
+
 ## [v25.04.01] - 2025-05-16
 
 ### Changed

@@ -20,8 +20,6 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-# Parameters
-#SBATCH --time=1:00:00
 set -eu -o pipefail
 
 if [ ${BASH_VERSION:0:1} -lt 4 ] || [ ${BASH_VERSION:0:1} -eq 4 -a ${BASH_VERSION:2:1} -lt 2 ]; then
@@ -30,34 +28,48 @@ if [ ${BASH_VERSION:0:1} -lt 4 ] || [ ${BASH_VERSION:0:1} -eq 4 -a ${BASH_VERSIO
     exit 1
 fi
 
+export WORKLOAD_TYPE=pretraining
+export MODEL_NAME=llama3.1
+export FW_VERSION=25.04.01
 
-export FW_VERSION=25.02.01
+# Ensure STAGE_PATH is not set as it's been replaced by LLMB_INSTALL
+if [ -n "${STAGE_PATH+x}" ]; then
+  echo "Error: STAGE_PATH is deprecated and should not be set. Please use LLMB_INSTALL instead."
+  exit 1
+fi
 
-export NEMO_DIR="NeMo"
-export NEMO_COMMIT="d2b21556f2455b52ad7217f334bb66eaa13c0f83"
-export MEGATRON_COMMIT="ee6737da824b18f945946b4c798adf2328374cb7"
-export NEMO_RUN_COMMIT="fb550a3738768fbf1100e1579f3ca0e2207c6487"
+export LLMB_INSTALL=${LLMB_INSTALL:?Please set LLMB_INSTALL to the path of the installation directory for all workloads}
+export LLMB_WORKLOAD=$LLMB_INSTALL/workloads/${WORKLOAD_TYPE}_${MODEL_NAME}
+export NEMO_DIR=$LLMB_WORKLOAD/NeMo
 
-LLM_REPO=$PWD
+# Build LLMB_INSTALL location 
+export MANUAL_INSTALL=${MANUAL_INSTALL:-true}
+if [ "$MANUAL_INSTALL" = true ]; then
+  mkdir -p $LLMB_INSTALL $LLMB_INSTALL/{datasets,images,venvs,workloads}
+  mkdir -p $LLMB_WORKLOAD
+fi
+
+# -------- llmb-nemo commits
+# r2.3.0 llmb-nemo
+export NEMO_COMMIT="7a8f1cc7bc40a84447c0681a9e4e956a135ae8a2"
+export MEGATRON_COMMIT="7094270c6fa1dbc6b2e99072171e3a559ca36d0f"
+export NEMO_RUN_COMMIT="78f54ee182c8057bbe35872e49459c17458b669e"
 
 # 1. Clone the NeMo source code
 #Setup NeMo 
 if [ ! -d "$NEMO_DIR" ]; then
-    git clone https://github.com/NVIDIA/NeMo
-    cd $NEMO_DIR
-    git checkout $NEMO_COMMIT
-    git apply $LLM_REPO/gsw_nemo.patch
-    ./reinstall.sh
+    git clone https://github.com/NVIDIA/NeMo "$NEMO_DIR" 
 fi
 
-# Copy launch scripts to NeMo performance scripts directory
-cp $LLM_REPO/*.py $LLM_REPO/NeMo/scripts/performance/llm/
+pushd $NEMO_DIR
+git fetch origin
+git checkout -f $NEMO_COMMIT
+./reinstall.sh
+popd
 
 # 2. Install dependencies
 pip install 'scipy<1.13.0' # a workaround for compatibility issue
+pip install 'bitsandbytes==0.45.5' # Future NeMo release 25.07/09 will have this fix.
 pip install megatron-core@git+https://github.com/NVIDIA/Megatron-LM.git@$MEGATRON_COMMIT
 pip install nemo_run@git+https://github.com/NVIDIA/NeMo-Run.git@$NEMO_RUN_COMMIT
-
-# 3. Squash image file
-srun bash -c "enroot import --output ${STAGE_PATH}/nvidia+nemo+${FW_VERSION}.sqsh docker://nvcr.io#nvidia/nemo:${FW_VERSION}"
 

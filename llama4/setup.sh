@@ -28,9 +28,10 @@ if [ ${BASH_VERSION:0:1} -lt 4 ] || [ ${BASH_VERSION:0:1} -eq 4 -a ${BASH_VERSIO
     exit 1
 fi
 
+
 export WORKLOAD_TYPE=pretraining
-export MODEL_NAME=grok1
-export FW_VERSION=25.04.00
+export MODEL_NAME=llama4_maverick
+export FW_VERSION=25.04.01
 
 # Ensure STAGE_PATH is not set as it's been replaced by LLMB_INSTALL
 if [ -n "${STAGE_PATH+x}" ]; then
@@ -42,7 +43,7 @@ export LLMB_INSTALL=${LLMB_INSTALL:?Please set LLMB_INSTALL to the path of the i
 export LLMB_WORKLOAD=$LLMB_INSTALL/workloads/${WORKLOAD_TYPE}_${MODEL_NAME}
 export NEMO_DIR=$LLMB_WORKLOAD/NeMo
 
-# Build LLMB_INSTALL location 
+# Build LLMB_INSTALL location
 export MANUAL_INSTALL=${MANUAL_INSTALL:-true}
 if [ "$MANUAL_INSTALL" = true ]; then
   mkdir -p $LLMB_INSTALL $LLMB_INSTALL/{datasets,images,venvs,workloads}
@@ -54,14 +55,13 @@ fi
 # r2.3.0 llmb-nemo
 export NEMO_COMMIT="7a8f1cc7bc40a84447c0681a9e4e956a135ae8a2"
 export MEGATRON_COMMIT="7094270c6fa1dbc6b2e99072171e3a559ca36d0f"
-export NEMO_RUN_COMMIT="bc412ee5584ed3072717af59f54565ec0d265a6f" #r0.4.0
+export NEMO_RUN_COMMIT="0d271a97445dba63880ebdc9e0906de573d62a95"
 
 # 1. Clone the NeMo source code
-#Setup NeMo 
+#Setup NeMo
 if [ ! -d "$NEMO_DIR" ]; then
     git clone https://github.com/NVIDIA/NeMo.git $NEMO_DIR
 fi
-
 # Ensure we are on same commit and have dependencies installed.
 pushd $NEMO_DIR
 git fetch origin
@@ -69,9 +69,9 @@ git checkout -f $NEMO_COMMIT
 ./reinstall.sh
 popd
 
+
 # 2. Install dependencies
 pip install 'scipy<1.13.0' # a workaround for compatibility issue
 pip install 'bitsandbytes==0.45.5' # Future NeMo release 25.07/09 will have this fix.
 pip install megatron-core@git+https://github.com/NVIDIA/Megatron-LM.git@$MEGATRON_COMMIT
 pip install nemo_run@git+https://github.com/NVIDIA/NeMo-Run.git@$NEMO_RUN_COMMIT
-

@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llmb-installer"
+version = "0.1.0"
+description = "Installer for LLM benchmarking workloads"
+
+dependencies = [
+    "PyYAML>=6.0",
+    "questionary>=1.10.0",
+]
+
+[project.scripts]
+llmb-install = "installer:main" 

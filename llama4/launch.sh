@@ -20,7 +20,8 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-if [ ${BASH_VERSION:0:1} -lt 4 ] || [ ${BASH_VERSION:0:1} -eq 4 -a ${BASH_VERSION:2:1} -lt 2 ]; then
+# Check Bash version
+if [ "${BASH_VERSION:0:1}" -lt 4 ] || [ "${BASH_VERSION:0:1}" -eq 4 ] && [ "${BASH_VERSION:2:1}" -lt 2 ]; then
     printf "Unsupported %s version: %s\n" "${BASH}" "${BASH_VERSION}" >&2
     echo "Requires Bash 4.2 or greater." >&2
     exit 1
@@ -28,14 +29,19 @@ fi
 
 set -eu -o pipefail
 
+# Required environment variables
+: "${SBATCH_ACCOUNT:?Required variable SBATCH_ACCOUNT}"
+: "${SBATCH_PARTITION:?Required variable SBATCH_PARTITION}"
+: "${HF_TOKEN:?Required variable Hugging Face token}"
+: "${GPU_TYPE:?Required variable GPU_TYPE (Eg: gb200, h100)}"
+: "${LLMB_INSTALL:?Required variable LLMB_INSTALL}"
 
 export WORKLOAD_TYPE=pretraining
-export MODEL_NAME=grok1
-export FW_VERSION=25.04.00
+export MODEL_NAME=llama4_maverick
+export FW_VERSION=25.04.01
 export GSW_VERSION=25.05
 
 export OPENBLAS_NUM_THREADS=1 # optional, to avoid resource contention at the frontend node.
-export HF_TOKEN=${HF_TOKEN?"Required variable HF_TOKEN"}
 
 # Ensure STAGE_PATH is not set as it's been replaced by LLMB_INSTALL
 if [ -n "${STAGE_PATH+x}" ]; then
@@ -44,152 +50,115 @@ if [ -n "${STAGE_PATH+x}" ]; then
 fi
 
 export LLMB_WORKLOAD=$LLMB_INSTALL/workloads/${WORKLOAD_TYPE}_${MODEL_NAME}
-export NEMORUN_HOME=$LLMB_WORKLOAD
 export LLMB_REPO=$PWD
 
-export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh}
+export IMAGE=${IMAGE:-${LLMB_INSTALL}/images/nvidia+nemo+${FW_VERSION}.sqsh}
 
-CLUSTER_TYPE=${CLUSTER_TYPE:-slurm}
-DTYPE=${DTYPE:-fp8}
-JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:-128}
-MODEL_SIZE=314b
+export NEMORUN_HOME=$LLMB_WORKLOAD
+export HF_HOME=${HF_HOME:-$LLMB_WORKLOAD}
+export NEMO_HOME=${NEMO_HOME:-$LLMB_WORKLOAD}
+
+#Default values
+DTYPE=${DTYPE:-bf16}
+MODEL_SIZE=${MODEL_SIZE:-400b}
+MODEL_SIZE=${MODEL_SIZE,,}
+MAX_STEPS=${MAX_STEPS:-50}
+CPU_PER_TASK_PINNING=${CPU_PER_TASK_PINNING:-0}
+
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 PROFILE_ENABLED=${PROFILE_ENABLED,,}
 NCCLTRACE_ENABLED=${ENABLE_NCCLTRACE:-false}
 NCCLTRACE_ENABLED=${NCCLTRACE_ENABLED,,}
-GPU_TYPE=${GPU_TYPE:-"gb200"}
-GPU_TYPE=${GPU_TYPE,,}
 
-TIME_LIMIT=${TIME_LIMIT:-"00:30:00"}
-MAX_STEPS=${MAX_STEPS:-50}
-CPU_PER_TASK_PINNING=${CPU_PER_TASK_PINNING:-0}
-ENABLE_CHECKPOINT=${ENABLE_CHECKPOINT:-false}
-ENABLE_CHECKPOINT=${ENABLE_CHECKPOINT,,}
-
+export CONTAINER_MOUNTS="${LLMB_WORKLOAD}/NeMo:/opt/NeMo"
 export PROFILE_START_STEP=${PROFILE_START_STEP:-45}
 export PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
 
-if [[ $CLUSTER_TYPE != "slurm" ]]; then
-  echo "Only SLURM is supported for this workload"
-  exit 1
-fi
-
 if [ $GPU_TYPE = "gb200" ]; then
+  #Default launch configs for GB200
+  JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:-128}
   GPUS_PER_NODE=${GPUS_PER_NODE:-4}
-  TP=${TP:-4}
-  PP=${PP:-1}
+  #Parallelism settings for GB200
+  TP=${TP:-1}
+  PP=${PP:-2}
   CP=${CP:-1}
-  EP=${EP:-8}
-  VP=${VP:-1}
-  ET=${ET:-8}
-  GBS=${GBS:-}
-  if [ -z "$GBS" ]; then
-    GBS=$(( JOB_TOTAL_GPUS * 2 ))
-  fi
-  MBS=${MBS:-1}
-  CUDA_GRAPH=${CUDA_GRAPH:-true}
-elif [ $GPU_TYPE = "b200" ]; then
-  GPUS_PER_NODE=${GPUS_PER_NODE:-8}
-  TP=${TP:-4}
-  PP=${PP:-1}
-  CP=${CP:-1}
-  EP=${EP:-8}
-  VP=${VP:-1}
-  ET=${ET:-8}
-  GBS=${GBS:-}
-  if [ -z "$GBS" ]; then
-    GBS=$(( JOB_TOTAL_GPUS * 2 ))
-  fi
-  MBS=${MBS:-1}
-  CUDA_GRAPH=${CUDA_GRAPH:-true}
-elif [ $GPU_TYPE = "h100" ]; then
-  GPUS_PER_NODE=${GPUS_PER_NODE:-8}
-  TP=${TP:-4}
-  PP=${PP:-8}
-  CP=${CP:-2}
-  EP=${EP:-8}
-  VP=${VP:-1}
-  ET=${ET:-1}
-  GBS=${GBS:-}
-  if [ -z "$GBS" ]; then
-    GBS=$(( JOB_TOTAL_GPUS * 2 ))
-  fi
+  EP=${EP:-64}
+  VP=${VP:-12}
+  ETP=${ETP:-1}
   MBS=${MBS:-1}
   CUDA_GRAPH=${CUDA_GRAPH:-false}
+  GBS=${GBS:-1024}
+  TIME_LIMIT=${TIME_LIMIT:-"00:30:00"}
+elif [ $GPU_TYPE = "h100" ]; then
+  #Default launch config for GB200
+  JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:-512}
+  GPUS_PER_NODE=${GPUS_PER_NODE:-8}
+  #Parallelism settings for h100
+  TP=${TP:-4}
+  PP=${PP:-1}
+  CP=${CP:-1}
+  EP=${EP:-128}
+  VP=${VP:-1}
+  ETP=${ETP:-4}
+  MBS=${MBS:-1}
+  GBS=${GBS:-1024}
+  if [ "$DTYPE" = "fp8" ]; then
+    CUDA_GRAPH=${CUDA_GRAPH:-true}
+  else
+    CUDA_GRAPH=${CUDA_GRAPH:-false}
+  fi
+  TIME_LIMIT=${TIME_LIMIT:-"00:55:00"}
 else
   echo "$GPU_TYPE not supported"
   exit 1
 fi
 
-NUM_LAYERS=${NUM_LAYERS:-64}
-HIDDEN_SIZE=${HIDDEN_SIZE:-6144}
 
 CONFIG_OVERRIDES=" -tp $TP \
   -pp $PP \
   -cp $CP \
   -ep $EP \
   -vp $VP \
-  -et $ET \
+  -et $ETP \
   -gb $GBS \
   -mb $MBS \
   --cuda_graphs $CUDA_GRAPH \
-  --num_layers $NUM_LAYERS \
-  --hidden_size $HIDDEN_SIZE \
 "
 
-if [ $PROFILE_ENABLED = true ]; then
+if [ $PROFILE_ENABLED = true ] && [ $NCCLTRACE_ENABLED = true ]; then
+  echo "Cannot both profile and get NCCL traces"
+  exit 1
+fi
+
+if [[ "$PROFILE_ENABLED" = "true" ]]; then
   CONFIG_OVERRIDES+=" -en "
   CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
   CONFIG_OVERRIDES+=" --profiling_stop_step=$PROFILE_STOP_STEP "
   MAX_STEPS=$PROFILE_STOP_STEP
-elif [ $NCCLTRACE_ENABLED = true ]; then
+elif [[ "$NCCLTRACE_ENABLED" = "true" ]]; then
   CONFIG_OVERRIDES+=" -nt "
   MAX_STEPS=5
   TIME_LIMIT="00:15:00"
 fi
 
-if [[ -n ${LOAD_CHECKPOINT_PATH-} ]]; then
-  MAX_STEPS=1
-fi
+SCRIPT_NAME="scripts.performance.llm.pretrain_llama4_e128"
 
-if [ $CPU_PER_TASK_PINNING -gt 0 ]; then
-  CONFIG_OVERRIDES+=" --cpu_pinning $CPU_PER_TASK_PINNING "
-fi
+pushd "${LLMB_WORKLOAD}/NeMo"
 
-pushd $LLMB_WORKLOAD/NeMo
-
-if [ $CLUSTER_TYPE = slurm ]; then
-  python -m scripts.performance.llm.pretrain_grok1_314b \
-    --gpu $GPU_TYPE \
-    --container_image $IMAGE \
-    --compute_dtype $DTYPE \
-    --num_gpus $JOB_TOTAL_GPUS \
-    --gpus_per_node $GPUS_PER_NODE \
-    --max_steps $MAX_STEPS \
-    --hf_token $HF_TOKEN \
+python3 -m ${SCRIPT_NAME} \
+    -cm "${CONTAINER_MOUNTS}" \
+    -hf "${HF_TOKEN}" \
+    --gpu "${GPU_TYPE}" \
+    --num_gpus "${JOB_TOTAL_GPUS}" \
+    --container_image "${IMAGE}" \
+    --compute_dtype "${DTYPE}" \
+    --gpus_per_node "${GPUS_PER_NODE}" \
+    --max_steps "${MAX_STEPS}" \
     $CONFIG_OVERRIDES \
     slurm \
-    --account $SBATCH_ACCOUNT \
-    --partition $SBATCH_PARTITION \
-    --time_limit $TIME_LIMIT \
-    --log_dir ${NEMORUN_HOME}
-else
-  python -m scripts.performance.llm.pretrain_grok1_314b \
-    --gpu $GPU_TYPE \
-    --container_image nvcr.io/nvidia/nemo:$FW_VERSION \
-    --compute_dtype $DTYPE \
-    --num_gpus $JOB_TOTAL_GPUS \
-    --gpus_per_node $GPUS_PER_NODE \
-    --max_steps $MAX_STEPS \
-    --hf_token $HF_TOKEN \
-    $CONFIG_OVERRIDES \
-    runai \
-    --base_url $BASE_URL \
-    --app_id $APP_ID \
-    --app_secret $APP_SECRET \
-    --project_name $PROJECT_NAME \
-    --pvc_nemo_run_dir $PVC_DIR
-
-fi
+    --account "${SBATCH_ACCOUNT}" \
+    --partition "${SBATCH_PARTITION}" \
+    --log_dir "${NEMORUN_HOME}" \
+    --time_limit $TIME_LIMIT
 
 popd

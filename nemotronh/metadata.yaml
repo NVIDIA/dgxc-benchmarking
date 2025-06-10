@@ -1,0 +1,26 @@
+# Setup
+general:
+  workload: nemotronh
+  workload_type: pretraining
+  gsw_version: 25.05
+  framework: nemo2
+
+container:
+  images: 
+    - 'nvcr.io/nvidia/nemo:25.04.01'
+
+setup:
+  setup_script: 'setup.sh'
+  venv_req: True
+
+# Run
+run:
+  launcher_type: 'nemo'
+  launch_script: 'launch.sh'
+
+  gpu_configs:
+    h100:
+      model_configs:
+        - model_size: '56b'
+          dtypes: 'fp8'
+          scales: [32, 64, 128, 256, 512, 1024, 2048]

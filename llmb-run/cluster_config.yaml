@@ -1,0 +1,29 @@
+# High-level launcher configuration (moved from current workloads section)
+launcher:
+  llmb_repo: "/path/to/LLMB_REPO"
+  llmb_install: "/lustre/path/to/LLMB_INSTALL"
+  gpu_type: "gb200"  # GPU_TYPE assumed to be homogeneous environment.
+
+# Any environment variables that should apply to all workloads.
+environment:
+  HF_TOKEN: "hf_token" 
+
+slurm:
+  account: "all_the_fairshare"
+  gpu_partition: "partition"
+  gpu_gres: null
+  cpu_partition: "partition"
+  cpu_gres: null
+
+workloads:
+  # List of workloads that are installed on the cluster, auto populated by installer.
+  installed: 
+    - pretraining_nemotron
+
+  config:
+    # Workload specific settings, pairs with metadata.yaml files.
+    pretraining_nemotron:
+      venv_path: "/lustre/path/to/venv/folder"
+      venv_type: "venv"  # Type of virtual environment: 'venv' or 'conda'
+      environment:
+        ENV_VAR: "value" # Environment variables to set for the workload. (Optional)
