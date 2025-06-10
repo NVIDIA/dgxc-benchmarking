@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llmb-run"
+version = "0.1.0"
+description = "Lightweight tool for automating large batches of LLM benchmarking workloads"
+dependencies = [
+    "pyyaml>=6.0"
+]
+
+[project.scripts]
+llmb-run = "llmb_run:main"

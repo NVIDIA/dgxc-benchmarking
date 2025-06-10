@@ -28,47 +28,125 @@ fi
 
 set -eu -o pipefail
 
-export FW_VERSION=25.02.01
-export GSW_VERSION=25.04.01
+export WORKLOAD_TYPE=pretraining
+export MODEL_NAME=nemotron
+export FW_VERSION=25.04.00
+export GSW_VERSION=25.05
 
 export OPENBLAS_NUM_THREADS=1 # optional, to avoid resource contention at the frontend node.
-export NEMORUN_HOME=$STAGE_PATH
-export LLMB_PATH=$PWD
 
+# Ensure STAGE_PATH is not set as it's been replaced by LLMB_INSTALL
+if [ -n "${STAGE_PATH+x}" ]; then
+  echo "Error: STAGE_PATH is deprecated and should not be set. Please use LLMB_INSTALL instead."
+  exit 1
+fi
+
+export LLMB_WORKLOAD=$LLMB_INSTALL/workloads/${WORKLOAD_TYPE}_${MODEL_NAME}
+export NEMORUN_HOME=$LLMB_WORKLOAD
+export LLMB_REPO=$PWD
+
+export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh}
+
+GPU_TYPE=${GPU_TYPE:-"gb200"}
+GPU_TYPE=${GPU_TYPE,,}
+CLUSTER_TYPE=${CLUSTER_TYPE:-slurm}
+CLUSTER_TYPE=${CLUSTER_TYPE,,}
 DTYPE=${DTYPE:-fp8}
+DYTPE=${DTYPE,,}
 JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:-16}
 MODEL_SIZE=${MODEL_SIZE:-15b}
 MODEL_SIZE=${MODEL_SIZE,,}
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 PROFILE_ENABLED=${PROFILE_ENABLED,,}
-
+STRONG_SCALING=${STRONG_SCALING:-false}
+STRONG_SCALING=${STRONG_SCALING,,}
 MAX_STEPS=${MAX_STEPS:-50}
 CPU_PER_TASK_PINNING=${CPU_PER_TASK_PINNING:-0}
 ENABLE_CHECKPOINT=${ENABLE_CHECKPOINT:-false}
 ENABLE_CHECKPOINT=${ENABLE_CHECKPOINT,,}
 
-export PROFILE_START_STEP=${PROFILE_START_STEP:-20}
-export PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-25}
-
-if [ $MODEL_SIZE = 15b ]; then
-  TP=2
-  PP=1
-  CP=1
-  GBS=$(( $JOB_TOTAL_GPUS * 4 ))
-  MBS=2
-  VP=0
-  NUM_LAYERS=32
-  HIDDEN_SIZE=6144
-elif [ $MODEL_SIZE = 340b ]; then
-  TP=8
-  PP=8
-  CP=1
-  GBS=$(( $JOB_TOTAL_GPUS / 4 ))
-  MBS=1
-  VP=12
-  NUM_LAYERS=96
-  HIDDEN_SIZE=18432
+if [[ $CLUSTER_TYPE != "slurm" ]]; then
+  echo "Only SLURM is supported for this workload"
+  exit 1
 fi
+
+# Validate that checkpointing features are only used with H100 GPUs
+if [[ $ENABLE_CHECKPOINT = true ]] && [[ $GPU_TYPE != "h100" ]]; then
+  echo "Error: ENABLE_CHECKPOINT=true is only supported with GPU_TYPE=h100. Current GPU_TYPE=$GPU_TYPE"
+  exit 1
+fi
+
+
+if [[ $MODEL_SIZE = 15b ]] && [[ $STRONG_SCALING = true ]]; then
+  echo "Strong scaling is only supported with MODEL_SIZE=340b. Current MODEL_SIZE=$MODEL_SIZE"
+  exit 1
+fi
+
+if [[ $GPU_TYPE = h100 ]] && [[ $STRONG_SCALING = true ]]; then
+  echo "Strong scaling is only supported with GPU_TYPE=gb200. Current GPU_TYPE=$GPU_TYPE"
+  exit 1
+fi
+
+if [[ -n ${LOAD_CHECKPOINT_PATH-} ]] && [[ $GPU_TYPE != "h100" ]]; then
+  echo "Error: LOAD_CHECKPOINT_PATH is only supported with GPU_TYPE=h100. Current GPU_TYPE=$GPU_TYPE"
+  exit 1
+fi
+
+export PROFILE_START_STEP=${PROFILE_START_STEP:-45}
+export PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
+
+if [ $GPU_TYPE = gb200 ]; then
+  GPUS_PER_NODE=${GPUS_PER_NODE:-4}
+  if [ $MODEL_SIZE = 15b ]; then
+	TP=1
+  	PP=1
+  	CP=1
+  	GBS=$(( $JOB_TOTAL_GPUS * 4 ))
+  	MBS=2
+  	VP=1
+	NUM_LAYERS=32
+        HIDDEN_SIZE=6144
+  elif [ $MODEL_SIZE = 340b ]; then
+	TP=8
+  	PP=4
+  	CP=1
+	if [ $STRONG_SCALING = true ]; then
+		GBS=512
+		TIME_LIMIT=${TIME_LIMIT:-"00:35:00"}
+	else
+		GBS=$(( $JOB_TOTAL_GPUS / 4 ))
+	fi
+  	MBS=1
+  	VP=12
+  	NUM_LAYERS=96
+        HIDDEN_SIZE=18432
+  fi
+elif [ $GPU_TYPE = h100 ]; then
+  GPUS_PER_NODE=${GPUS_PER_NODE:-8}
+  if [ $MODEL_SIZE = 15b ]; then
+  	TP=2
+  	PP=1
+  	CP=1
+  	GBS=$(( $JOB_TOTAL_GPUS * 4 ))
+  	MBS=2
+  	VP=0
+  	NUM_LAYERS=32
+  	HIDDEN_SIZE=6144
+  elif [ $MODEL_SIZE = 340b ]; then
+  	TP=8
+  	PP=8
+  	CP=1
+  	GBS=$(( $JOB_TOTAL_GPUS / 4 ))
+  	MBS=1
+  	VP=12
+  	NUM_LAYERS=96
+  	HIDDEN_SIZE=18432
+  fi
+else
+    echo "${GPU_TYPE} is unsupported for this workload."
+
+fi
+
 
 CONFIG_OVERRIDES=" -tp $TP \
   -pp $PP \
@@ -77,7 +155,12 @@ CONFIG_OVERRIDES=" -tp $TP \
   -mb $MBS \
   --num_layers $NUM_LAYERS \
   --hidden_size $HIDDEN_SIZE \
+  -ep 1 \
 "
+
+if [ $GPU_TYPE = gb200 ]; then
+  CONFIG_OVERRIDES+=" -fsdp 0 --cuda_graphs true "
+fi
 
 if [ $VP != 0 ]; then
   CONFIG_OVERRIDES+=" -vp $VP " 
@@ -90,26 +173,52 @@ if [ $PROFILE_ENABLED = true ]; then
   MAX_STEPS=$PROFILE_STOP_STEP
 fi
 
+if [[ $ENABLE_CHECKPOINT = true ]]; then
+  CONFIG_OVERRIDES+=" --checkpoint_save=True "
+else
+  CONFIG_OVERRIDES+=" --checkpoint_save=False "
+fi
+
 if [[ -n ${LOAD_CHECKPOINT_PATH-} ]]; then
   MAX_STEPS=1
+  CONFIG_OVERRIDES+=" --checkpoint_load_path=$LOAD_CHECKPOINT_PATH "
 fi
 
-if [ $CPU_PER_TASK_PINNING -gt 0 ]; then
-  CONFIG_OVERRIDES+=" --cpu_pinning $CPU_PER_TASK_PINNING "
+# After all overrides - STRONG_SCALING is significantly slower at 128 than weak scaling.
+TIME_LIMIT=${TIME_LIMIT:-"00:20:00"}
+
+pushd $LLMB_WORKLOAD/NeMo
+
+if [ $CLUSTER_TYPE = slurm ]; then
+  python3 -m scripts.performance.llm.pretrain_nemotron4_${MODEL_SIZE} \
+    --gpu $GPU_TYPE \
+    --container_image $IMAGE \
+    --compute_dtype $DTYPE \
+    --num_gpus $JOB_TOTAL_GPUS \
+    --gpus_per_node $GPUS_PER_NODE \
+    --max_steps $MAX_STEPS \
+    $CONFIG_OVERRIDES \
+    slurm \
+    --account $SBATCH_ACCOUNT \
+    --partition $SBATCH_PARTITION \
+    --log_dir ${NEMORUN_HOME} \
+    --time_limit $TIME_LIMIT
+else
+  python3 -m scripts.performance.llm.pretrain_nemotron4_${MODEL_SIZE} \
+    --gpu $GPU_TYPE \
+    --container_image nvcr.io/nvidia/nemo:$FW_VERSION \
+    --compute_dtype $DTYPE \
+    --num_gpus $JOB_TOTAL_GPUS \
+    --gpus_per_node $GPUS_PER_NODE \
+    --max_steps $MAX_STEPS \
+    --custom_mounts $CUSTOM_MOUNT \
+    $CONFIG_OVERRIDES \
+    runai \
+    --base_url $BASE_URL \
+    --app_id $APP_ID \
+    --app_secret $APP_SECRET \
+    --project_name $PROJECT_NAME \
+    --pvc_nemo_run_dir $PVC_DIR
 fi
-
-pushd $LLMB_PATH/NeMo
-
-python -m scripts.performance.llm.pretrain_nemotron4_${MODEL_SIZE} \
-  --account $SBATCH_ACCOUNT \
-  --partition $SBATCH_PARTITION \
-  --log_dir ${NEMORUN_HOME} \
-  --gpu h100 \
-  --container_image $STAGE_PATH/nvidia+nemo+$FW_VERSION.sqsh \
-  --compute_dtype $DTYPE \
-  --num_gpus $JOB_TOTAL_GPUS \
-  --gpus_per_node 8 \
-  --max_steps $MAX_STEPS \
-  $CONFIG_OVERRIDES
 
 popd

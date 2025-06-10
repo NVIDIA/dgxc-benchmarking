@@ -1,0 +1,26 @@
+# Setup
+general:
+  workload: grok1
+  workload_type: pretraining
+  gsw_version: 25.05
+  framework: nemo2
+
+container:
+  images: 
+    - 'nvcr.io#nvidia/nemo:25.04.00'
+
+setup:
+  setup_script: 'setup.sh'
+  venv_req: True
+
+# Run
+run:
+  launcher_type: 'nemo'
+  launch_script: 'launch.sh'
+
+  gpu_configs:
+    gb200:
+      model_configs:
+        - model_size: '314b'
+          dtypes: ['fp8', 'bf16']
+          scales: [128, 256, 512]

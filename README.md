@@ -11,32 +11,97 @@ Each recipe maps to one workload and can be run at various cluster scales and pr
 
 ## Prerequisites
 
-At this time, Performance Recipes require Slurm as the cluster's job scheduler.
-Before you use the Performance Recipes, make sure you have installed the following packages on your cluster.
+To use the Performance Recipes, make sure you have the following prerequisites installed on your cluster:
 
-* Bash 4.2 or newer
-* Slurm 22.x or newer
-  * `task/affinity` plugin required for process pinning
-* [Enroot](https://github.com/NVIDIA/enroot/)
-* [NGC Registry Access](https://org.ngc.nvidia.com/setup)
-* Python 3.10.12 or newer
-* CUDA 12.3 or newer
-* [NV Driver: 535.129.03 or newer](https://www.nvidia.com/en-us/drivers/)
-* [OFED: 5.9-0.5.6.0.127 or newer](https://network.nvidia.com/products/infiniband-drivers/linux/mlnx_ofed/)
-* [NCCL: 2.19.4 or newer](https://developer.nvidia.com/nccl/nccl-download)
+### General Prerequisites
+
+*   Bash 4.2 or newer
+*   [NGC Registry Access](https://org.ngc.nvidia.com/setup)
+*   NGC CLI 3.148.1 or newer (Optional, required for NIM Inference workloads)
+*   Python 3.12.x
+*   CUDA 12.3 or newer
+*   [NV Driver: 535.129.03 or newer](https://www.nvidia.com/en-us/drivers/)
+*   [OFED: 5.9-0.5.6.0.127 or newer](https://network.nvidia.com/products/infiniband-drivers/linux/mlnx_ofed/)
+*   [NCCL: 2.19.4 or newer](https://developer.nvidia.com/nccl/nccl-download)
+
+### Cluster-Specific Prerequisites
+
+Depending on your cluster's job scheduler, ensure the following are met:
+
+*   **Slurm Clusters**
+    *   Version 22.x or newer
+    *   `task/affinity` plugin required for process pinning
+    *   [Enroot](https://github.com/NVIDIA/enroot/)
 
 
-## Accessing and Using the Collection
+## Quick Start Guide
 
-Follow these steps to access and start using the LLM Benchmarking Collection:
-1. **Sign in**: Sign in to the [NVIDIA NGC container registry](http://ngc.nvidia.com) and search for "DGX Cloud Benchmarking"
-2. **Log in**: connect to your cluster’s login node.
-3. **Download Recipe**: Download the recipe for your desired model family from NGC to your login node. Downloads can be found in the "File Browser" tab in each model.
-4. **Set Up Benchmarking Recipe**: extract the recipe
-5. **Run Setup Script**: Execute the setup.sh script to download all required assets, including the model container.
-6. **(Optional) Generate Dataset**: If required, run generate_dataset.sh to create the dataset.
-7. **Start Benchmarking**: follow the selected model’s README.md instructions to launch benchmarking workload.
-8. **Evaluate Results**: follow the methodology described in the selected model’s README.md to gather performance metrics and compare to published baseline values.
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/NVIDIA/dgxc-benchmarking.git
+   cd dgxc-benchmarking
+   ```
+
+2. (Optional) For NIM Inference workloads only:
+   - Generate an NGC API key from the [NGC Registry](https://org.ngc.nvidia.com/setup)
+   - Install and configure the NGC CLI:
+     ```bash
+     curl -L https://ngc.nvidia.com/downloads/ngccli_linux.zip -o ngccli_linux.zip
+     unzip -q ngccli_linux.zip -d $HOME/.local/bin
+     rm ngccli_linux.zip
+     export PATH=$HOME/.local/bin:$PATH
+     ngc config set
+     ```
+
+3. Run the installer:
+   ```bash
+   # The installer will add packages to your current Python environment.
+   # We recommend to activate a virtual environment with python 3.12.x before running installer command below.
+   
+   ./install.sh
+   ```
+   The installer will:
+   - Install required Python packages in your current environment
+   - Set up your benchmarking environment
+   - Configure SLURM settings
+   - Let you select workloads to install
+   - Prepare all necessary dependencies
+
+   > **Note:** For detailed installation options, workload-specific virtual environments, and troubleshooting, see the [Installer README](installer/README.md).
+
+4. Run a benchmark:
+   ```bash
+   # Navigate to your installed workload directory
+   cd $LLMB_INSTALL
+   
+   # Example: Run Nemotron4 340B pretraining on 256 GPUs with FP8 precision
+   llmb-run single -w pretraining_nemotron -s 340b --dtype fp8 --scale 256
+   ```
+
+### Directory Layout and Key Variables
+
+After running the installer, the following directory structure and environment variables are used:
+
+- `LLMB_REPO`: Directory containing the clone of the recipe repository.
+- `LLMB_INSTALL`: Top-level directory for all benchmarking artifacts (images, datasets, venvs, workloads, etc).
+- `LLMB_WORKLOAD`: Workload-specific directory, e.g. `${LLMB_INSTALL}/workloads/pretraining_nemotron`.
+- Results, logs, and checkpoints are stored under subfolders of `LLMB_WORKLOAD` (see below).
+
+**Example structure:**
+```
+$LLMB_INSTALL/
+  ├── images/
+  ├── datasets/
+  ├── venvs/
+  └── workloads/
+        └── pretraining_nemotron/   # <- $LLMB_WORKLOAD
+              ├── NeMo/
+              ├── ...
+              └── experiments/
+```
+
+**Migration Note:**
+If you previously used `STAGE_PATH`, replace it with `LLMB_INSTALL` (top-level) and `LLMB_WORKLOAD` (workload-specific). All output, logs, and checkpoints are now under `LLMB_WORKLOAD`.
 
 
 ## Workload Resources Overview
@@ -49,41 +114,65 @@ The overview page for each workload highlights target performance metrics for th
 
 ## Available Benchmarks
 
-The following table lists each benchmark used to evaluate the model’s performance, along with their specific configurations.
+The following tables list each benchmark used to evaluate the model's performance, along with their specific configurations.
 
-| Framework | Model | Container Version | Model Size | Type | Max Scale (# of GPUs) | Precision | Model Access Required |
-| --------- | :---------------: | :---- | :--------: | :--- | :-------------------- | :-------- | :-------------------- |
-| NeMo | Nemotron4 | 25.02.01 | 15B, 340B | Pretrain | 2048 | FP8, BF16 | No |
-| NeMo | GPT3      | 24.12 | 175B      | Pretrain | 2048 | FP8, BF16 | No |
-| NeMo | Llama 3.1 | 25.02.01 | 8B, 70B, 405B | Pretrain | 2304 | FP8, BF16 | Yes |
-| Maxtext | Llama3 |  25.01 |70B | Pretrain | 2048 | FP8, BF16 | No |
-| NeMo | Grok1 | 24.12 | 314B | Pretrain  | 2048 | FP8, BF16 | No |
-| NeMo | Llama 3 | 24.12 | 8B, 70B | Fine-Tuning (SFT, LORA) | 32 | FP8, BF16 | Yes |
-| NIM | Llama 3.1 and 3.2 | instruct:1.3.3, rerank:1.3, embed:1.3.1 | 70b, 1b | Inference | n/a | n/a | Yes 
-| NIM | Llama 3 | 1.0.3 | 70B | Inference | 4 | FP8 | Yes |
-| NIM | DeepSeek R1 | 1.7.2 | 671B | Inference | 16 | FP8 | Yes |
+**Note:** The "Scale (# of GPUs)" column indicates the minimum supported scale and the maximum scale tested for each workload. The recipes may function at larger scales, although they have not been explicitly validated beyond the listed maximum.
 
+### GB200 Workloads
+
+| Framework | Model | Container Version | Model Size | Type | Scale (# of GPUs) | Precision | Model Access Required | Checkpointing | Cluster Type |
+| --------- | :---------------: | :---- | :--------: | :--- | :-------------------- | :-------- | :-------------------- | :-----------: | :----------: |
+| NeMo | Nemotron4 | 25.04.00 | 340B | Pretrain | 128-256 | FP8, BF16 | No | No | Slurm |
+| NeMo | Llama 3.1 | 25.04.01 | 405B | Pretrain | 128-256 | FP8, BF16 | Yes | No | Slurm |
+| NeMo | DeepSeek V3 | 25.04.01 | 671B | Pretrain | 128-256 | BF16 | Yes | No | Slurm |
+| NeMo | Grok1 | 25.04.00 | 314B | Pretrain | 128-256 | FP8, BF16 | No | No | Slurm |
+| NeMo | Llama4 Maverick | 25.04.01 | 400B | Pretrain | 128-512 | FP8, BF16 | Yes | No | Slurm |
+
+### H100 Workloads
 
 Baseline performance metrics were using workloads on the NVIDIA DGX H100 Reference Architecture. For more information see [DGX H100 Systems](https://blogs.nvidia.com/blog/dgx-h100-systems-shipping/).
 
-Note, the benchmarks are updated monthly. For older releases you can use Search feature in NGC Resources section.
+| Framework | Model | FW Container Version | Model Size | Type | Scale (# of GPUs) | Precision | Model Access Required | Checkpointing | Cluster Type |
+| --------- | :---------------: | :---- | :--------: | :--- | :-------------------- | :-------- | :-------------------- | :-----------: | :----------: |
+| NeMo | Nemotron4 | 25.04.00 | 15B | Pretrain | 16 | FP8, BF16 | No | Yes | Slurm |
+| NeMo | Nemotron4 | 25.04.00 | 340B | Pretrain | 256 | FP8, BF16 | No | Yes | Slurm |
+| NeMo | DeepSeek V3 | 25.04.01 | 671B | Pretrain | 1024 | BF16 | Yes | No | Slurm |
+| NeMo | Llama4 Maverick | 25.04.01 | 400B | Pretrain | 512 | FP8, BF16 | Yes | No | Slurm |
+| NeMo | Nemotron-H | 25.04.01 | 56B | Pretrain | 32-2048 | FP8 | No | No | Slurm |
+| NIM | Llama 3.1 and 3.2 | instruct:1.3.3, rerank:1.3, embed:1.3.1 | 70b, 1b | Inference | 1-8 | n/a | Yes | No | Slurm |
+| NIM | Llama 3 | 1.0.3 | 70B | Inference | 4 | FP8 | Yes | No | Slurm |
+| NIM | DeepSeek R1 | 1.7.2 | 671B | Inference | 16 | FP8 | Yes | No | Slurm |
 
-E.g., here are the steps to locate benchmarks from release 24.11.1:
-* Click on [Resources](https://catalog.ngc.nvidia.com/resources) tab
-* Type "24.11.1 (DGXC Benchmarking)" in the "Search resources..." field
-* You shall now see list of benchmarks with version 24.11.1
+### Deprecated
 
+| Framework | Model | FW Container Version | Model Size | Type | Scale (# of GPUs) | Precision | Model Access Required | Checkpointing | Cluster Type | Last Version |
+| --------- | :---------------: | :---- | :--------: | :--- | :-------------------- | :-------- | :-------------------- | :-----------: | :----------: | :----------: |
+| Maxtext | Llama3 |  25.01 |70B | Pretrain | 128-2048 | FP8, BF16 | No | No | Slurm | 25.04.01
+| NeMo | Llama 3 | 24.12 | 8B, 70B | Fine-Tuning (SFT, LORA) | 8-32 | FP8, BF16 | Yes | No | Slurm | 25.04.01
+| NeMo | GPT3 | 24.12 | 175B | Pretrain | 128-2048 | FP8, BF16 | No | No | Slurm | 25.04.01 |
+| HF | Llama 2 | 24.02-py3 | 70B | Finetuning | 8-512 | FP8, BF16 | Yes | No | Slurm | 25.01.01 |
+| HF | Mistral | 24.02-py3 | 7B | Finetuning | 8-256 | FP8, BF16 | Yes | No | Slurm | 25.01.01 |
+| Jax | Llama 2 | jax:maxtext-2024-12-09 | 70B | Pretrain | 128-2048 | FP8, BF16 | No | No | Slurm | 25.01.01 |
+| Jax | GPT3 | jax:pax-2024-03-04 | 175B | Pretrain | 128-2048 | FP8, BF16 | No | No | Slurm | 25.01.01 |
+| NeMo | Llama 2 | 24.03.01.framework | 7B | Pretrain | 8-2048 | FP8, BF16 | Yes | No | Slurm | 25.08 |
+| NeMo | Llama 2 | 24.03.01.framework | 70B | Pretrain | 64-2048 | FP8, BF16 | Yes | No | Slurm | 25.08 |
+| NeMo | Llama 3 | 25.05 | 8B | Pretrain | 8-128 | FP8, BF16 | Yes | No | Slurm | 25.08 |
+| NeMo | Llama 3 | 25.05 | 70B | Pretrain | 64-2048 | FP8, BF16 | Yes | No | Slurm | 25.08 |
 
 # Reference Infrastructure
 
-The LLM Benchmarking Collection published baseline benchmark results using the following infrastructure, CSP-specific configurations, and software.
+The LLM Benchmarking Collection published baseline benchmark results using the following reference infrastructures, CSP-specific configurations, and software.
+
+## H100 Reference Architecture
+
+Baseline performance metrics for H100 workloads were collected using the NVIDIA DGX H100 Reference Architecture. For more information see [DGX H100 Systems](https://blogs.nvidia.com/blog/dgx-h100-systems-shipping/).
 
 * GPU: 8xH100 80GB HBM3 (640GB total)
   * TDP 700W
-  * Memory bandwidth 3.2 TBs
+  * Memory bandwidth 3.2 TB/s
 * CPU: 2x Intel Sapphire Rapids, Intel(R) Xeon(R) Platinum 8480CL E5
   * 112 cores (56 cores per CPU)
-  * 2.00 GHz (Base), 3.8 Ghz (Max boost)
+  * 2.00 GHz (Base), 3.8 GHz (Max boost)
   * Numa nodes per socket = 1
   * PCIe Gen5
 * NVLink: NVLink 4th Generation
@@ -97,19 +186,33 @@ The LLM Benchmarking Collection published baseline benchmark results using the f
   * 2x 1.92TB NVMe M.2
   * 8x 3.84TB NVMe U.2
 
+## GB200 Reference Architecture
+
+Baseline performance metrics for GB200 workloads were collected using the NVIDIA DGX GB200 Reference Architercture. For more information see [NVIDIA GB200 NVL72](https://www.nvidia.com/en-us/data-center/gb200-nvl72/)
+
+* GB200 Grace Blackwell Superchip
+  * 72 Arm Neoverse V2 cores
+  * 2x Blackwell GPUs
+    * Memory bandwidth 16 TB/s
+* NVLink: NVLink 5th Generation
+  * 3.6 TB/s
+
+
+
 ## CSP Specific Configurations
 AI platforms may vary in implementation, such as differences in network fabric and virtualization implementations, and thus require different tuning. 
 For optimal performance, users should leverage the correct implementation for their platform. The example platform-specific tuning is provided as a starting point. Further tuning may be necessary if instance type varies from the Reference Architecture. 
 
 ### AWS
-Enable Elastic Fabric Adapter (EFA) support by following the [step-by-step guide](https://docs.aws.amazon.com/sagemaker/latest/dg/your-algorithms-training-efa.html#your-algorithms-training-efa-install). Use the [reference NCCL tests Dockerfile with EFA support](https://github.com/aws-samples/awsome-distributed-training/blob/main/micro-benchmarks/nccl-tests/nccl-tests.Dockerfile). 
 
-  If you need to build a new docker image, use **setup.sh** script from corresponding benchmark folder to determine the exact base image. The setup.sh will include commands for importing docker image used by the workload: e.g., nemotron/setup.sh includes `"enroot import --output ${STAGE_PATH}/nvidia+nemo+24.12.sqsh docker://nvcr.io#nvidia/nemo:24.12"` which translates into `nvcr.io/nvidia/nemo:24.12` as the base image.
+For NeMo based images EFA support is already included starting with version 25.02 (nvcr.io/nvidia/nemo:25.02).
+
+For other images or if you need to update Enable Elastic Fabric Adapter (EFA) follow the [step-by-step guide](https://docs.aws.amazon.com/sagemaker/latest/dg/your-algorithms-training-efa.html#your-algorithms-training-efa-install). Use the [reference NCCL tests Dockerfile with EFA support](https://github.com/aws-samples/awsome-distributed-training/blob/main/micro-benchmarks/nccl-tests/nccl-tests.Dockerfile). 
 
 ### GCP
-Ensure that all required pre-conditions for [GCP cluster deployment](https://cloud.google.com/ai-hypercomputer/docs/create/create-slurm-cluster#before-you-begin) have been met. 
+Ensure that all required pre-conditions for [GCP cluster deployment](https://cloud.google.com/ai-hypercomputer/docs/create/create-Slurm-cluster#before-you-begin) have been met. 
 
-   Configure Compute Fabric with TCP-X by ensuring the following environment variables are set and present for your environment. 
+Configure Compute Fabric with TCP-X by ensuring the following environment variables are set and present for your environment. 
 
 ```shell
 NCCL_LIB_DIR='/var/lib/tcpxo/lib64' source /var/lib/tcpxo/lib64/nccl-env-profile.sh; \
@@ -120,84 +223,48 @@ NCCL_LIB_DIR='/var/lib/tcpxo/lib64' source /var/lib/tcpxo/lib64/nccl-env-profile
 	  export NCCL_NET=FasTrak; \
 	  ls /var/lib/tcpxo/lib64;"
 ```
+
+**Important:** 
+* The above example hasn't been tested with the latest TCP-X version. Check with your cluster admin for the most recent instructions.
+* If additional files need to be mounted into running container, they should be placed under `$LLMB_WORKLOAD` folder as this location is already mounted. 
+
 ### Azure 
-Requires four settings for optimal performance: two environment variables and two slurm parameters.
-   1. **NCCL_TOPO_FILE**=`<path to topo file>`.
+Requires two settings for optimal performance:
+   1. **NCCL_TOPO_FILE**=`<path to topo file under $LLMB_WORKLOAD>`.
       * The VM topology files ensure that the correct CPUs, GPUs and NICs are bound together. Location of this file varies, it **must** be mounted into the container.
+      * **Important:** Place NCCL Topology file under `$LLMB_WORKLOAD` folder as this location is already mounted into running container. 
    2. **NCCL_P2P_CHUNKSIZE**=2097152
       * Increasing message size for NCCL send/recv for optimal performance
-   3. **--container-env**=NCCL_TOPO_FILE,NCCL_P2P_CHUNKSIZE
-      * Pyxis flag to override these variables if they exist in the container with the new settings above.
-   4. **--cpu-bind=mask_cpu**:”fff,fff000,fff000000,fff000000000,fff000000000000,fff000000000000000,fff000000000000000000,fff000000000000000000000"
-      * CPU pinning binds a specific, optimal set of CPUs per mpi process.
 
 
-Example Configuration for Nemo Megatron Launcher:
+Example Configuration for a training recipe:
 ```shell
-export NCCL_TOPO_FILE=/opt/microsoft/nvd5-topo.xml # Exact location varies by cluster
+export NCCL_TOPO_FILE=$LLMB_WORKLOAD/nvd5-topo.xml # Exact location varies by cluster
 export NCCL_P2P_NET_CHUNKSIZE=2097152
-srun --container-image ${IMAGE} \
-   --container-writable \
-   --container-mounts ${NCCL_TOPO_FILE},${DATA_DIR}:/datasets/,${RESULT_DIR},$INDEX_MAPPING_DIR,${STAGE_PATH}/cfg:/cfg/ \
-   --container-env=NCCL_TOPO_FILE,NCCL_P2P_NET_CHUNKSIZE \   
-   --cpu-bind=mask_cpu:"fff,fff000,fff000000,fff000000000,fff000000000000,fff000000000000000,fff000000000000000000,fff000000000000000000000" \
-   --no-container-mount-home
-    <snip> ...
 ```
-
-## Process Pinning
-Process pinning has been found to improve performance for most workloads. We have set defaults that should be broadly applicable. Depending on your exact system configuration these may need to be adjusted to provide optimal performance.
-
-**Prerequisite:** The Slurm `task/affinity` plugin must be configured on your cluster.
-
-For more information on Slurm affinity options see: [Slurm Multi-Core Support README](https://slurm.schedmd.com/mc_support.html)
-
-
-### Default Configuration
-
-The default process pinning configuration uses three key Slurm parameters in our launch scripts:
-
-```shell
-# Calculate cores per task based on available resources
-CPUS_PER_TASK=$(( SLURM_CPUS_ON_NODE / SLURM_NTASKS_PER_NODE ))
-
-# Slurm parameters for process pinning
---cpus-per-task=$CPUS_PER_TASK  # Allocates unique CPU cores to each task
---cpu-bind=verbose              # Bind and show the CPU binding mask used
--m "*:block"                    # Uses block distribution across NUMA nodes
-```
-
-### Customization Options
-
-You can customize the process pinning behavior by modifying these parameters:
-
-1. **CPU Allocation**
-   - Adjust `CPUS_PER_TASK` to change how many cores each process gets
-
-1. **Binding Strategy**
-   - `--cpu-bind=verbose`: Bind and show binding information (recommended)
-   - `--cpu-bind=quiet`: Bind and don't print binding information
-
-1. **Process Distribution**
-   - `-m "*:block"` : Allocates consecutive tasks to the same socket (recipe default)
-   - `-m "*:cyclic"` : Round robin placement of tasks between sockets
-
-
-### Platform-Specific Considerations
-
-Different platforms may require specific tuning, for example if SMT (Simultaneous Multithreading) is not desired:
-- Add `--hint=nomultithread`
-- Adjust CPUS_PER_TASK to be (Number of Physical Cores / Processes per Node).
-
-Monitor performance metrics to determine the optimal configuration for your specific hardware and workload.
-
 
 # Release Notes
 
-## Performance Recipes collection version 25.04.01
-  - Fixed MFU formula for Nemotron4 workload
-  - Fixed setup script for FineTuning workload
+## Performance Recipes version 25.05
 
+### Added
+  - GB200 support for the following recipes
+    - Llama3.1 405B
+    - Grok1 314B
+    - Nemotron4 15B/340B
+    - Deepseek v3
+    - Llama 4 Maverick
+  - Nemotron-H 56B model training recipe for H100 GPUs
+  - End to end installer and launcher for all recipes
+
+
+### Changed
+  - Recipes collection moved from [NGC Collection](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/dgxc-benchmarking/collections/dgxc-benchmarking) to [GitHub](https://github.com/NVIDIA/dgxc-benchmarking).
+
+### Removed
+  - NeMo GPT3 175b training recipe in favor of Nemotron4
+  - Maxtext Llama 3 training recipe
+  - Llama 3 SFT/LoRa fine tuning recipes
 
 # FAQ
 
@@ -227,7 +294,7 @@ These usually mean that one of the GPUs is hanging. Possible resolutions:
 ## 2. Slurm job failed, need to find log files
 
 ### Symptom
-A slurm job failed during benchmark run. E.g., a nemotron benchmark job with ID=2041792 failed
+A Slurm job failed during benchmark run. E.g., a nemotron benchmark job with ID=2041792 failed
 
 ```
 sacct -j 2041792
@@ -241,19 +308,12 @@ JobID           JobName  Partition    Account  AllocCPUS      State ExitCode
 
 ### Solution
 
-#### NeMo1 (e.g., Grok1, GPT3, Maxtext) 
-You can find log files associated with this run under `$STAGE_PATH/results/$GSW_VERSION/$DTYPE/$MODEL_SIZE/$JOB_TOTAL_GPUS` folder.
-
-E.g., for the job failure above and assuming the gpt3 175b job ran on 128 GPUs, used version 25.02, and with precision bf16 the path will be under `$STAGE_PATH/results/25.02/bf16/175b/128/log-nemo_megatron_175b_128_2041792.*`
-
-Search for errors in the `log-nemo_megatron_175b_128_2041792.err` or `log-nemo_megatron_175b_128_2041792.out` files.
-
 #### NeMo2 (e.g., Nemotron4, Llama3.1)
-You can find log files associated with this run under `$STAGE_PATH/experiments/pretrain_nemotron4_${MODEL_SIZE}_${DTYPE}_${JOB_TOTAL_GPUS}` folder. The folder will have subfolders that will contain `log-nemo_nemotron4_*.out` files with a root cause error message.
+You can find log files associated with this run under `$LLMB_WORKLOAD/experiments/pretrain_nemotron4_<size>_<dtype>_<scale>_<config>` folder. The folder will have subfolders that will contain `log-account.pretrain_nemotron4_<size>_<dtype>_<scale>_<config>.out` files with a root cause error message.
 
-E.g., for the job failure above and assuming the nemotron 15b job ran on 16 GPUs, used version 25.04, and with precision bf16 the path will be under `$STAGE_PATH/experiments/pretrain_nemotron4_15b_bf16_16/pretrain_nemotron4_15b_bf16_16_<timestamp>/pretrain_nemotron4_15b_bf16_16/`
+E.g., for the job failure above and assuming the nemotron 15b job ran on 16 GPUs, used version 25.05, and with precision bf16 the path will be under `$LLMB_WORKLOAD/experiments/pretrain_nemotron4_15b_bf16_gpus16_tp1_pp1_cp1_vp1_mbs2_gbs64/...`
 
-Search for errors in the `log-myaccount.pretrain_nemotron4_15b_bf16_16_2041792_0.out` file. 
+Search for errors in the `log-account.pretrain_nemotron4_15b_bf16_gpus16_tp1_pp1_cp1_vp1_mbs2_gbs64_3358926_0.out` file. 
 
 ## 3. Unable to use venv required by benchmark
 
@@ -286,5 +346,7 @@ conda deactivate
 ```
 
 # Support
+
+Terminology used in these recipes is explained in the [Appendix](APPENDIX.md).
 
 For questions or to provide feedback, please contact LLMBenchmarks@nvidia.com
