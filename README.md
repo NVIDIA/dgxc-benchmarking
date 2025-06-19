@@ -125,7 +125,7 @@ The following tables list each benchmark used to evaluate the model's performanc
 | NeMo | Nemotron4 | 25.04.00 | 340B | Pretrain | 128-256 | FP8, BF16 | No | No | Slurm |
 | NeMo | Llama 3.1 | 25.04.01 | 405B | Pretrain | 128-256 | FP8, BF16 | Yes | No | Slurm |
 | NeMo | DeepSeek V3 | 25.04.01 | 671B | Pretrain | 128-256 | BF16 | Yes | No | Slurm |
-| NeMo | Grok1 | 25.04.00 | 314B | Pretrain | 128-256 | FP8, BF16 | No | No | Slurm |
+| NeMo | Grok1 | 25.04.00 | 314B | Pretrain | 128-256 | FP8, BF16 | Yes | No | Slurm |
 | NeMo | Llama4 Maverick | 25.04.01 | 400B | Pretrain | 128-512 | FP8, BF16 | Yes | No | Slurm |
 
 ### H100 Workloads
@@ -139,6 +139,8 @@ Baseline performance metrics were using workloads on the NVIDIA DGX H100 Referen
 | NeMo | DeepSeek V3 | 25.04.01 | 671B | Pretrain | 1024 | BF16 | Yes | No | Slurm |
 | NeMo | Llama4 Maverick | 25.04.01 | 400B | Pretrain | 512 | FP8, BF16 | Yes | No | Slurm |
 | NeMo | Nemotron-H | 25.04.01 | 56B | Pretrain | 32-2048 | FP8 | No | No | Slurm |
+| NeMo | Llama 3.1 | 25.04.01 | 405B | Pretrain | 512 | FP8, BF16 | Yes | No | Slurm |
+| NeMo | Grok1 | 25.04.00 | 314B | Pretrain | 512 | FP8, BF16 | Yes | No | Slurm |
 | NIM | Llama 3.1 and 3.2 | instruct:1.3.3, rerank:1.3, embed:1.3.1 | 70b, 1b | Inference | 1-8 | n/a | Yes | No | Slurm |
 | NIM | Llama 3 | 1.0.3 | 70B | Inference | 4 | FP8 | Yes | No | Slurm |
 | NIM | DeepSeek R1 | 1.7.2 | 671B | Inference | 16 | FP8 | Yes | No | Slurm |
@@ -245,26 +247,19 @@ export NCCL_P2P_NET_CHUNKSIZE=2097152
 
 # Release Notes
 
-## Performance Recipes version 25.05
+## Performance Recipes version 25.05.01
 
 ### Added
-  - GB200 support for the following recipes
+  - H100 support for the following recipes
     - Llama3.1 405B
     - Grok1 314B
-    - Nemotron4 15B/340B
-    - Deepseek v3
-    - Llama 4 Maverick
-  - Nemotron-H 56B model training recipe for H100 GPUs
-  - End to end installer and launcher for all recipes
-
 
 ### Changed
-  - Recipes collection moved from [NGC Collection](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/dgxc-benchmarking/collections/dgxc-benchmarking) to [GitHub](https://github.com/NVIDIA/dgxc-benchmarking).
-
-### Removed
-  - NeMo GPT3 175b training recipe in favor of Nemotron4
-  - Maxtext Llama 3 training recipe
-  - Llama 3 SFT/LoRa fine tuning recipes
+  - Fixed DeepSeek and Llama4 READMEs
+  - Installer
+    - Enforce min and max python versions
+    - Use GRES properly for CPU_PARTITION jobs.
+  - bitsandbytes update for ARM systems.
 
 # FAQ
 

@@ -52,9 +52,9 @@ fi
 
 # -------- llmb-nemo commits
 # r2.3.0 llmb-nemo
-export NEMO_COMMIT="7a8f1cc7bc40a84447c0681a9e4e956a135ae8a2"
-export MEGATRON_COMMIT="7094270c6fa1dbc6b2e99072171e3a559ca36d0f"
-export NEMO_RUN_COMMIT="bc412ee5584ed3072717af59f54565ec0d265a6f" #r0.4.0
+export NEMO_COMMIT="6f2c6fdaffcc0af97a9e2219fcc104e2399627e4"
+export MEGATRON_COMMIT="64cb6bd7a155c4e742514ed1024407fb97d0a367"
+export NEMO_RUN_COMMIT="f3e69eebb2bf66e46f6a2aa64465f714f9ea751d"
 
 # 1. Clone the NeMo source code
 #Setup NeMo 
@@ -71,7 +71,7 @@ popd
 
 # 2. Install dependencies
 pip install 'scipy<1.13.0' # a workaround for compatibility issue
-pip install 'bitsandbytes==0.45.5' # Future NeMo release 25.07/09 will have this fix.
+pip install 'bitsandbytes==0.46.0' # Future NeMo release 25.07/09 will have this fix.
 pip install megatron-core@git+https://github.com/NVIDIA/Megatron-LM.git@$MEGATRON_COMMIT
 pip install nemo_run@git+https://github.com/NVIDIA/NeMo-Run.git@$NEMO_RUN_COMMIT
 

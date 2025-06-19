@@ -3,12 +3,10 @@
 This recipe contains information and scripts to produce performance results for the Llama3.1 405B training workload. The scripts help perform environment setup and launch benchmark jobs.
 This variant of the workload is best-suited for GPU clusters with
 
-**H100**:
-* For H100 support: [see the previous release](https://github.com/NVIDIA/dgxc-benchmarking/blob/v25.04.01/llama3.1/README.md). This workload runs with FP8 and BF16 precision.
-
 **GB200**: 
-* At least 128 GPUs with at least 80 GB memory each. Training of this 405-billion parameter variant of the workload will not fit on fewer GPUs with less memory.
+* At least 128 GPUs with at least 186 GB memory each. Training of this 405-billion parameter variant of the workload will not fit on fewer GPUs with less memory.
 * The GB200 recipes listed below progressively increase GPU count, with configurations weak-scaled to match.
+* This workload runs with FP8 and BF16 precision.
 
 
 | GPUs | SeqLen | Layers | FSDP | TP | PP | CP | EP | ETP | DP | VP | MBS | GBS | GA |
@@ -16,6 +14,15 @@ This variant of the workload is best-suited for GPU clusters with
 | 128  | 8192   | 126    | 0    |  4 | 8  | 2  | NA | NA  | 2  | 8  |  1  | 64  | 32 |
 | 256  | 8192   | 126    | 0    |  4 | 8  | 2  | NA | NA  | 4  | 8  |  1  | 128 | 32 |
 | 512  | 8192   | 126    | 0    |  4 | 8  | 2  | NA | NA  | 8  | 8  |  1  | 256 | 32 |
+
+
+**H100**:
+* At least 512 GPUs with at least 80 GB memory each. Training of this 405-billion parameter variant of the workload will not fit on fewer GPUs with less memory.
+* This workload runs with FP8 and BF16 precision.
+
+| GPUs | SeqLen | Layers | FSDP | TP | PP | CP | EP | ETP | DP | VP | MBS | GBS | GA |
+|------|:------:|:------:|:----:|:--:|:--:|:--:|:--:|:---:|:--:|:--:|:---:|:---:|:--:|
+| 512  | 8192   | 126    | 0    |  8 | 8  | 2  | NA | NA  | 4  | 8  |  1  | 256 | 32 |
 
 # Expected Performance
 
@@ -54,7 +61,14 @@ To calculate the model flops utilization (MFU). Calculation shown [here](#notes)
 MFU = (global batch size) * (model flops) / (training step time) / (number of GPUs) / (peak GPU FLOPS)
 ```
 
-The peak theoretical throughput for GB200 FP8 is **4.9** PFLOPS and for GB200 BF16 is **2.45** PFLOPS.
+
+**Peak theoretical throughput across GPUs and Data Types (in TFLOPS)**
+
+| Data Type | GB200 | H100 |
+|-----------|:-----:|:----:|
+| BF16      | 2450  | 989  |
+| FP8       | 4900  | 1979 |
+
 
 The model flops for Llama3.1 405B for GBS=1 per GPU is 2.17E+16
 
@@ -66,6 +80,8 @@ model flops = 2.17E+16
 
 MFU = 64 * 2.17E+16 / 9.347 / 128 / 2.45E+15 = 47.4%
 ```
+
+# GB200 Performance
 
 | Llama3.1 405b BF16                    | 128x GB200 GPUs | 256x GB200 GPUs | 512x GB200 GPUs |
 |---------------------------------------|:---------------:|:---------------:|:---------------:|
@@ -80,6 +96,22 @@ MFU = 64 * 2.17E+16 / 9.347 / 128 / 2.45E+15 = 47.4%
 | Throughput in tokens per second       | 85514           | 169590          | 335867          |
 | Model flops utilization               | 36.1%           | 35.8%           | 35.5%           |
 | Time to train 1T tokens in days       | 135.35          | 68.25           | 34.46           |
+
+# H100 Performance
+
+| Llama3.1 405b BF16                    | 512x H100 GPUs |
+|---------------------------------------|:--------------:|
+| Training step time (seconds per step) |     19.810      |
+| Throughput in tokens per second       |     105863      |
+| Model flops utilization               |       55.34%    |
+| Time to train 1T tokens in days       |     109.33     |
+
+| Llama3.1 405b FP8                    | 512x H100 GPUs |
+|---------------------------------------|:--------------:|
+| Training step time (seconds per step) |     13.020      |
+| Throughput in tokens per second       |     161072      |
+| Model flops utilization               |      42.12%     |
+| Time to train 1T tokens in days       |     71.86     |
 
 
 # Prerequisites
@@ -169,7 +201,8 @@ JOB_TOTAL_GPUS=<number> [DTYPE=<precision>] [GPU_TYPE=<type>] ./launch.sh
 - `MODEL_SIZE`: Model variant (fixed: `405b`)
   - `405b` - 405 billion parameter model (only supported size)
 - `GPU_TYPE`: Type of GPU hardware (default: `gb200`)
-  - `gb200` - NVIDIA GB200 GPUs (Note: Only GB200 currently supported)
+  - `gb200` - NVIDIA GB200 GPUs
+  - `h100` - NVIDIA H100 GPUs
 
 ### Example Commands
 
@@ -186,6 +219,11 @@ JOB_TOTAL_GPUS=128 DTYPE=bf16 ./launch.sh
 Train with FP8 precision on 256 GB200 GPUs:
 ```shell
 JOB_TOTAL_GPUS=256 ./launch.sh
+```
+
+Train with BF16 precision on 512 H100 GPUs:
+```shell
+JOB_TOTAL_GPUS=512 DTYPE=bf16 GPU_TYPE=h100 ./launch.sh
 ```
 
 # Output Locations
@@ -363,8 +401,8 @@ conda deactivate
 
 To install and activate python venv 
 ```shell
-python3 -m venv $LLMB_INSTALL/venv/<venv_name>
-source $LLMB_INSTALL/venv/<venv_name>/bin/activate
+python3 -m venv $LLMB_INSTALL/venvs/<venv_name>
+source $LLMB_INSTALL/venvs/<venv_name>/bin/activate
 ```
 
 When you are finished running this benchmark you can deactivate the environment, run this command
@@ -374,29 +412,24 @@ deactivate
 
 ### Setup script
 
-Create an install directory by running the attached setup.sh script.
+Create a install directory by running the attached setup.sh. The script converts the docker image to a ```.sqsh``` file under the $LLMB_INSTALL/images folder and installs required packages to the python environment to enable NeMo-Run launcher functionality.
 
-***Important***
-
-The setup script must be run while you are in your virtual environment. 
-This script clones the ***NeMo*** repository, installs ***megatron-core*** and ***nemo_run***, and installs required packages to the python environment to enable NeMo-Run launcher functionality. 
-
-Be sure to **completely deactivate** your virtual environment before importing the container image to be used to run the workload. If using conda this means deactivating (base).
+**Important:** Make sure the previous step has been completed and python virtual environment is active. Run the setup script using the following command.
 
 **SLURM:**
 
 ```shell
 # activate virtual python environment setup previously
 ./setup.sh
-# deactivate virtual environment
+```
+To fetch the image ensure your virtual environment has been **deactivated**, then run:
+
+```shell
 srun --account ${SBATCH_ACCOUNT} --partition ${SBATCH_PARTITION} bash -c "enroot import --output ${LLMB_INSTALL}/images/nvidia+nemo+25.04.01.sqsh docker://nvcr.io#nvidia/nemo:25.04.01"
 ```
-***Important***
-The above srun command converts the docker image to a ```.sqsh``` file under the $LLMB_INSTALL/images folder. Your virtual env must be deactivated before running this command.
 
 
 **Note**: output log from running `setup.sh` script may include an error about tritonclient dependency. The error can be ignored as it doesn't affect benchmark functionality. 
 It would look like this:
 `ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
 tritonclient 2.51.0 requires urllib3>=2.0.7, but you have urllib3 1.26.20 which is incompatible.`
-

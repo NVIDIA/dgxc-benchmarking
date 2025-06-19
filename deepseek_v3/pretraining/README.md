@@ -122,7 +122,7 @@ These parameters can be set either by exporting the environment variable or usin
 
 ## Prepare environment
 
-The recommended way to prepare your environment is to use the **installer** referenced in the [main README](../README.md):
+The recommended way to prepare your environment is to use the **installer** referenced in the [main README](../../README.md):
 
 Note, that a new directory layout and key variables are now used in the recipe:
 
@@ -345,8 +345,8 @@ conda deactivate
 
 To install and activate python venv 
 ```shell
-python3 -m venv $LLMB_INSTALL/venv/<venv_name>
-source $LLMB_INSTALL/venv/<venv_name>/bin/activate
+python3 -m venv $LLMB_INSTALL/venvs/<venv_name>
+source $LLMB_INSTALL/venvs/<venv_name>/bin/activate
 ```
 
 When you are finished running this benchmark you can deactivate the environment, run this command
@@ -356,25 +356,21 @@ deactivate
 
 ### Setup script
 
-Create a install directory by running the attached setup.sh.
+Create a install directory by running the attached setup.sh. The script converts the docker image to a ```.sqsh``` file under the $LLMB_INSTALL/images folder and installs required packages to the python environment to enable NeMo-Run launcher functionality.
 
-***Important***
-
-The setup script must be run while you are in your virtual environment. 
-This script clones the ***NeMo*** repository, installs ***megatron-core*** and ***nemo run***, and installs required packages to the python environment to enable NeMo-Run launcher functionality. 
-
-Be sure to **deactivate** your virtual environment before importing the container image to be used to run the workload. 
+**Important:** Make sure the previous step has been completed and python virtual environment is active. Run the setup script using the following command.
 
 **SLURM:**
 
 ```shell
 # activate virtual python environment setup previously
 ./setup.sh
-# deactivate virtual environment
-srun --account ${SBATCH_ACCOUNT} --partition ${SBATCH_PARTITION} bash -c "srun --account ${SBATCH_ACCOUNT} --partition ${SBATCH_PARTITION} bash -c "enroot import --output ${LLMB_INSTALL}/images/nvidia+nemo+25.04.01.sqsh docker://nvcr.io#nvidia/nemo:25.04.01""
 ```
-***Important***
-The above srun command converts the docker image to a ```.sqsh``` file under the $LLMB_INSTALL/images folder. Your virtual env must be deactivated before running this command. 
+To fetch the image ensure your virtual environment has been **deactivated**, then run:
+
+```shell
+srun --account ${SBATCH_ACCOUNT} --partition ${SBATCH_PARTITION} bash -c "enroot import --output ${LLMB_INSTALL}/images/nvidia+nemo+25.04.01.sqsh docker://nvcr.io#nvidia/nemo:25.04.01"
+``` 
 
 
 **Note**: output log from running `setup.sh` script may include an error about tritonclient dependency. The error can be ignored as it doesn't affect benchmark functionality. 

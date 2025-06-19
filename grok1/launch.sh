@@ -32,7 +32,7 @@ set -eu -o pipefail
 export WORKLOAD_TYPE=pretraining
 export MODEL_NAME=grok1
 export FW_VERSION=25.04.00
-export GSW_VERSION=25.05
+export GSW_VERSION=25.05.01
 
 export OPENBLAS_NUM_THREADS=1 # optional, to avoid resource contention at the frontend node.
 export HF_TOKEN=${HF_TOKEN?"Required variable HF_TOKEN"}
@@ -81,7 +81,7 @@ if [ $GPU_TYPE = "gb200" ]; then
   CP=${CP:-1}
   EP=${EP:-8}
   VP=${VP:-1}
-  ET=${ET:-8}
+  ET=${ET:-4}
   GBS=${GBS:-}
   if [ -z "$GBS" ]; then
     GBS=$(( JOB_TOTAL_GPUS * 2 ))
@@ -108,7 +108,7 @@ elif [ $GPU_TYPE = "h100" ]; then
   PP=${PP:-8}
   CP=${CP:-2}
   EP=${EP:-8}
-  VP=${VP:-1}
+  VP=${VP:-8}
   ET=${ET:-1}
   GBS=${GBS:-}
   if [ -z "$GBS" ]; then

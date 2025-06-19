@@ -2,7 +2,7 @@
 general:
   workload: llama4_maverick
   workload_type: pretraining
-  gsw_version: 25.04.01
+  gsw_version: 25.05.01
   framework: nemo2
 
 container:
