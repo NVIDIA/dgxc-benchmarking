@@ -367,9 +367,9 @@ deactivate
 
 ### Setup script
 
-The setup script creates the necessary folder hierarchy and installs required packages to the python environment to enable NeMo-Run launcher functionality. It does **not** fetch the image which is a separate step.
+Create a install directory by running the attached setup.sh. The script converts the docker image to a ```.sqsh``` file under the $LLMB_INSTALL/images folder and installs required packages to the python environment to enable NeMo-Run launcher functionality.
 
-Make sure the previous step has been completed and python virtual environment is active. Run the setup script using the following command.
+**Important:** Make sure the previous step has been completed and python virtual environment is active. Run the setup script using the following command.
 
 **SLURM:**
 
@@ -377,8 +377,8 @@ Make sure the previous step has been completed and python virtual environment is
 # activate virtual python environment setup previously
 ./setup.sh
 ```
-
 To fetch the image ensure your virtual environment has been **deactivated**, then run:
+
 ```shell
 srun --account ${SBATCH_ACCOUNT} --partition ${SBATCH_PARTITION} bash -c "enroot import --output ${LLMB_INSTALL}/images/nvidia+nemo+25.04.01.sqsh docker://nvcr.io#nvidia/nemo:25.04.01"
 ```

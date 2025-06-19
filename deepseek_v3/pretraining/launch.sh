@@ -31,7 +31,7 @@ set -eu -o pipefail
 export WORKLOAD_TYPE=pretraining
 export MODEL_NAME=deepseek_v3
 export FW_VERSION=25.04.01
-export GSW_VERSION=25.05
+export GSW_VERSION=25.05.01
 
 export OPENBLAS_NUM_THREADS=1 # optional, to avoid resource contention at the frontend node.
 

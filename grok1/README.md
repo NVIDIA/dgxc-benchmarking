@@ -3,9 +3,6 @@
 This recipe contains information and scripts to produce performance results for the Grok 1 training workload on GB200 platforms. The scripts help perform environment setup and launch benchmark jobs.
 This variant of the workload is best-suited for GPU clusters with
 
-**H100**:
-* For H100 support: [see the previous release](https://github.com/NVIDIA/dgxc-benchmarking/blob/v25.04.01/grok1/README_314b.md).
-
 **GB200**:
 * At least 128 GPUs with at least 80 GB memory each. Training of this 314-billion parameter variant of the workload will not fit on fewer GPUs with less memory.
 * GB200 GPUs. This workload runs with FP8 and BF16 precision.
@@ -15,9 +12,17 @@ The GB200 recipes listed below progressively increase GPU count, with configurat
 
 | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | ETP | DP  | VP  | MBS | GBS  | GA  |
 |------|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
-| 128  | 8192   | 64     | 4   | 1   | 1   | 8   | 4   | 32   | 1   | 1   | 256  | 8 |
-| 256  | 8192   | 64     | 4   | 1   | 1   | 8   | 4   | 64   | 1   | 1   | 512  | 8 |
-| 512  | 8192   | 64     | 4   | 1   | 1   | 8   | 4   | 128  | 1   | 1   | 1024 | 8 |
+| 128  | 8192   | 64     | 4   | 1   | 1   | 8   | 4   | 32  | 1   | 1   | 256  | 8   |
+| 256  | 8192   | 64     | 4   | 1   | 1   | 8   | 4   | 64  | 1   | 1   | 512  | 8   |
+| 512  | 8192   | 64     | 4   | 1   | 1   | 8   | 4   | 128 | 1   | 1   | 1024 | 8   |
+
+**H100**:
+* At least 512 GPUs with at least 80 GB memory each. Training of this 314-billion parameter variant of the workload will not fit on fewer GPUs with less memory.
+* This workload runs with FP8 and BF16 precision.
+
+| GPUs | SeqLen | Layers | TP | PP | CP | EP | ETP | DP | VP | MBS | GBS  | GA  |
+|------|:------:|:------:|:--:|:--:|:--:|:--:|:---:|:--:|:--:|:---:|:----:|:---:|
+| 512  | 8192   | 64     |  4 | 8  | 2  | 8  | 1   | 8  | 8  | 1   | 1024 | 128 |
 
 
 # Expected Performance
@@ -59,6 +64,8 @@ MFU = (global batch size) * (model flops) / (training step time) / (number of GP
 
 For GB200 GPUs, peak theoretical throughput for FP8 is 4.9 PFLOPS and for BF16 is 2.45 PFLOPS.
 
+The peak theoretical throughput for H100 FP8 is 1979 TFLOPS and for H100 BF16 is 989 TFLOPS.
+
 The model flops for Grok 1 for GBS=1 per GPU is 4.27E+15
 
 E.g. Grok 1 FP8 on 128x GB200 GPUs (GBS=256)
@@ -69,6 +76,8 @@ model flops = 4.27E+15
 
 MFU = 256 * 4.27E+15 / 6.631 / 128 / 4.9E+15 = 26.3%
 ```
+
+# GB200 Performance
 
 | Grok1 314b BF16 | 128x GB200 GPUs  | 256x GB200 GPUs  | 512x GB200 GPUs  | 
 |---|:---:|:---:|:---:|
@@ -83,6 +92,22 @@ MFU = 256 * 4.27E+15 / 6.631 / 128 / 4.9E+15 = 26.3%
 | Throughput in tokens per second       | 395838.43 | 802891.27 | 807684 |
 | Model flops utilization               | 32.90%  | 33.36%  | 33.6% |
 | Time to train 1T tokens in days       | 29.24  | 14.41  |  14.33 |
+
+# H100 Performance
+
+| Grok1 314b BF16                       | 512x H100 GPUs |
+|---------------------------------------|:--------------:|
+| Training step time (seconds per step) | 16.930         |
+| Throughput in tokens per second       | 495487.77      |
+| Model flops utilization               | 51.00%         |
+| Time to train 1T tokens in days       | 23.36          |
+
+| Grok1 314b FP8                        | 512x H100 GPUs |
+|---------------------------------------|:--------------:|
+| Training step time (seconds per step) | 13.454         |
+| Throughput in tokens per second       | 623502.90      |
+| Model flops utilization               | 32.07%         |
+| Time to train 1T tokens in days       | 18.56          |
 
 # Prerequisites
 
@@ -356,8 +381,8 @@ conda deactivate
 
 To install and activate python venv 
 ```shell
-python3 -m venv $LLMB_INSTALL/venv/<venv_name>
-source $LLMB_INSTALL/venv/<venv_name>/bin/activate
+python3 -m venv $LLMB_INSTALL/venvs/<venv_name>
+source $LLMB_INSTALL/venvs/<venv_name>/bin/activate
 ```
 
 When you are finished running this benchmark you can deactivate the environment, run this command
@@ -367,17 +392,18 @@ deactivate
 
 ### Setup script
 
-The setup script creates the necessary folder hierarchy and installs required packages to the python environment to enable NeMo-Run launcher functionality. It does **not** fetch the image which is a separate step.
+Create a install directory by running the attached setup.sh. The script converts the docker image to a ```.sqsh``` file under the $LLMB_INSTALL/images folder and installs required packages to the python environment to enable NeMo-Run launcher functionality.
 
-Make sure the previous step has been completed and python virtual environment is active. Run the setup script using the following command.
+**Important:** Make sure the previous step has been completed and python virtual environment is active. Run the setup script using the following command.
+
 **SLURM:**
 
 ```shell
 # activate virtual python environment setup previously
 ./setup.sh
 ```
-
 To fetch the image ensure your virtual environment has been **deactivated**, then run:
+
 ```shell
 srun --account ${SBATCH_ACCOUNT} --partition ${SBATCH_PARTITION} bash -c "enroot import --output ${LLMB_INSTALL}/images/nvidia+nemo+25.04.00.sqsh docker://nvcr.io#nvidia/nemo:25.04.00"
 ```

@@ -2,7 +2,7 @@
 general:
   workload: llama3.1
   workload_type: pretraining
-  gsw_version: 25.05
+  gsw_version: 25.05.01
   framework: nemo2
 
 container:
@@ -24,4 +24,9 @@ run:
         - model_size: '405b'
           dtypes: ['fp8', 'bf16']
           scales: [128, 256, 512]
+    h100:
+      model_configs:
+        - model_size: '405b'
+          dtypes: ['fp8', 'bf16']
+          scales: [512]
   

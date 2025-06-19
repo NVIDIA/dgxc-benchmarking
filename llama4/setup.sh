@@ -72,6 +72,6 @@ popd
 
 # 2. Install dependencies
 pip install 'scipy<1.13.0' # a workaround for compatibility issue
-pip install 'bitsandbytes==0.45.5' # Future NeMo release 25.07/09 will have this fix.
+pip install 'bitsandbytes==0.46.0' # Future NeMo release 25.07/09 will have this fix.
 pip install megatron-core@git+https://github.com/NVIDIA/Megatron-LM.git@$MEGATRON_COMMIT
 pip install nemo_run@git+https://github.com/NVIDIA/NeMo-Run.git@$NEMO_RUN_COMMIT

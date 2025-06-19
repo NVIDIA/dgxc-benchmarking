@@ -8,15 +8,15 @@ The GB200 jobs listed below progressively increase GPU count, with configuration
 
 |Model Size|Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  |ETP | MBS | GBS  | GA  |
 |:---------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|:---:|
-| 400b | BF16/FP8  | 128    | 8192   | 32     | 1   | 2   | 1   | 64  | 64   | 12 | 1  | 1   | 1024  | 16 |
-| 400b | BF16/FP8  | 256    | 8192   | 32     | 1   | 2   | 1   | 64  | 128   | 12 | 1  | 1   | 2048  | 16 |
-| 400b | BF16/FP8  | 512    | 8192   | 32     | 1   | 2   | 1   | 64  | 256   | 12 | 1  | 1   | 4096  | 16 |
+| 400b | BF16/FP8  | 128    | 8192   | 48     | 1   | 2   | 1   | 64  | 64   | 12 | 1  | 1   | 1024  | 16 |
+| 400b | BF16/FP8  | 256    | 8192   | 48     | 1   | 2   | 1   | 64  | 128   | 12 | 1  | 1   | 2048  | 16 |
+| 400b | BF16/FP8  | 512    | 8192   | 48     | 1   | 2   | 1   | 64  | 256   | 12 | 1  | 1   | 4096  | 16 |
 
 **H100 Configs** 
 
 |Model Size|Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP | ETP  | MBS | GBS  | GA  |
 |:---------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|:---:|
-| 400b | BF16/FP8  | 512    | 8192   | 32     | 4   | 1   | 1   | 128  | 128   | 12  | 4 | 1   | 1024  | 8 |
+| 400b | BF16/FP8  | 512    | 8192   | 48     | 4   | 1   | 1   | 128  | 128   | 12  | 4 | 1   | 1024  | 8 |
 
 
 # Expected Performance
@@ -388,8 +388,8 @@ conda deactivate
 
 To install and activate python venv 
 ```shell
-python3 -m venv $LLMB_INSTALL/venv/<venv_name>
-source $LLMB_INSTALL/venv/<venv_name>/bin/activate
+python3 -m venv $LLMB_INSTALL/venvs/<venv_name>
+source $LLMB_INSTALL/venvs/<venv_name>/bin/activate
 ```
 
 When you are finished running this benchmark you can deactivate the environment, run this command
@@ -401,7 +401,7 @@ deactivate
 
 Create a install directory by running the attached setup.sh. The script converts the docker image to a ```.sqsh``` file under the $LLMB_INSTALL/images folder and installs required packages to the python environment to enable NeMo-Run launcher functionality.
 
-Make sure the previous step has been completed and python virtual environment is active. Run the setup script using the following command.
+**Important:** Make sure the previous step has been completed and python virtual environment is active. Run the setup script using the following command.
 
 **SLURM:**
 
@@ -409,9 +409,9 @@ Make sure the previous step has been completed and python virtual environment is
 # activate virtual python environment setup previously
 ./setup.sh
 ```
-To fetch the image ensure your virtual environment has been deactivated, then run:
+To fetch the image ensure your virtual environment has been **deactivated**, then run:
 
-```
+```shell
 srun --account ${SBATCH_ACCOUNT} --partition ${SBATCH_PARTITION} bash -c "enroot import --output ${LLMB_INSTALL}/images/nvidia+nemo+25.04.01.sqsh docker://nvcr.io#nvidia/nemo:25.04.01"
 ```
 

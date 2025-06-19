@@ -2,7 +2,7 @@
 general:
   workload: deepseek_v3
   workload_type: pretraining
-  gsw_version: 25.05
+  gsw_version: 25.05.01
   framework: nemo2
 
 container:

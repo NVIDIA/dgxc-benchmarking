@@ -31,7 +31,7 @@ set -eu -o pipefail
 export WORKLOAD_TYPE=pretraining
 export MODEL_NAME=llama3.1
 export FW_VERSION=25.04.01
-export GSW_VERSION=25.05
+export GSW_VERSION=25.05.01
 
 export OPENBLAS_NUM_THREADS=1 # optional, to avoid resource contention at the frontend node.
 export HF_TOKEN=${HF_TOKEN?"Required variable HF_TOKEN"}
@@ -50,13 +50,34 @@ export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh
 
 CLUSTER_TYPE=${CLUSTER_TYPE:-slurm}
 DTYPE=${DTYPE:-fp8}
-JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:-128}
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 PROFILE_ENABLED=${PROFILE_ENABLED,,}
+GPU_METRICS_ENABLED=${ENABLE_GPU_METRICS:-false}
+GPU_METRICS_ENABLED=${GPU_METRICS_ENABLED,,}
 NCCLTRACE_ENABLED=${ENABLE_NCCLTRACE:-false}
 NCCLTRACE_ENABLED=${NCCLTRACE_ENABLED,,}
 GPU_TYPE=${GPU_TYPE:-gb200}
 GPU_TYPE=${GPU_TYPE,,}
+
+if [ $GPU_TYPE = "gb200" ] || [ $GPU_TYPE = "b200" ]; then
+  DEF_JOB_TOTAL_GPUS=128
+  if [ $GPU_TYPE = "gb200" ]; then
+    DEF_GPUS_PER_NODE=4
+  elif [ $GPU_TYPE = "b200" ]; then
+    DEF_GPUS_PER_NODE=8
+  fi
+  DEF_TP=4
+elif [ $GPU_TYPE = "h100" ]; then
+  DEF_JOB_TOTAL_GPUS=512
+  DEF_GPUS_PER_NODE=8
+  DEF_TP=8
+else
+  echo "$GPU_TYPE not supported"
+  exit 1
+fi
+
+JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:-$DEF_JOB_TOTAL_GPUS}
+GPUS_PER_NODE=${GPUS_PER_NODE:-$DEF_GPUS_PER_NODE}
 
 TIME_LIMIT=${TIME_LIMIT:-"00:30:00"}
 MAX_STEPS=${MAX_STEPS:-50}
@@ -77,21 +98,10 @@ fi
 export PROFILE_START_STEP=${PROFILE_START_STEP:-45}
 export PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
 
-if [ $GPU_TYPE = "gb200" ]; then
-  DEF_GPUS_PER_NODE=4
-elif [ $GPU_TYPE = "b200" ] || [ $GPU_TYPE = "h100" ]; then
-  DEF_GPUS_PER_NODE=8
-else
-  echo "$GPU_TYPE not supported"
-  exit 1
-fi
-
-GPUS_PER_NODE=${GPUS_PER_NODE:-$DEF_GPUS_PER_NODE}
-
 NUM_LAYERS=${NUM_LAYERS:-126}
 HIDDEN_SIZE=${HIDDEN_SIZE:-8192}
 
-TP=${TP:-4}
+TP=${TP:-$DEF_TP}
 PP=${PP:-8}
 CP=${CP:-2}
 VP=${VP:-8}
@@ -114,10 +124,13 @@ if [ $PROFILE_ENABLED = true ] && [ $NCCLTRACE_ENABLED = true ]; then
   exit 1
 fi
 
-if [[ "$PROFILE_ENABLED" = "true" ]]; then
+if [[ $PROFILE_ENABLED = true ]]; then
   CONFIG_OVERRIDES+=" -en " 
   CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
   CONFIG_OVERRIDES+=" --profiling_stop_step=$PROFILE_STOP_STEP "
+  if [[ $GPU_METRICS_ENABLED = true ]]; then
+    CONFIG_OVERRIDES+=" -pgm "
+  fi
   MAX_STEPS=$PROFILE_STOP_STEP
 elif [[ $NCCLTRACE_ENABLED = true ]]; then
   CONFIG_OVERRIDES+=" -nt "

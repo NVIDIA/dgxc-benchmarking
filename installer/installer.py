@@ -32,9 +32,11 @@ from typing import Dict, Any, Optional
 
 import questionary
 
-# Define minimum Python version required for virtual environments
+# Define [minimum, maximum) Python version required for virtual environments
 MIN_PYTHON_VERSION = "3.12"
 MIN_PYTHON_VERSION_TUPLE = tuple(map(int, MIN_PYTHON_VERSION.split('.')))
+MAX_PYTHON_VERSION = "3.13"
+MAX_PYTHON_VERSION_TUPLE = tuple(map(int, MAX_PYTHON_VERSION.split('.')))
 
 def find_metadata_files(root_dir: str) -> list[Path]:
     """Find all metadata.yaml files in the given directory and its subdirectories, excluding deprecated folder."""
@@ -385,14 +387,14 @@ def prompt_slurm_info() -> dict:
         return True
     
     print("This is the partition where you want to run the benchmarks.")
-    partition = questionary.text(
+    gpu_partition = questionary.text(
         "SLURM GPU partition:",
         default=default_partition if default_partition else "",
         validate=validate_partition
     ).ask()
     print()
 
-    if partition is None:
+    if gpu_partition is None:
         return None
 
     cpu_default = None
@@ -428,7 +430,7 @@ def prompt_slurm_info() -> dict:
 
     try:
         result = subprocess.run(
-            ["sinfo", "--noheader", "-p", f"{partition},{cpu_partition}", "-o", "%P,%G"],
+            ["sinfo", "--noheader", "-p", f"{gpu_partition},{cpu_partition}", "-o", "%P,%G"],
             capture_output=True,
             text=True,
             check=True
@@ -443,15 +445,19 @@ def prompt_slurm_info() -> dict:
                 p_name = p_name.strip().rstrip('*')
                 gres_raw = gres_raw.strip()
 
-                if p_name == partition:
+                if p_name == gpu_partition:
                     gpu_partition_gres_value = parse_gpu_gres(gres_raw)
                 elif p_name == cpu_partition:
                     cpu_partition_gres_value = parse_gpu_gres(gres_raw)
 
+        # If both partitions are the same, sinfo only returns one line.
+        if gpu_partition == cpu_partition:
+            cpu_partition_gres_value = gpu_partition_gres_value
+
         if gpu_partition_gres_value is not None:
             print(f"Auto-detected GPU partition GRES: {gpu_partition_gres_value} GPUs per node")
         else:
-            print(f"No GPU GRES for partition '{partition}' detected.")
+            print(f"No GPU GRES for partition '{gpu_partition}' detected.")
             
         if cpu_partition_gres_value is not None:
             print(f"Auto-detected CPU partition GRES: {cpu_partition_gres_value} GPUs per node")
@@ -459,15 +465,15 @@ def prompt_slurm_info() -> dict:
             print(f"No GPU GRES detected for CPU partition '{cpu_partition}' (expected)")
 
     except (subprocess.CalledProcessError, FileNotFoundError, Exception) as e:
-        print(f"Note: Could not determine GRES information for partitions {partition},{cpu_partition}: {e}")
+        print(f"Note: Could not determine GRES information for partitions {gpu_partition},{cpu_partition}: {e}")
 
     slurm_config = {
         "slurm": {
             "account": account,
-            "gpu_partition": partition,
+            "gpu_partition": gpu_partition,
             "cpu_partition": cpu_partition,
-            "gpu_partition_gpus_from_gres": gpu_partition_gres_value,
-            "cpu_partition_gpus_from_gres": cpu_partition_gres_value
+            "gpu_partition_gres": gpu_partition_gres_value,
+            "cpu_partition_gres": cpu_partition_gres_value
         }
     }
 
@@ -743,12 +749,12 @@ def prompt_environment_type() -> str:
     print("Environment Configuration")
     print("------------------------")
     print(f"Current Python version: {'.'.join(map(str, current_python_version))}")
-    print(f"Minimum Python version for venvs: {MIN_PYTHON_VERSION}")
+    print(f"Supported Python version range for venvs: [{MIN_PYTHON_VERSION}, {MAX_PYTHON_VERSION})")
     
     venv_available = is_venv_installed()
     conda_available = is_conda_installed()
     
-    can_use_venv = venv_available and current_python_version >= MIN_PYTHON_VERSION_TUPLE
+    can_use_venv = venv_available and MIN_PYTHON_VERSION_TUPLE <= current_python_version < MAX_PYTHON_VERSION_TUPLE
     can_use_conda = conda_available
     
     selected_venv_type = None
@@ -774,20 +780,35 @@ def prompt_environment_type() -> str:
             # venv is available but Python version is too low, conda is available
             print(f"WARNING: Your current Python version ({'.'.join(map(str, current_python_version))}) is below the minimum required ({MIN_PYTHON_VERSION}) for venv workloads.")
             print("Conda is available and will be used instead.")
+        elif venv_available and current_python_version >= MAX_PYTHON_VERSION_TUPLE:
+            # venv is available but Python version is too high, conda is available
+            print(f"WARNING: Your current Python version ({'.'.join(map(str, current_python_version))}) is above the maximum supported ({MAX_PYTHON_VERSION}) for venv workloads.")
+            print("Conda is available and will be used instead.")
         else:
             print("venv is not available. Using conda.")
             
         selected_venv_type = 'conda'
     else:
         # Neither venv nor conda is available, or venv available but wrong version and conda not available
-        error_message = "Error: Cannot proceed with installation."
+        print("Error: Cannot proceed with installation.")
+        print()
+        
         if venv_available and current_python_version < MIN_PYTHON_VERSION_TUPLE:
-             error_message += f"Your current Python version ({'.'.join(map(str, current_python_version))}) is below the minimum required ({MIN_PYTHON_VERSION}) for venv workloads."
+            print(f"Your current Python version ({'.'.join(map(str, current_python_version))}) is below the minimum required ({MIN_PYTHON_VERSION}).")
+            print("To fix this issue, please either:")
+            print(f"  1. Install conda/miniconda (recommended)")
+            print(f"  2. Upgrade your Python to version {MIN_PYTHON_VERSION} but less than {MAX_PYTHON_VERSION}")
+        elif venv_available and current_python_version >= MAX_PYTHON_VERSION_TUPLE:
+            print(f"Your current Python version ({'.'.join(map(str, current_python_version))}) is above the maximum supported ({MAX_PYTHON_VERSION}).")
+            print("To fix this issue, please either:")
+            print(f"  1. Install conda/miniconda (recommended)")
+            print(f"  2. Use Python version {MIN_PYTHON_VERSION} but less than {MAX_PYTHON_VERSION}")
         else:
-            error_message += "Neither venv nor conda is available on your system."
-
-        error_message += "A compatible virtual environment is required to install the recipes. Please ensure venv (with Python = 3.12.x) or conda is installed."
-        print(error_message)
+            print("Neither venv nor conda is available on your system.")
+            print("To fix this issue, please either:")
+            print(f"  1. Install conda/miniconda (recommended)")
+            print(f"  2. Install Python {MIN_PYTHON_VERSION} with venv support")
+        
         raise SystemExit(1)
 
     if selected_venv_type is None:
@@ -821,9 +842,9 @@ def create_cluster_config(install_path: str, root_dir: str, selected_workloads: 
         'slurm': {
             'account': slurm_info['slurm']['account'],
             'gpu_partition': slurm_info['slurm']['gpu_partition'],
-            'gpu_gres': slurm_info['slurm'].get('gpu_partition_gpus_from_gres'),
+            'gpu_gres': slurm_info['slurm'].get('gpu_partition_gres'),
             'cpu_partition': slurm_info['slurm']['cpu_partition'],
-            'cpu_gres': slurm_info['slurm'].get('cpu_partition_gpus_from_gres')
+            'cpu_gres': slurm_info['slurm'].get('cpu_partition_gres')
         },
         'workloads': {
             'installed': selected_workloads,
@@ -881,9 +902,9 @@ def fetch_container_images(images: Dict[str, str], install_path: str, node_archi
             cmd_args.append(f"docker://{image_url}")
 
             if install_method == 'slurm':
-                srun_args = ["srun", f"--account={slurm_info['slurm']['account']}", f"--partition={slurm_info['slurm']['cpu_partition']}", "-t", "60", "--exclusive", "--pty"]
-                #if slurm_info['slurm'].get('gpus_per_node'):
-                #     srun_args.append(f"--gres=gpu:{slurm_info['slurm']['gpus_per_node']}")
+                srun_args = ["srun", f"--account={slurm_info['slurm']['account']}", f"--partition={slurm_info['slurm']['cpu_partition']}", "-t", "35", "--exclusive", "--pty"]
+                if slurm_info['slurm'].get('cpu_partition_gres'):
+                    srun_args.append(f"--gpus-per-node={slurm_info['slurm']['cpu_partition_gres']}")
 
                 full_cmd_args = srun_args + cmd_args
                 print(f"Submitting download via SLURM: {' '.join(full_cmd_args)}")
@@ -1045,6 +1066,9 @@ def main():
     #print_available_workloads(workloads)
     
     try:
+        venv_type = prompt_environment_type()
+        print()
+
         install_path = prompt_install_location()
         if not install_path:
             print("\nInstallation cancelled.")
@@ -1064,9 +1088,6 @@ def main():
         if not filtered_workloads:
             print(f"No workloads found that support {gpu_type} GPU type.")
             return
-
-        venv_type = prompt_environment_type()
-        print()
 
         install_method = prompt_install_method()
         print()
