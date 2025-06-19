@@ -70,13 +70,6 @@ if [[ $CLUSTER_TYPE != "slurm" ]]; then
   exit 1
 fi
 
-# Validate that checkpointing features are only used with H100 GPUs
-if [[ $ENABLE_CHECKPOINT = true ]] && [[ $GPU_TYPE != "h100" ]]; then
-  echo "Error: ENABLE_CHECKPOINT=true is only supported with GPU_TYPE=h100. Current GPU_TYPE=$GPU_TYPE"
-  exit 1
-fi
-
-
 if [[ $MODEL_SIZE = 15b ]] && [[ $STRONG_SCALING = true ]]; then
   echo "Strong scaling is only supported with MODEL_SIZE=340b. Current MODEL_SIZE=$MODEL_SIZE"
   exit 1
@@ -84,11 +77,6 @@ fi
 
 if [[ $GPU_TYPE = h100 ]] && [[ $STRONG_SCALING = true ]]; then
   echo "Strong scaling is only supported with GPU_TYPE=gb200. Current GPU_TYPE=$GPU_TYPE"
-  exit 1
-fi
-
-if [[ -n ${LOAD_CHECKPOINT_PATH-} ]] && [[ $GPU_TYPE != "h100" ]]; then
-  echo "Error: LOAD_CHECKPOINT_PATH is only supported with GPU_TYPE=h100. Current GPU_TYPE=$GPU_TYPE"
   exit 1
 fi
 
