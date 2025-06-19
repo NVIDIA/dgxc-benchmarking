@@ -338,8 +338,6 @@ Since most of the benchmarking jobs run on multiple GPUs, there will be multiple
 
 Checkpoint save and load can be enabled for this workload in order to measure the impact of storage on checkpointing operations. The additional collected metrics are: time to save a checkpoint and time to load a checkpoint. 
 
-**Note**: Checkpointing features (both saving and loading checkpoints) are only supported on H100 GPUs. Attempting to use `ENABLE_CHECKPOINT=true` or `LOAD_CHECKPOINT_PATH` with other GPU types will result in an error.
-
 ## Save Checkpoint
 
 Save checkpoint feature works for both Nemotron4 15b and 340b sizes with either FP8 or BF16 precision. Make sure your file system has sufficient disk space to accomodate checkpoint sizes below:
