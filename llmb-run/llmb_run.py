@@ -573,16 +573,16 @@ def model_optimizations(model_overrides):
     return ' '.join(optimizations)
 
 def get_slurm_env_vars(config):
-    """Convert slurm config section to SBATCH_ environment variables."""
+    """Convert slurm config section to SLURM_ environment variables."""
     slurm_env = {}
     slurm_config = config.get('slurm', {})
     
     if slurm_config.get('account'):
-        slurm_env['SBATCH_ACCOUNT'] = str(slurm_config['account'])
+        slurm_env['SLURM_ACCOUNT'] = str(slurm_config['account'])
     if slurm_config.get('gpu_partition'):
-        slurm_env['SBATCH_PARTITION'] = str(slurm_config['gpu_partition'])
+        slurm_env['SLURM_PARTITION'] = str(slurm_config['gpu_partition'])
     if slurm_config.get('gpu_gres'):
-        slurm_env['SBATCH_GPUS_PER_NODE'] = str(slurm_config['gpu_gres'])
+        slurm_env['SLURM_GPUS_PER_NODE'] = str(slurm_config['gpu_gres'])
     
     return slurm_env
 
