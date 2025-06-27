@@ -264,7 +264,7 @@ For comprehensive examples of both simple and complex configurations, see the [B
 
 5. **Job Submission Fails**
    - Check your Slurm account and partition settings in `cluster_config.yaml`
-   - If your system does not support GRES, make sure `SBATCH_GPUS_PER_NODE` is not in your environment section
+   - If your system does not support GRES, make sure `SLURM_GPUS_PER_NODE` is not in your environment section
    - Use `-v` flag for verbose output to see detailed error messages
 
 ## Alternative Installation Methods
