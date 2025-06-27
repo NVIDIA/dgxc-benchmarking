@@ -45,13 +45,34 @@ Depending on your cluster's job scheduler, ensure the following are met:
 2. (Optional) For NIM Inference workloads only:
    - Generate an NGC API key from the [NGC Registry](https://org.ngc.nvidia.com/setup)
    - Install and configure the NGC CLI:
-     ```bash
-     curl -L https://ngc.nvidia.com/downloads/ngccli_linux.zip -o ngccli_linux.zip
-     unzip -q ngccli_linux.zip -d $HOME/.local/bin
-     rm ngccli_linux.zip
-     export PATH=$HOME/.local/bin:$PATH
-     ngc config set
-     ```
+	<details>
+	
+	<summary>x86</summary>
+	
+	```bash
+	curl -L https://ngc.nvidia.com/downloads/ngccli_linux.zip -o ngccli_linux.zip
+	unzip -q ngccli_linux.zip -d $HOME/.local/bin
+	rm ngccli_linux.zip
+	export PATH=$HOME/.local/bin:$PATH
+	ngc config set
+	```
+	
+	</details>
+	
+	<details>
+	
+	<summary>arm64</summary>
+	
+	```bash
+ 	curl -L https://ngc.nvidia.com/downloads/ngccli_arm64.zip -o ngccli_arm64.zip
+	unzip -q ngccli_arm64.zip -d $HOME/.local/bin
+	rm ngccli_arm64.zip
+	export PATH=$HOME/.local/bin/ngc-cli:$PATH
+	ngc config set
+	```
+	</details>
+
+     
 
 3. Run the installer:
    ```bash
