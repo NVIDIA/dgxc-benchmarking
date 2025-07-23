@@ -1,3 +1,9 @@
+## [v25.05.02] - 2025-07-22
+
+### Updated
+  - H100 baseline performance numbers based on most recent runs
+    - Grok1 314B
+
 ## [v25.05.01] - 2025-06-18
 
 ### Added

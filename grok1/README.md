@@ -97,17 +97,17 @@ MFU = 256 * 4.27E+15 / 6.631 / 128 / 4.9E+15 = 26.3%
 
 | Grok1 314b BF16                       | 512x H100 GPUs |
 |---------------------------------------|:--------------:|
-| Training step time (seconds per step) | 16.930         |
-| Throughput in tokens per second       | 495487.77      |
-| Model flops utilization               | 51.00%         |
-| Time to train 1T tokens in days       | 23.36          |
+| Training step time (seconds per step) | 15.933         |
+| Throughput in tokens per second       | 526493         |
+| Model flops utilization               | 54.2%          |
+| Time to train 1T tokens in days       | 21.98          |
 
 | Grok1 314b FP8                        | 512x H100 GPUs |
 |---------------------------------------|:--------------:|
-| Training step time (seconds per step) | 13.454         |
-| Throughput in tokens per second       | 623502.90      |
-| Model flops utilization               | 32.07%         |
-| Time to train 1T tokens in days       | 18.56          |
+| Training step time (seconds per step) | 13.433         |
+| Throughput in tokens per second       | 624478         |
+| Model flops utilization               | 32.2%          |
+| Time to train 1T tokens in days       | 18.53          |
 
 # Prerequisites
 
