@@ -1,3 +1,8 @@
+## [v25.04.02] - 2025-07-23
+
+### Changed
+  - Fixed launch errors for nemotron and llama 3.1 recipes
+
 ## [v25.04.01] - 2025-05-16
 
 ### Changed

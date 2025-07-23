@@ -194,9 +194,10 @@ Monitor performance metrics to determine the optimal configuration for your spec
 
 # Release Notes
 
-## Performance Recipes collection version 25.04.01
-  - Fixed MFU formula for Nemotron4 workload
-  - Fixed setup script for FineTuning workload
+## [v25.04.02] - 2025-07-23
+
+### Changed
+  - Fixed launch errors for nemotron and llama 3.1 recipes
 
 
 # FAQ
