@@ -247,19 +247,11 @@ export NCCL_P2P_NET_CHUNKSIZE=2097152
 
 # Release Notes
 
-## Performance Recipes version 25.05.01
+## Performance Recipes version 25.05.02
 
-### Added
-  - H100 support for the following recipes
-    - Llama3.1 405B
+### Updated
+  - H100 baseline performance numbers based on most recent runs
     - Grok1 314B
-
-### Changed
-  - Fixed DeepSeek and Llama4 READMEs
-  - Installer
-    - Enforce min and max python versions
-    - Use GRES properly for CPU_PARTITION jobs.
-  - bitsandbytes update for ARM systems.
 
 # FAQ
 
