@@ -7,7 +7,7 @@ general:
 
 container:
   images: 
-    - 'nvcr.io/nvidia/nemo:25.04.01'
+    - 'nvcr.io#nvidia/nemo:25.04.01'
 
 setup:
   setup_script: 'setup.sh'
