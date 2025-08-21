@@ -268,11 +268,10 @@ export NCCL_P2P_NET_CHUNKSIZE=2097152
 
 # Release Notes
 
-## Performance Recipes version 25.05.02
+## Performance Recipes version 25.05.03
 
-### Updated
-  - H100 baseline performance numbers based on most recent runs
-    - Grok1 314B
+### Changed
+  - Fixed nvcr.io links in DeepSeek V3 and Nemotron-H metadata files.
 
 # FAQ
 

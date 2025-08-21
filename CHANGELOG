@@ -1,3 +1,8 @@
+## [v25.05.03] - 2025-08-21
+
+### Changed
+  - Fixed nvcr.io links in DeepSeek V3 and Nemotron-H metadata files.
+
 ## [v25.05.02] - 2025-07-22
 
 ### Updated
