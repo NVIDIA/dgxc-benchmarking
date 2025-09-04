@@ -1,3 +1,12 @@
+## [v25.05.04] - 2025-09-04
+
+### Added
+  - H100 512 GPU support for DeepSeek V3 Pretrain
+
+### Changed
+  - Bug fix for broken launch sequence due to transformers package update
+  - Include latest LLMB tooling with improved capabilities for mass recipe submission and other updates
+
 ## [v25.05.03] - 2025-08-21
 
 ### Changed

@@ -44,3 +44,9 @@ nemotron/0
 
 *.egg-info
 build/
+.venv/
+.pytest_cache/
+.coverage
+__pycache__/
+llm-benchmarking-collection-internal.cursor-workspace.code-workspace
+.vscode/settings.json

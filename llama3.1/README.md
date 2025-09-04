@@ -167,10 +167,10 @@ The easiest way to run benchmarks is using the llmb-run launcher tool. This meth
 cd $LLMB_INSTALL
 
 # Run a benchmark with llmb-run
-llmb-run single -w pretraining_llama3.1 -s 405b --dtype fp8 --scale 128
+llmb-run single -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128
 
 # Example with BF16 precision
-llmb-run single -w pretraining_llama3.1 -s 405b --dtype bf16 --scale 256
+llmb-run single -w pretrain_llama3.1 -s 405b --dtype bf16 --scale 256
 ```
 
 For more details on llmb-run usage, see the [llmb-run documentation](../llmb-run/README.md).

@@ -28,7 +28,7 @@ if [ ${BASH_VERSION:0:1} -lt 4 ] || [ ${BASH_VERSION:0:1} -eq 4 -a ${BASH_VERSIO
     exit 1
 fi
 
-export WORKLOAD_TYPE=pretraining
+export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=deepseek_v3
 export FW_VERSION=25.04.01
 
@@ -71,5 +71,6 @@ popd
 # 2. Install dependencies
 pip install 'scipy<1.13.0' # a workaround for compatibility issue
 pip install 'bitsandbytes==0.46.0' # Future NeMo release 25.07/09 will have this fix.
+pip install 'transformers==4.55.4'
 pip install megatron-core@git+https://github.com/NVIDIA/Megatron-LM.git@$MEGATRON_COMMIT
 pip install nemo_run@git+https://github.com/NVIDIA/NeMo-Run.git@$NEMO_RUN_COMMIT

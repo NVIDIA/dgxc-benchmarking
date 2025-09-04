@@ -36,7 +36,7 @@ cd $LLMB_INSTALL
 llmb-run list
 
 # Run your first job (example)
-llmb-run single -w pretraining_nemotron -s 340b --dtype fp8 --scale 256
+llmb-run single -w pretrain_nemotron4 -s 340b --dtype fp8 --scale 256
 ```
 
 **Note**: llmb-run requires access to `cluster_config.yaml` which is located in your installation directory. Always run llmb-run commands from this directory.
@@ -75,7 +75,7 @@ Workload configuration:
 
 ## Commands
 
-llmb-run supports three main commands: `list`, `single`, and `bulk`.
+llmb-run supports four main commands: `list`, `single`, `bulk`, and `submit-all`.
 
 ### List Command
 
@@ -87,7 +87,6 @@ llmb-run list
 ```
 
 #### Options
-- `-v, --verbose`: Show detailed configuration for each workload including data types, scales, and GPU types
 - `-w, --workload <name>`: Show detailed information for a specific workload
 
 #### Examples
@@ -97,14 +96,9 @@ llmb-run list
 llmb-run list
 ```
 
-2. Show detailed configuration for all workloads:
+2. Show details for a specific workload:
 ```bash
-llmb-run list --verbose
-```
-
-3. Show details for a specific workload:
-```bash
-llmb-run list -w pretraining_llama3.1
+llmb-run list -w pretrain_llama3.1
 ```
 
 ### Single Job
@@ -117,7 +111,7 @@ llmb-run single -w <workload> -s <model_size> --dtype <fp8/bf16> --scale <num_gp
 ```
 
 #### Required Flags
-- `-w, --workload`: Name of the workload to run (e.g., pretraining_llama3.1, pretraining_nemotron)
+- `-w, --workload`: Name of the workload to run (e.g., pretrain_llama3.1, pretrain_nemotron4)
 - `-s, --model_size`: Size of the model (e.g., 405b, 340b, 314b)
 - `--dtype`: Data type for the model (supported values: fp8, bf16)
 - `--scale`: Number of GPUs to use for the job
@@ -129,26 +123,31 @@ llmb-run single -w <workload> -s <model_size> --dtype <fp8/bf16> --scale <num_gp
 - `-d, --dryrun`: Preview mode that lists the job parameters without submitting
 - `-v, --verbose`: Enable verbose output including debug information
 
+
 #### Examples
 
 1. Basic job submission:
 ```bash
-llmb-run single -w pretraining_llama3.1 -s 405b --dtype fp8 --scale 256
+llmb-run single -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 256
 ```
 
 2. Job with profiling enabled:
 ```bash
-llmb-run single -w pretraining_nemotron -s 340b --dtype fp8 --scale 256 -p
+# Enable profiling with GPU metrics
+ENABLE_GPU_METRICS=true llmb-run single -w pretrain_nemotron4 -s 340b --dtype fp8 --scale 256 -p
+
+# Enable profiling without GPU metrics (default)
+llmb-run single -w pretrain_nemotron4 -s 340b --dtype fp8 --scale 256 -p
 ```
 
 3. Preview job parameters (dry run):
 ```bash
-llmb-run single -w pretraining_grok1 -s 314b --dtype fp8 --scale 256 -d
+llmb-run single -w pretrain_grok1 -s 314b --dtype fp8 --scale 256 -d
 ```
 
 4. Verbose output with profiling:
 ```bash
-llmb-run single -w pretraining_grok1 -s 314b --dtype bf16 --scale 128 -p -v
+llmb-run single -w pretrain_grok1 -s 314b --dtype bf16 --scale 128 -p -v
 ```
 
 **Note**: The script validates the workload and model size against available configurations and your cluster's GPU type. If the combination is invalid, it will show suggestions and error out before submission.
@@ -179,7 +178,7 @@ For simple configurations, you can use a basic format:
 
 Example:
 ```
-pretraining_nemotron_340b:
+pretrain_nemotron4_340b:
 ('bf16', [128, 256, 512], 3)
 ('fp8', [128], 1)
 ```
@@ -187,7 +186,7 @@ This will run Nemotron 340b bf16 at 128, 256 and 512 GPUs 3x each. And fp8 128 G
 
 You can also mix and match:
 ```
-pretraining_nemotron_340b:
+pretrain_nemotron4_340b:
 (['bf16','fp8'], [128, 256, 512], 3)
 ('fp8', [1024], 1, True)
 ```
@@ -228,6 +227,100 @@ The advanced YAML format provides more flexibility and control over job configur
   - `overrides`: Task-specific overrides for `env`.
 
 For comprehensive examples of both simple and complex configurations, see the [Bulk_Examples.md](Bulk_Examples.md) file.
+
+### Submit All Jobs
+
+The `submit-all` command automatically discovers all installed pretrain and finetune workloads and generates jobs based on their metadata, up to a specified maximum scale.
+
+#### Basic Usage
+```bash
+llmb-run submit-all --max-scale <num_gpus>
+```
+
+#### Required Flags
+- `--max-scale`: Maximum scale (number of GPUs) to test up to. The tool will generate jobs for all supported scales up to this limit, automatically extending with power-of-2 scales if not explicitly defined in metadata (unless `exact_scales: true` is set).
+
+#### Optional Flags
+- `--repeats <num>`: Number of repeats for each test configuration (default: 1).
+- `-p, --profile`: Enable profiling for all generated jobs.
+- `-d, --dryrun`: Preview mode that lists all jobs to be submitted without actually submitting them.
+- `-v, --verbose`: Enable verbose output including debug information.
+
+#### Examples
+
+1. Preview all jobs up to 256 GPUs:
+```bash
+llmb-run submit-all --max-scale 256 --dryrun
+```
+
+2. Submit all jobs up to 512 GPUs with 3 repeats each:
+```bash
+llmb-run submit-all --max-scale 512 --repeats 3
+```
+
+3. Submit all jobs with profiling enabled, up to 1024 GPUs:
+```bash
+llmb-run submit-all --max-scale 1024 --profile
+```
+
+## Job Configuration Files
+
+When you launch a job using `llmb-run`, a `llmb-config_<JOBID>.yaml` file is automatically created in the experiment's folder. This file contains comprehensive information about the job configuration and can be useful for:
+
+- **Job tracking**: Keep a record of all job parameters and settings
+- **Reproducibility**: Recreate the exact same job configuration later
+- **Debugging**: Understand what parameters were used for a specific run
+- **Analysis**: Extract job metadata for performance analysis
+
+### Config File Location
+
+- **Nemo2 launcher**: The config file is created in the experiment's working directory (returned by the launcher)
+- **Sbatch launcher**: The config file is created in the current working directory
+
+### Config File Structure
+
+The `llmb-config_<JOBID>.yaml` file contains the following sections:
+
+```yaml
+job_info:
+  job_id: "3530909"                    # SLURM job ID
+  launch_time: "2025-01-15T10:30:45"  # ISO timestamp of job launch
+
+workload_info:
+  framework: "nemo2"                   # Framework used (nemo2, maxtext, etc.)
+  gsw_version: "25.07"                 # GSW version
+  fw_version: "25.04.00"               # Framework version from container image
+  workload_type: "pretrain"            # Type of workload (pretrain, finetune, etc.)
+  synthetic_dataset: true              # Whether synthetic dataset is used
+
+model_info:
+  model_name: "nemotron4"               # Model name
+  model_size: "340b"                   # Model size
+  dtype: "fp8"                         # Data type (fp8, bf16)
+  scale: 256                           # Number of GPUs
+  gpu_type: "h100"                     # GPU type
+
+cluster_info:
+  cluster_name: "cluster1"             # Cluster name
+  gpus_per_node: "8"                   # GPUs per node configuration
+  llmb_install: "/path/to/install"     # LLMB installation path
+  llmb_repo: "/path/to/repo"           # Repository path
+  slurm_account: "account_name"        # SLURM account
+  slurm_gpu_partition: "partition"     # SLURM partition
+
+container_info:
+  images:                              # Container images used
+    - "nvcr.io#nvidia/nemo:25.04.00"
+
+job_config:
+  profile_enabled: true                # Whether profiling was enabled
+  env_overrides:                       # Environment variable overrides
+    DEBUG: "true"
+  model_overrides:                     # Model parameter overrides
+    seq_len: 8192
+```
+
+See [example_llmb_config.yaml](example_llmb_config.yaml) for a complete example.
 
 ## Troubleshooting
 
@@ -293,8 +386,9 @@ chmod +x llmb-run
 ### Option 3: Python Module
 ```bash
 # Run as a Python module (must be in directory with cluster_config.yaml)
-python3 llmb_run.py --help
-```**Note**: These alternative methods require you to:
+llmb-run --help
+```
+**Note**: These alternative methods require you to:
 1. Create your own `cluster_config.yaml`
 2. Install workloads manually
 3. Set up any required virtual environments

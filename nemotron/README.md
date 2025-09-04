@@ -210,10 +210,10 @@ The easiest way to run benchmarks is using the llmb-run launcher tool. This meth
 cd $LLMB_INSTALL
 
 # Run a benchmark with llmb-run
-llmb-run single -w pretraining_nemotron -s 15b --dtype fp8 --scale 128
+llmb-run single -w pretrain_nemotron -s 15b --dtype fp8 --scale 128
 
 # Example with 340B model
-llmb-run single -w pretraining_nemotron -s 340b --dtype bf16 --scale 256
+llmb-run single -w pretrain_nemotron -s 340b --dtype bf16 --scale 256
 ```
 
 For more details on llmb-run usage, see the [llmb-run documentation](../llmb-run/README.md).

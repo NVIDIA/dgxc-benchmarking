@@ -4,13 +4,21 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "llmb-installer"
-version = "0.1.0"
+version = "0.10.3"
+requires-python = ">=3.10"
 description = "Installer for LLM benchmarking workloads"
 
 dependencies = [
     "PyYAML>=6.0",
     "questionary>=1.10.0",
+    "prompt_toolkit<3.0.52",
 ]
 
 [project.scripts]
 llmb-install = "installer:main" 
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0"
+]

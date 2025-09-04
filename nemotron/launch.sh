@@ -28,10 +28,10 @@ fi
 
 set -eu -o pipefail
 
-export WORKLOAD_TYPE=pretraining
+export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=nemotron
 export FW_VERSION=25.04.00
-export GSW_VERSION=25.05.01
+export GSW_VERSION=25.05.04
 
 export OPENBLAS_NUM_THREADS=1 # optional, to avoid resource contention at the frontend node.
 

@@ -23,7 +23,7 @@ Bulk job submission allows you to run multiple workloads with different configur
 
 ### Basic Configuration
 ```yaml
-pretraining_nemotronh_56b:
+pretrain_nemotron-h_56b:
   tasks:
     - dtypes: 'fp8'
       scales: [128, 256, 512]
@@ -33,19 +33,19 @@ pretraining_nemotronh_56b:
 
 ### Multiple Data Types
 ```yaml
-pretraining_nemotronh_56b:
+pretrain_nemotron4_15b:
   tasks:
     - dtypes: ['fp8', 'bf16']
-      scales: [128, 256]
+      scales: [16, 32]
       repeats: 2
 ```
-**Explanation**: This configuration will run the workload with both fp8 and bf16 precision at two different scales. Each combination (fp8@128, fp8@256, bf16@128, bf16@256) will be run twice. Total of 8 jobs will be submitted.
+**Explanation**: This configuration will run the workload with both fp8 and bf16 precision at two different scales. Each combination (fp8@16, fp8@32, bf16@16, bf16@32) will be run twice. Total of 8 jobs will be submitted.
 
 ## Intermediate Examples
 
 ### With Environment Variables
 ```yaml
-pretraining_grok1_314b:
+pretrain_grok1_314b:
   defaults:
     env:
       DEBUG: true
@@ -60,7 +60,7 @@ pretraining_grok1_314b:
 
 ### Multiple Tasks with Overrides
 ```yaml
-pretraining_nemotron_340b:
+pretrain_nemotron_340b:
   defaults:
     env:
       LOG_LEVEL: "INFO"
@@ -87,7 +87,7 @@ pretraining_nemotron_340b:
 
 ### Multiple Workloads with Different Configurations
 ```yaml
-pretraining_llama3.1_405b:
+pretrain_llama3.1_405b:
   defaults:
     env:
       NCCL_IB_QPS_PER_CONNECTION: 1
@@ -96,7 +96,7 @@ pretraining_llama3.1_405b:
       scales: [256, 512]
       repeats: 3
 
-pretraining_grok1_314b:
+pretrain_grok1_314b:
   tasks:
     - dtypes: 'fp8'
       scales: [128, 256]
@@ -107,8 +107,8 @@ pretraining_grok1_314b:
       profile: true
 ```
 **Explanation**: This example shows how to configure multiple different workloads:
-1. `pretraining_llama3.1_405b`: Runs with both precisions at two scales, with `ENABLE_TF32` set. Each configuration is repeated 3 times.
-2. `pretraining_grok1_314b`: Runs with fp8 at two scales, repeated twice. It also includes separate profiling runs for each scale.
+1. `pretrain_llama3.1_405b`: Runs with both precisions at two scales, with `NCCL_IB_QPS_PER_CONNECTION` set. Each configuration is repeated 3 times.
+2. `pretrain_grok1_314b`: Runs with fp8 at two scales, repeated twice. It also includes separate profiling runs for each scale.
 3. Each workload has its own configuration.
 
 ## Usage
@@ -120,7 +120,7 @@ To run any of these examples:
 llmb-run bulk my_config.yaml
 
 # Using python directly
-python3 llmb_run.py bulk my_config.yaml
+llmb-run bulk my_config.yaml
 
 # Dry run to preview jobs (recommended first step)
 llmb-run bulk my_config.yaml --dryrun

@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
@@ -20,21 +18,32 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-"""
-llmb-run: A lightweight tool for automating submission of single jobs and batches of workloads.
 
-This is a simple wrapper script that imports and runs the main function from the llmb_run package.
-"""
+"""Constants used throughout the llmb-run application."""
 
-import sys
-import os
+# SLURM configuration
+SLURM_OUTPUT_PATTERN = 'slurm-%j.out'
 
-# Add the src directory to the Python path so we can import llmb_run
-script_dir = os.path.dirname(os.path.abspath(__file__))
-src_dir = os.path.join(script_dir, 'src')
-sys.path.insert(0, src_dir)
+# File patterns
+METADATA_FILE_PATTERN = '**/metadata.yaml'
 
-from llmb_run import main
+# Model parameter mappings
+NEMO_MODEL_PARAMS = {
+    "mbs": "model.micro_batch_size",
+    "gbs": "model.global_batch_size",
+    "cp": "model.context_parallel_size",
+    "tp": "model.tensor_model_parallel_size",
+    "pp": "model.pipeline_model_parallel_size",
+    "vp": "model.virtual_pipeline_model_parallel_size",
+}
 
-if __name__ == '__main__':
-    main()
+# Mapping of GPU types to number of GPUs per node
+GPU_TYPE_TO_NUM_GPUS = {
+    "a100": 8,
+    "h100": 8,
+    "b200": 8,
+    "gb200": 4,
+}
+
+# Workload exclusions (currently empty but keeping for future use)
+EXCLUDE_WORKLOADS = []

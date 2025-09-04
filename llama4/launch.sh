@@ -36,10 +36,10 @@ set -eu -o pipefail
 : "${GPU_TYPE:?Required variable GPU_TYPE (Eg: gb200, h100)}"
 : "${LLMB_INSTALL:?Required variable LLMB_INSTALL}"
 
-export WORKLOAD_TYPE=pretraining
+export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=llama4_maverick
 export FW_VERSION=25.04.01
-export GSW_VERSION=25.05.01
+export GSW_VERSION=25.05.04
 
 export OPENBLAS_NUM_THREADS=1 # optional, to avoid resource contention at the frontend node.
 

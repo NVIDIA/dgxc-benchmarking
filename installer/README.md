@@ -4,7 +4,7 @@ The installer is an interactive tool that simplifies the setup and deployment of
 
 ## Quick Start
 
-It is recommended to run installer in a virtual environment (conda or venv with python 3.12.x). Make sure to have the environment activated before running commands below.
+It is recommended to run installer in a virtual environment (conda or venv with python 3.12.x). The installer has been tested with these two environment types; other solutions may work but are not officially supported. Make sure to have the environment activated before running commands below.
 
 ```bash
 # Install installer dependencies

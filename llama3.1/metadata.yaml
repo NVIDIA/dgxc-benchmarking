@@ -1,8 +1,8 @@
 # Setup
 general:
   workload: llama3.1
-  workload_type: pretraining
-  gsw_version: 25.05.01
+  workload_type: pretrain
+  gsw_version: 25.05.04
   framework: nemo2
 
 container:

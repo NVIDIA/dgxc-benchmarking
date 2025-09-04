@@ -45,34 +45,13 @@ Depending on your cluster's job scheduler, ensure the following are met:
 2. (Optional) For NIM Inference workloads only:
    - Generate an NGC API key from the [NGC Registry](https://org.ngc.nvidia.com/setup)
    - Install and configure the NGC CLI:
-	<details>
-	
-	<summary>x86</summary>
-	
-	```bash
-	curl -L https://ngc.nvidia.com/downloads/ngccli_linux.zip -o ngccli_linux.zip
-	unzip -q ngccli_linux.zip -d $HOME/.local/bin
-	rm ngccli_linux.zip
-	export PATH=$HOME/.local/bin:$PATH
-	ngc config set
-	```
-	
-	</details>
-	
-	<details>
-	
-	<summary>arm64</summary>
-	
-	```bash
- 	curl -L https://ngc.nvidia.com/downloads/ngccli_arm64.zip -o ngccli_arm64.zip
-	unzip -q ngccli_arm64.zip -d $HOME/.local/bin
-	rm ngccli_arm64.zip
-	export PATH=$HOME/.local/bin/ngc-cli:$PATH
-	ngc config set
-	```
-	</details>
-
-     
+     ```bash
+     curl -L https://ngc.nvidia.com/downloads/ngccli_linux.zip -o ngccli_linux.zip
+     unzip -q ngccli_linux.zip -d $HOME/.local/bin
+     rm ngccli_linux.zip
+     export PATH=$HOME/.local/bin:$PATH
+     ngc config set
+     ```
 
 3. Run the installer:
    ```bash
@@ -95,8 +74,8 @@ Depending on your cluster's job scheduler, ensure the following are met:
    # Navigate to your installed workload directory
    cd $LLMB_INSTALL
    
-   # Example: Run Nemotron4 340B pretraining on 256 GPUs with FP8 precision
-   llmb-run single -w pretraining_nemotron -s 340b --dtype fp8 --scale 256
+   # Example: Run Nemotron4 340B pretrain on 256 GPUs with FP8 precision
+   llmb-run single -w pretrain_nemotron -s 340b --dtype fp8 --scale 256
    ```
 
 ### Directory Layout and Key Variables
@@ -157,7 +136,7 @@ Baseline performance metrics were using workloads on the NVIDIA DGX H100 Referen
 | --------- | :---------------: | :---- | :--------: | :--- | :-------------------- | :-------- | :-------------------- | :-----------: | :----------: |
 | NeMo | Nemotron4 | 25.04.00 | 15B | Pretrain | 16 | FP8, BF16 | No | Yes | Slurm |
 | NeMo | Nemotron4 | 25.04.00 | 340B | Pretrain | 256 | FP8, BF16 | No | Yes | Slurm |
-| NeMo | DeepSeek V3 | 25.04.01 | 671B | Pretrain | 1024 | BF16 | Yes | No | Slurm |
+| NeMo | DeepSeek V3 | 25.04.01 | 671B | Pretrain | 512-1024 | BF16 | Yes | No | Slurm |
 | NeMo | Llama4 Maverick | 25.04.01 | 400B | Pretrain | 512 | FP8, BF16 | Yes | No | Slurm |
 | NeMo | Nemotron-H | 25.04.01 | 56B | Pretrain | 32-2048 | FP8 | No | No | Slurm |
 | NeMo | Llama 3.1 | 25.04.01 | 405B | Pretrain | 512 | FP8, BF16 | Yes | No | Slurm |
@@ -233,7 +212,7 @@ For NeMo based images EFA support is already included starting with version 25.0
 For other images or if you need to update Enable Elastic Fabric Adapter (EFA) follow the [step-by-step guide](https://docs.aws.amazon.com/sagemaker/latest/dg/your-algorithms-training-efa.html#your-algorithms-training-efa-install). Use the [reference NCCL tests Dockerfile with EFA support](https://github.com/aws-samples/awsome-distributed-training/blob/main/micro-benchmarks/nccl-tests/nccl-tests.Dockerfile). 
 
 ### GCP
-Ensure that all required pre-conditions for [GCP cluster deployment](https://cloud.google.com/ai-hypercomputer/docs/create/create-Slurm-cluster#before-you-begin) have been met. 
+Ensure that all required pre-conditions for [GCP cluster deployment](https://cloud.google.com/ai-hypercomputer/docs/create/create-slurm-cluster) have been met. 
 
 Configure Compute Fabric with TCP-X by ensuring the following environment variables are set and present for your environment. 
 
@@ -268,10 +247,14 @@ export NCCL_P2P_NET_CHUNKSIZE=2097152
 
 # Release Notes
 
-## Performance Recipes version 25.05.03
+## Performance Recipes version 25.05.04
+
+### Added
+  - H100 512 GPU support for DeepSeek V3 Pretrain
 
 ### Changed
-  - Fixed nvcr.io links in DeepSeek V3 and Nemotron-H metadata files.
+  - Bug fix for broken launch sequence due to transformers package update
+  - Include latest LLMB tooling with improved capabilities for mass recipe submission and other updates
 
 # FAQ
 

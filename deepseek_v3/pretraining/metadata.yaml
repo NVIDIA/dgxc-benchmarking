@@ -1,8 +1,8 @@
 # Setup
 general:
   workload: deepseek_v3
-  workload_type: pretraining
-  gsw_version: 25.05.01
+  workload_type: pretrain
+  gsw_version: 25.05.04
   framework: nemo2
 
 container:
@@ -29,4 +29,4 @@ run:
       model_configs:
         - model_size: '671b'
           dtypes: 'bf16'
-          scales: [1024]
+          scales: [512, 1024]

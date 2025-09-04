@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
@@ -20,21 +18,11 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
+
 """
 llmb-run: A lightweight tool for automating submission of single jobs and batches of workloads.
-
-This is a simple wrapper script that imports and runs the main function from the llmb_run package.
 """
 
-import sys
-import os
+from .main import main
 
-# Add the src directory to the Python path so we can import llmb_run
-script_dir = os.path.dirname(os.path.abspath(__file__))
-src_dir = os.path.join(script_dir, 'src')
-sys.path.insert(0, src_dir)
-
-from llmb_run import main
-
-if __name__ == '__main__':
-    main()
+__all__ = ["main"]

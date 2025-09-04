@@ -124,10 +124,10 @@ The easiest way to run benchmarks is using the llmb-run launcher tool. This meth
 cd $LLMB_INSTALL
 
 # Run a benchmark with llmb-run
-llmb-run single -w pretraining_nemotronh -s 56b --dtype fp8 --scale 256
+llmb-run single -w pretrain_nemotronh -s 56b --dtype fp8 --scale 256
 
 # Example with different scale
-llmb-run single -w pretraining_nemotronh -s 56b --dtype fp8 --scale 1024
+llmb-run single -w pretrain_nemotronh -s 56b --dtype fp8 --scale 1024
 ```
 
 For more details on llmb-run usage, see the [llmb-run documentation](../llmb-run/README.md).

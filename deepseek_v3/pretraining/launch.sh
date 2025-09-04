@@ -28,10 +28,10 @@ fi
 
 set -eu -o pipefail
 
-export WORKLOAD_TYPE=pretraining
+export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=deepseek_v3
 export FW_VERSION=25.04.01
-export GSW_VERSION=25.05.01
+export GSW_VERSION=25.05.04
 
 export OPENBLAS_NUM_THREADS=1 # optional, to avoid resource contention at the frontend node.
 
@@ -94,7 +94,11 @@ GBS=$(( $JOB_TOTAL_GPUS * 8 ))
 if [[ $GPU_TYPE = "h100"  ]]; then
   GPUS_PER_NODE=${GPUS_PER_NODE:-8}
   TP=2
-  PP=16
+  if [[ $JOB_TOTAL_GPUS -eq 512 ]]; then
+    PP=8
+  else
+    PP=16
+  fi
   EP=64
   VP=1
   ETP=1

@@ -8,10 +8,11 @@ Weak scaling methodology is used in the configurations below.
 
 # H100s specifications
 
-- At least 1024 GPUs with at least 80GB memory each for BF16.
+- At least 512 GPUs with at least 80GB memory each for BF16.
 
 | Size  | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | ETP | DP | VP  | MBS | GBS  | GA  |
 |-------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
+| 671B | BF16 | 512   | 4096   | 61         | 2  | 8    | 1   | 64  | 1   | 32  | 1   | 1   | 4096 | 128 |
 | 671B | BF16 | 1024  | 4096   | 61         | 2  | 16   | 1   | 64  | 1   | 32  | 1   | 1   | 8192 | 256 |
 
 # GB200 specifications
@@ -76,13 +77,13 @@ MFU = 163.7e+12 / 989e+12 = 16.55%
 The peak theoretical throughput for H100 FP8 is **1979** TFLOPS and for H100 BF16 is **989** TFLOPS.
 
 
-| Deepseek V3 BF16 H100 | 1024x H100 GPUs  |
-|---|:---:|
-Training step time (seconds per step)| 52.04 |
-Throughput in tokens per second | 644781.55 |
-TFLOPS_per_GPU | 163.7 |
-Model flops utilization| 16.55% | 
-Time to train 1T tokens in days| 17.95 | 
+| Deepseek V3 BF16 H100 | 512x H100 GPUs  | 1024x H100 GPUs  |
+|---|:---:|---:|
+Training step time (seconds per step)| 48.948 | 52.04 |
+Throughput in tokens per second | 342755.90 | 644781.55 |
+TFLOPS_per_GPU | 174.02 | 163.7 |
+Model flops utilization| 17.60% | 16.55% |
+Time to train 1T tokens in days| 33.76 | 17.95 |
 
 
 # GB200 Performance
@@ -127,7 +128,7 @@ The recommended way to prepare your environment is to use the **installer** refe
 Note, that a new directory layout and key variables are now used in the recipe:
 
 - `LLMB_INSTALL`: Top-level directory for all benchmarking artifacts (images, datasets, venvs, workloads, etc).
-- `LLMB_WORKLOAD`: Workload-specific directory, e.g. `${LLMB_INSTALL}/workloads/pretraining_deepseek_v3`.
+- `LLMB_WORKLOAD`: Workload-specific directory, e.g. `${LLMB_INSTALL}/workloads/pretrain_deepseek_v3`.
 - Results, logs, and checkpoints are stored under subfolders of `LLMB_WORKLOAD` (see below).
 
 If you are an advanced user and need to perform a manual environment setup (e.g., for debugging or custom environments), see the [Advanced/Manual Environment Setup](#advancedmanual-environment-setup) section at the end of this file.
@@ -151,10 +152,10 @@ The easiest way to run benchmarks is using the llmb-run launcher tool. This meth
 cd $LLMB_INSTALL
 
 # Run a benchmark with llmb-run
-llmb-run single -w pretraining_deepseek_v3 -s 671b --dtype bf16 --scale 128
+llmb-run single -w pretrain_deepseek_v3 -s 671b --dtype bf16 --scale 128
 
 # Example with different scale
-llmb-run single -w pretraining_deepseek_v3 -s 671b --dtype bf16 --scale 256
+llmb-run single -w pretrain_deepseek_v3 -s 671b --dtype bf16 --scale 256
 ```
 
 For more details on llmb-run usage, see the [llmb-run documentation](../../llmb-run/README.md).
