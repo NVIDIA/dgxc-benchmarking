@@ -2,19 +2,31 @@
 
 This recipe contains information and scripts to produce performance results for the Nemotron-H pre-training workloads. The scripts help perform environment setup and launch benchmark jobs.
 
-The H100 recipes listed below progressively increase GPU count, with configurations weak-scaled to match.
+The recipes listed below progressively increase GPU count, with configurations weak-scaled to match.
+
+## H100
 
 | Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
 |------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
-| 56b   | FP8   | 32   | 8192  | 118   | 8     | 1     | 1     | NA    | 4     | NA    | 1     | 96    | 24    |
-| 56b   | FP8   | 64   | 8192  | 118   | 8     | 1     | 1     | NA    | 8     | NA    | 1     | 192   | 24    |
-| 56b   | FP8   | 128  | 8192  | 118   | 8     | 1     | 1     | NA    | 16    | NA    | 1     | 384   | 24    |
-| 56b   | FP8   | 256  | 8192  | 118   | 8     | 1     | 1     | NA    | 32    | NA    | 1     | 768   | 24    |
-| 56b   | FP8   | 512  | 8192  | 118   | 8     | 1     | 1     | NA    | 64    | NA    | 1     | 1536  | 24    |
-| 56b   | FP8   | 1024 | 8192  | 118   | 8     | 1     | 1     | NA    | 128   | NA    | 1     | 3072  | 24    |
-| 56b   | FP8   | 2048 | 8192  | 118   | 8     | 1     | 1     | NA    | 256   | NA    | 1     | 6144  | 24    |
+| 56B  | FP8       | 32   | 8192   | 118    | 8   | 1   | 1   | NA  | 4   | NA  | 1   | 96   | 24  |
+| 56B  | FP8       | 64   | 8192   | 118    | 8   | 1   | 1   | NA  | 8   | NA  | 1   | 192  | 24  |
+| 56B  | FP8       | 128  | 8192   | 118    | 8   | 1   | 1   | NA  | 16  | NA  | 1   | 384  | 24  |
+| 56B  | FP8       | 256  | 8192   | 118    | 8   | 1   | 1   | NA  | 32  | NA  | 1   | 768  | 24  |
+| 56B  | FP8       | 512  | 8192   | 118    | 8   | 1   | 1   | NA  | 64  | NA  | 1   | 1536 | 24  |
+| 56B  | FP8       | 1024 | 8192   | 118    | 8   | 1   | 1   | NA  | 128 | NA  | 1   | 3072 | 24  |
+| 56B  | FP8       | 2048 | 8192   | 118    | 8   | 1   | 1   | NA  | 256 | NA  | 1   | 6144 | 24  |
 
-# Expected Performance
+## B200 and GB200
+
+| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
+|------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
+| 56B  | FP8       | 32   | 8192   | 118    | 2   | 1   | 1   | NA  | 16  | NA  | 1   | 96   | 6  |
+| 56B  | FP8       | 64   | 8192   | 118    | 2   | 1   | 1   | NA  | 32  | NA  | 1   | 192  | 6  |
+| 56B  | FP8       | 128  | 8192   | 118    | 2   | 1   | 1   | NA  | 64  | NA  | 1   | 384  | 6  |
+| 56B  | FP8       | 256  | 8192   | 118    | 2   | 1   | 1   | NA  | 128 | NA  | 1   | 768  | 6  |
+| 56B  | FP8       | 512  | 8192   | 118    | 2   | 1   | 1   | NA  | 256 | NA  | 1   | 1536 | 6  |
+
+# Performance Measurement and Analysis
 
 Performance for Nemotron-H training is measured by seconds per iteration, or in other words seconds per training step. This metric is logged for every training step in the main training log file [see Output Locations](#output-locations).
 
@@ -22,30 +34,50 @@ Since the early training steps typically take much longer time (with input prefe
 
 **Note:** TFLOPS_per_GPU not currently supported for this model, values returned by the results parser are **invalid**.
 
+### Running the parse_train_timing.sh script
+
+To analyze training timing from your experiment results, run the script from the workload directory. Note, that `LLMB_REPO` is the directory containing the clone of the recipe repository.
+
+```bash
+# Basic usage - parses results in the directory named 'experiments' in the current folder
+$LLMB_REPO/common/parse_train_timing.sh
+
+# Specify a different experiments directory
+$LLMB_REPO/common/parse_train_timing.sh /path/to/experiments
+
+# Output in CSV format
+$LLMB_REPO/common/parse_train_timing.sh --format=csv
+
+# Output in JSON format
+$LLMB_REPO/common/parse_train_timing.sh --format=json
+
+# Show full filenames instead of shortened versions
+$LLMB_REPO/common/parse_train_timing.sh --full-names
+```
+
 ```shell
 # Run the parse_train_timing script to analyze all experiments
 common/parse_train_timing.sh $LLMB_WORKLOAD/experiments
 
 # Example output:
 Train Step Timing Analysis (iterations 11-44)
-==================================================================
+================================================================================
 Experiment                                                                         Status Time Mean (s) Time Std (s) TFLOPS_per_GPU Mean TFLOPS_per_GPU Std
 -------------------------------------------------------------------------------- -------- ------------- ------------ ------------------- ------------------
-pretrain_nemotronh_56b_fp8_gpus128_tp8_pp1_cp1_vpNone_mbs1_gbs768                 Success        15.858        1.262              532.39             472.74
+pretrain_nemotron-h_56b_fp8_gpus256_tp8_pp1_cp1_vpNone_mbs1_gbs768_2967925         Success        15.714        2.989              957.90             148.67
 ```
 
 To obtain throughput as a tokens per second measurement, follow this formula: 
 ```shell
 (sequence length) * (global batch size) / (training_step_timing) = (throughput in tokens per second)
 ```
-
-E.g. 8192 * 768 / 15.892  = 395888
+E.g. 8192 * 768 / 15.714 = 400373
 
 To calculate time to train estimate:
 ```shell
 (total tokens) / (throughput in tokens per second) / (number of seconds in a day) = (time to train in days) 
 ```
-E.g. 1e12 / 395895 / 86400 = 29.24 days
+E.g. 1e12 / 400373 / 86400 = 28.91 days
 
 
 To calculate the model flops utilization (MFU):
@@ -54,24 +86,17 @@ MFU = (global batch size) * (model flops) / (training step time) / (number of GP
 ```
 
 The peak theoretical throughput for H100 FP8 is **1979** TFLOPS.
-
 The model flops for Nemotron-H 56b for GBS=1 is 2.816e15. Calculation shown [here](#notes).
 
 E.g. Nemotron-H 56b FP8 on 256x H100 GPUs (GBS=768)
 ```shell
 peak FLOPS for H100 FP8 = 1979 TFLOPS
-training step time = 15.892 s
+training step time = 15.714 s
 model flops = 2.816e15
 
-MFU = 768 * 2.816e15 / 15.892 / 256 / 1979e+12 = 26.86%
+MFU = 768 * 2.816e15 / 15.714 / 256 / 1979e+12 = 27.17%
 ```
 
-| Nemotron-H 56b FP8 | 32x H100 GPUs | 64x H100 GPUs | 128x H100 GPUs | 256x H100 GPUs  |  512x H100 GPUs  | 1024x H100 GPUs  | 2048x H100 GPUs  |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-Training step time (seconds per step)|15.119|15.058|15.496|15.892|15.586|15.678|15.723|
-Throughput in tokens per second |52016|104454|203003|395888|807321|1605168|3201148|
-Model flops utilization|28.23%|28.35%|27.55%|26.86%|27.39%|27.23%|27.15%|
-Time to train 1T tokens in days|222.51|110.81|57.01|29.24|14.34|7.21|3.62|
 
 # Prerequisites
 
@@ -89,31 +114,30 @@ We reference a number of Slurm commands and parameters in this document. A brief
 - `SBATCH_PARTITION` or `-p` - Partition (or queue) to use.
 - `SBATCH_ACCOUNT` or `-A` - Slurm account to associate with your job, different from your user. Meant for accounting purposes.
 - `SBATCH_GPUS_PER_NODE` or `--gres=gpu:<num gpus>` - If your cluster is configured with GRES this should be set to all GPUs in a node. Ignore if not configured.
-	- Encountering errors such as 'GPUs not found' or 'Cannot submit to this partition without GPU resources' means this setting is required.
+  - Encountering errors such as 'GPUs not found' or 'Cannot submit to this partition without GPU resources' means this setting is required.
 
 These parameters can be set either by exporting the environment variable or using the corresponding `sbatch` flag.
 
 ## Prepare environment
 
-The recommended way to prepare your environment is to use the **installer** referenced in the [main README](../README.md):
+Use the **installer** referenced in the [main README](../README.md) to prepare the recipe environment:
 
-Note, that a new directory layout and key variables are now used in the recipe:
+The following directory layout and key variables are used in the recipe:
 
 - `LLMB_INSTALL`: Top-level directory for all benchmarking artifacts (images, datasets, venvs, workloads, etc).
-- `LLMB_WORKLOAD`: Workload-specific directory, e.g. `${LLMB_INSTALL}/workloads/pretraining_nemotronh`.
+- `LLMB_WORKLOAD`: Workload-specific directory, e.g. `${LLMB_INSTALL}/workloads/pretrain_nemotron-h`.
 - Results, logs, and checkpoints are stored under subfolders of `LLMB_WORKLOAD` (see below).
 
-If you are an advanced user and need to perform a manual environment setup (e.g., for debugging or custom environments), see the [Advanced/Manual Environment Setup](#advancedmanual-environment-setup) section at the end of this file.
 
 **Migration Note:**
-If you previously used `STAGE_PATH`, replace it with `LLMB_INSTALL` (top-level) and `LLMB_WORKLOAD` (workload-specific). All output, logs, and checkpoints are now under `LLMB_WORKLOAD`.
+If you previously used `STAGE_PATH`, replace it with `LLMB_INSTALL` (top-level). All output, logs, and checkpoints will be created under the workload's appropriate `LLMB_WORKLOAD` folder.
 
 # Prepare Dataset
 Since Nemotron-H training only uses synthetic datasets, this step is omitted.
 
 # Run Training
 
-Once the environment has been prepared, it is time to train a model. The training runs for the first 50 steps and then stops. Log files and results are stored under the `${LLMB_WORKLOAD}/experiments/` folder (see Output Locations for details).
+Once the environment has been prepared, it is time to train a model. The training runs for the first 50 steps and then stops. Log files and results are stored under the `${LLMB_WORKLOAD}/experiments/` folder ([see Output Locations](#output-locations) for details).
 
 ## Using llmb-run (Recommended)
 
@@ -124,10 +148,10 @@ The easiest way to run benchmarks is using the llmb-run launcher tool. This meth
 cd $LLMB_INSTALL
 
 # Run a benchmark with llmb-run
-llmb-run single -w pretrain_nemotronh -s 56b --dtype fp8 --scale 256
+llmb-run single -w pretrain_nemotron-h -s 56b --dtype fp8 --scale 128
 
 # Example with different scale
-llmb-run single -w pretrain_nemotronh -s 56b --dtype fp8 --scale 1024
+llmb-run single -w pretrain_nemotron-h -s 56b --dtype fp8 --scale 1024
 ```
 
 For more details on llmb-run usage, see the [llmb-run documentation](../llmb-run/README.md).
@@ -143,38 +167,43 @@ Alternatively, you can run training directly using the launch script. This metho
 ### Command Template
 
 ```shell
-JOB_TOTAL_GPUS=<number> [DTYPE=<precision>] [MODEL_SIZE=<size>] [GPU_TYPE=<type>] ./launch.sh
+JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] ./launch.sh
 ```
 
 ### Environment Variables
 
 **Required:**
 - `JOB_TOTAL_GPUS`: Number of GPUs to use
+- `GPU_TYPE`: Type of GPU hardware
+  - `gb200` - NVIDIA GB200 GPUs
+  - `b200` - NVIDIA B200 GPUs
+  - `h100` - NVIDIA H100 GPUs
 
 **Optional:**
 - `DTYPE`: Precision format (fixed: `fp8`)
   - `fp8` - FP8 precision (only supported precision)
 - `MODEL_SIZE`: Model variant (fixed: `56b`)
   - `56b` - 56 billion parameter model (only supported size)
-- `GPU_TYPE`: Type of GPU hardware (fixed: `h100`)
-  - `h100` - NVIDIA H100 GPUs (only supported type)
 
 **Note:** This workload only supports:
 - FP8 precision
-- 56B model size  
-- H100 GPUs
+- 56B model size
 
 ### Example Commands
 
-Train Nemotron-H 56B with FP8 precision on 256 H100 GPUs:
+Train Nemotron-H 56B with FP8 precision on 128 GB200 GPUs:
 ```shell
-# activate virtual environment
-JOB_TOTAL_GPUS=256 ./launch.sh
+JOB_TOTAL_GPUS=128 GPU_TYPE=GB200 ./launch.sh
 ```
 
-Train on 1024 H100 GPUs:
+Train Nemotron-H 56B with FP8 precision on 128 B200 GPUs:
 ```shell
-JOB_TOTAL_GPUS=1024 ./launch.sh
+JOB_TOTAL_GPUS=128 GPU_TYPE=B200 ./launch.sh
+```
+
+Train Nemotron-H 56B with FP8 precision on 128 H100 GPUs:
+```shell
+JOB_TOTAL_GPUS=128 GPU_TYPE=H100 ./launch.sh
 ```
 
 # Output Locations
@@ -193,27 +222,45 @@ experiments/
 │       └── [batch scripts and other files]
 ```
 
-The `<experiment_name>` typically follows the pattern: `pretraining_nemotronh_56b_<dtype>_<scale>_<config>`
+The `<experiment_name>` typically follows the pattern: `pretrain_nemotron-h_56b_<dtype>_<scale>_<config>`
 
 **Key files:**
 - `log-<experiment_name>.out` - Contains training step timing and performance metrics analyzed by `parse_train_timing.sh`
 - `nsys_profile/` - Contains profiling traces when `ENABLE_PROFILE=true`
 
 # Run Nsight Profiling
-To enable profiling with Nsight Systems set variable `ENABLE_PROFILE=true` when submitting your job. The job will run for a total of 50 steps where steps 46-50 will be profiled.
+To enable profiling with Nsight Systems set variable `ENABLE_PROFILE=true` when submitting your job. The job will run for a total of 50 steps where steps 45-50 will be profiled.
 
 In order to view the resulting profiles, ensure you have the latest version of Nsight Systems installed. For more information visit: [Nsight Systems](https://docs.nvidia.com/nsight-systems/)
 
 ### Profiling job details:
-* **MPI Ranks:** 0-8
-* **Job Steps:** 46-50
-* **Output Location:** Profiling output saved alongside training results (see Output Locations)
+* **MPI Ranks:** all ranks
+* **Job Steps:** 45-50
+* **Output Location:** Profiling output saved alongside training results ([see Output Locations](#output-locations))
 * **Filename format:** `profile_{SLURM_JOBID}_{SLURM_NODEID}_{SLURM_PROCID}.nsys-rep`
 
 **Example command:**
 ```shell
-ENABLE_PROFILE=true JOB_TOTAL_GPUS=256 ./launch.sh
+ENABLE_PROFILE=true JOB_TOTAL_GPUS=128 GPU_TYPE=gb200 ./launch.sh
 ```
+
+### Customizing profiling behavior:
+* Specify job steps to profile:
+  * `PROFILE_START_STEP`: start profiling on this job step.
+  - Default: 45
+  * `PROFILE_STOP_STEP`: stop profiling on this job step.
+  - Default: 50
+* Enable GPU metrics collection:
+  * `ENABLE_GPU_METRICS`: Enable GPU metrics collection during NSight profiling (default: false)
+  - When set to `true` along with `ENABLE_PROFILE=true`, captures detailed GPU performance metrics
+  - Provides additional GPU utilization, memory usage, and compute efficiency data
+  - May require additional system configuration for GPU device metrics to work properly
+
+**Example command with GPU metrics:**
+```shell
+ENABLE_PROFILE=true ENABLE_GPU_METRICS=true JOB_TOTAL_GPUS=128 GPU_TYPE=gb200 ./launch.sh
+```
+
 ### Viewing results
 
 In order to view the profile traces (*.nsys-rep files) interactively:
@@ -228,7 +275,7 @@ Since most of the benchmarking jobs run on multiple GPUs, there will be multiple
 
 ## Run NCCL Trace (For Debugging)
 
-NCCL traces can be a powerful tool for understanding communication patterns within your benchmarking job. They provide detailed information on the types of NCCL calls being made (like AllReduce, Broadcast, etc.) and the size of the messages being exchanged.
+NCCL traces are a tool for understanding communication patterns within your benchmarking job. They provide detailed information on the types of NCCL calls being made (like AllReduce, Broadcast, etc.) and the size of the messages being exchanged.
 
 **Important:** This feature is primarily intended for **troubleshooting and debugging purposes only**. It is not typically used during normal benchmark runs.
 
@@ -236,12 +283,12 @@ To collect NCCL Trace information, set the environment variable `ENABLE_NCCLTRAC
 
 **Defaults for Tracing:**
 *   **Duration:** Due to the large file sizes generated, tracing is limited to the first 5 steps of the job by default.
-*   **Output Location:** NCCL trace information is included directly within the standard job log file (see Output Locations)
+*   **Output Location:** NCCL trace information is included directly within the standard job log file ([see Output Locations](#output-locations))
 
 **Example command:**
 
 ```shell
-ENABLE_NCCLTRACE=true JOB_TOTAL_GPUS=256 ./launch.sh
+ENABLE_NCCLTRACE=true JOB_TOTAL_GPUS=256 GPU_TYPE=gb200 ./launch.sh
 ```
 
 ### Understanding NCCL Trace Results
@@ -271,118 +318,43 @@ This example shows an `AllReduce` operation with details about the buffers, coun
 mlp_block_flops = (2 * seq_len * hidden_size * intermediate_size) * num_mlp_layers
 
 attn_block_flops = (
-		2 * seq_len * hidden_size * num_attention_heads * attention_head_dim +
-		2 * seq_len * hidden_size * num_key_value_heads * attention_head_dim +
-		2 * seq_len * seq_len * hidden_size
-	) * num_attn_layers
+    2 * seq_len * hidden_size * num_attention_heads * attention_head_dim +
+    2 * seq_len * hidden_size * num_key_value_heads * attention_head_dim +
+    2 * seq_len * seq_len * hidden_size
+  ) * num_attn_layers
 
 mamba_block_flops = (
-		seq_len * hidden_size * (mamba_num_heads * mamba_head_dim * 3 + n_groups * ssm_state_size * 2 + mamba_num_heads) +
-		seq_len * hidden_size * expand * chunk_size +
-		2 * seq_len * hidden_size * expand * ssm_state_size +
-		seq_len * chunk_size * ssm_state_size * n_groups
-	) * num_mamba_layers
+    seq_len * hidden_size * (mamba_num_heads * mamba_head_dim * 3 + n_groups * ssm_state_size * 2 + mamba_num_heads) +
+    seq_len * hidden_size * expand * chunk_size +
+    2 * seq_len * hidden_size * expand * ssm_state_size +
+    seq_len * chunk_size * ssm_state_size * n_groups
+  ) * num_mamba_layers
 
 lm_head_flops = seq_len * hidden_size * vocab_size
 
 total_flops = (mlp_block_flops + attn_block_flops + mamba_block_flops + lm_head_flops) * 6
 
 Nemotron-H 56b calculation:
-	seq_len = 8192
-	hidden_size = 8192
-	intermediate_size = 32768
-	num_mlp_layers = 54
-	num_mamba_layers = 54
-	num_attn_layers = 10
-	num_attention_heads = 64
-	num_key_value_heads = 8
-	attention_head_dim = 128
-	mamba_num_heads = 256
-	mamba_head_dim = 64
-	expand = 2
-	chunk_size = 256
-	ssm_state_size = 256
-	n_groups = 8
-	vocab_size = 131072
+  seq_len = 8192
+  hidden_size = 8192
+  intermediate_size = 32768
+  num_mlp_layers = 54
+  num_mamba_layers = 54
+  num_attn_layers = 10
+  num_attention_heads = 64
+  num_key_value_heads = 8
+  attention_head_dim = 128
+  mamba_num_heads = 256
+  mamba_head_dim = 64
+  expand = 2
+  chunk_size = 256
+  ssm_state_size = 256
+  n_groups = 8
+  vocab_size = 131072
 
-	mlp_block_flops = (2 * 8192 * 8192 * 32768) * 54 = 237,494,511,599,616
-	attn_block_flops = (2 * 8192 * 8192 * 64 * 128 + 2 * 8192 * 8192 * 8 * 128 + 2 * 8192 * 8192 * 8192) * 10 = 23,364,622,090,240
-	mamba_block_flops = (8192 * 8192 * (256 * 64 * 3 + 8 * 256 * 2 + 256) + 8192 * 8192 * 2 * 256 + 2 * 8192 * 8192 * 2 * 256 + 8192 * 256 * 256 * 8) * 54 = 199,690,209,460,224
-	lm_head_flops = 8192 * 8192 * 131072 = 8,796,093,022,208
-	total_flops = (237,494,511,599,616 + 23,364,622,090,240 + 199,690,209,460,224 + 8,796,093,022,208) * 6 = 2.816e15
-
+  mlp_block_flops = (2 * 8192 * 8192 * 32768) * 54 = 237,494,511,599,616
+  attn_block_flops = (2 * 8192 * 8192 * 64 * 128 + 2 * 8192 * 8192 * 8 * 128 + 2 * 8192 * 8192 * 8192) * 10 = 23,364,622,090,240
+  mamba_block_flops = (8192 * 8192 * (256 * 64 * 3 + 8 * 256 * 2 + 256) + 8192 * 8192 * 2 * 256 + 2 * 8192 * 8192 * 2 * 256 + 8192 * 256 * 256 * 8) * 54 = 199,690,209,460,224
+  lm_head_flops = 8192 * 8192 * 131072 = 8,796,093,022,208
+  total_flops = (237,494,511,599,616 + 23,364,622,090,240 + 199,690,209,460,224 + 8,796,093,022,208) * 6 = 2.816e15
 ```
-# Advanced/Manual Environment Setup
-
-> **Caution:** This section is for advanced users who need to manually set up the environment. Most users should use the common installer as described above.
-
-### Set the environment variables
-```shell
-# Set the path where all artifacts will be downloaded
-export LLMB_INSTALL=<path to your shared file system folder> (e.g. /lustre/myproject/nemo)
-```
-
-**Important:** `LLMB_INSTALL` used in this step must be used when running the workload.
-
-### Prepare python virtual environment
-
-The workload relies on python virtual environment in order ensure there are no conflicts between required dependencies and user's packages. We require Python 3.12.x for the workload to work.
-
-There are multiple choices available to set up virtual environment: 
-* conda
-* python venv
-
-#### Conda 
-
-To install and activate conda virtual environment
-```shell
-# pick INSTALL_PATH with sufficient disk space
-INSTALL_PATH=~
-wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O $INSTALL_PATH/miniconda.sh
-bash $INSTALL_PATH/miniconda.sh -b -p $INSTALL_PATH/miniconda3
-$INSTALL_PATH/miniconda3/bin/conda init
-source ~/.bashrc
-
-conda create -n nemo2-nemotronh python=3.12
-conda activate nemo2-nemotronh
-```
-
-When you are finished running this benchmark you can deactivate the environment, run this command
-```shell
-conda deactivate
-```
-
-#### Python venv
-
-To install and activate python venv 
-```shell
-python3 -m venv $LLMB_INSTALL/venvs/<venv_name>
-source $LLMB_INSTALL/venvs/<venv_name>/bin/activate
-```
-
-When you are finished running this benchmark you can deactivate the environment, run this command
-```shell
-deactivate
-```
-
-### Setup script
-
-Create a install directory by running the attached setup.sh. The script converts the docker image to a ```.sqsh``` file under the $LLMB_INSTALL/images folder and installs required packages to the python environment to enable NeMo-Run launcher functionality.
-
-**Important:** Make sure the previous step has been completed and python virtual environment is active. Run the setup script using the following command.
-
-**SLURM:**
-
-```shell
-# activate virtual python environment setup previously
-./setup.sh
-```
-To fetch the image ensure your virtual environment has been **deactivated**, then run:
-
-```shell
-srun --account ${SBATCH_ACCOUNT} --partition ${SBATCH_PARTITION} bash -c "enroot import --output ${LLMB_INSTALL}/images/nvidia+nemo+25.04.01.sqsh docker://nvcr.io#nvidia/nemo:25.04.01"
-```
-**Note**: output log from running `setup.sh` script may include an error about tritonclient dependency. The error can be ignored as it doesn't affect benchmark functionality. 
-It would look like this:
-`ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
-tritonclient 2.51.0 requires urllib3>=2.0.7, but you have urllib3 1.26.20 which is incompatible.`

@@ -1,0 +1,26 @@
+# Setup
+general:
+  workload: llama3.3
+  workload_type: inference
+  gsw_version: '25.07'
+  framework: trt-llm
+
+container:
+  images:
+    - 'nvcr.io#nvidia/tensorrt-llm/release:1.0.0rc1'
+
+setup:
+  setup_script: 'setup.sh'
+  venv_req: True
+
+# Run
+run:
+  launcher_type: 'sbatch'
+  launch_script: 'launch.sh'
+
+  gpu_configs:
+    gb200:
+      model_configs:
+        - model_size: '70b'
+          dtypes: ['nvfp4']
+          scales: [1]

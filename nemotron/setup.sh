@@ -29,8 +29,8 @@ if [ ${BASH_VERSION:0:1} -lt 4 ] || [ ${BASH_VERSION:0:1} -eq 4 -a ${BASH_VERSIO
 fi
 
 export WORKLOAD_TYPE=pretrain
-export MODEL_NAME=nemotron
-export FW_VERSION=25.04.00
+export MODEL_NAME=nemotron4
+export FW_VERSION=25.04.01
 
 # Ensure STAGE_PATH is not set as it's been replaced by LLMB_INSTALL
 if [ -n "${STAGE_PATH+x}" ]; then
@@ -51,9 +51,9 @@ fi
 
 # -------- llmb-nemo commits
 # r2.3.0 llmb-nemo
-export NEMO_COMMIT="b4148d21695de467d50ebf050566555429c26919"
-export MEGATRON_COMMIT="7094270c6fa1dbc6b2e99072171e3a559ca36d0f"
-export NEMO_RUN_COMMIT="f3c3ac22fe169acf93aa7647ab9785290537d4a4"
+export NEMO_COMMIT="00b778eb5e98baf5042d7b08d3148ec3229b5754"
+export MEGATRON_COMMIT="64cb6bd7a155c4e742514ed1024407fb97d0a367"
+export NEMO_RUN_COMMIT="8d46493b76abdb0e145ac92606b3ed56e03ee28c"
 
 # 1. Clone the NeMo source code
 #Setup NeMo 

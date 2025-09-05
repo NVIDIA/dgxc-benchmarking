@@ -1,3 +1,24 @@
+## [v25.07] - 2025-09-05
+
+### Added
+  - B200 Support
+    - Pretrain recipes: Nemotron4 340B, Llama 3.1 405B, DeepSeek V3 671B, Grok1 314B, Nemotron-H 56B
+    - Finetune recipes: Llama4 Maverick 400B
+  - TensorRT-LLM Inference recipes for GB200:
+    - DeepSeek R1
+    - Llama 3.3
+    - Llama 4
+  - Nemotron-H GB200 support
+  - Nemotron4 checkpointing support GB200
+  - Nemotron4 support for Run:ai clusters
+  - GPU metrics collection during NSight profiling (ENABLE_GPU_METRICS variable)
+
+### Changed
+  - Grok1 314B - GB200 Config
+
+### Removed
+  - Llama3 70b inference NIM recipe
+
 ## [v25.05.04] - 2025-09-05
 
 ### Added

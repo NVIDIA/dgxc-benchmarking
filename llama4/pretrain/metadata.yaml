@@ -1,6 +1,6 @@
 # Setup
 general:
-  workload: nemotron4
+  workload: llama4-maverick
   workload_type: pretrain
   gsw_version: '25.07'
   framework: nemo2
@@ -18,10 +18,10 @@ repositories:
     commit: "64cb6bd7a155c4e742514ed1024407fb97d0a367"
   nemo_run:
     url: "https://github.com/NVIDIA/NeMo-Run.git"
-    commit: "8d46493b76abdb0e145ac92606b3ed56e03ee28c"
+    commit: "f3e69eebb2bf66e46f6a2aa64465f714f9ea751d"
 
 setup:
-  venv_req: true
+  venv_req: True
   dependencies:
     git:
       nemo:
@@ -46,20 +46,12 @@ run:
   gpu_configs:
     gb200:
       model_configs:
-        - model_size: '340b'
+        - model_size: '400b'
           dtypes: ['fp8', 'bf16']
           scales: [128, 256, 512]
-    b200:
-      model_configs:
-        - model_size: '340b'
-          dtypes: ['fp8', 'bf16']
-          scales: [128, 256, 512, 1024]
 
     h100:
       model_configs:
-        - model_size: '15b'
+        - model_size: '400b'
           dtypes: ['fp8', 'bf16']
-          scales: [16, 32, 64, 128, 256, 512]
-        - model_size: '340b'
-          dtypes: ['fp8', 'bf16']
-          scales: [256, 512]
+          scales: [512]

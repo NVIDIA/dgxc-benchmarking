@@ -31,9 +31,9 @@ set -eu -o pipefail
 export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=llama3.1
 export FW_VERSION=25.04.01
-export GSW_VERSION=25.05.04
+export GSW_VERSION=25.07
 
-export OPENBLAS_NUM_THREADS=1 # optional, to avoid resource contention at the frontend node.
+export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 export HF_TOKEN=${HF_TOKEN?"Required variable HF_TOKEN"}
 
 # Ensure STAGE_PATH is not set as it's been replaced by LLMB_INSTALL
@@ -50,17 +50,19 @@ export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh
 
 CLUSTER_TYPE=${CLUSTER_TYPE:-slurm}
 DTYPE=${DTYPE:-fp8}
+DTYPE=${DTYPE,,}
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 PROFILE_ENABLED=${PROFILE_ENABLED,,}
 GPU_METRICS_ENABLED=${ENABLE_GPU_METRICS:-false}
 GPU_METRICS_ENABLED=${GPU_METRICS_ENABLED,,}
 NCCLTRACE_ENABLED=${ENABLE_NCCLTRACE:-false}
 NCCLTRACE_ENABLED=${NCCLTRACE_ENABLED,,}
-GPU_TYPE=${GPU_TYPE:-gb200}
+
+GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
 GPU_TYPE=${GPU_TYPE,,}
+JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
 
 if [ $GPU_TYPE = "gb200" ] || [ $GPU_TYPE = "b200" ]; then
-  DEF_JOB_TOTAL_GPUS=128
   if [ $GPU_TYPE = "gb200" ]; then
     DEF_GPUS_PER_NODE=4
   elif [ $GPU_TYPE = "b200" ]; then
@@ -68,7 +70,6 @@ if [ $GPU_TYPE = "gb200" ] || [ $GPU_TYPE = "b200" ]; then
   fi
   DEF_TP=4
 elif [ $GPU_TYPE = "h100" ]; then
-  DEF_JOB_TOTAL_GPUS=512
   DEF_GPUS_PER_NODE=8
   DEF_TP=8
 else
@@ -76,7 +77,6 @@ else
   exit 1
 fi
 
-JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:-$DEF_JOB_TOTAL_GPUS}
 GPUS_PER_NODE=${GPUS_PER_NODE:-$DEF_GPUS_PER_NODE}
 
 TIME_LIMIT=${TIME_LIMIT:-"00:30:00"}

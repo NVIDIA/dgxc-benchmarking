@@ -1,9 +1,9 @@
 # Overview
 
 This recipe contains information and scripts to produce performance results for the Llama3.1 405B training workload. The scripts help perform environment setup and launch benchmark jobs.
-This variant of the workload is best-suited for GPU clusters with
+This variant of the workload is best-suited for clusters with GPUs below:
 
-**GB200**: 
+## GB200
 * At least 128 GPUs with at least 186 GB memory each. Training of this 405-billion parameter variant of the workload will not fit on fewer GPUs with less memory.
 * The GB200 recipes listed below progressively increase GPU count, with configurations weak-scaled to match.
 * This workload runs with FP8 and BF16 precision.
@@ -15,20 +15,53 @@ This variant of the workload is best-suited for GPU clusters with
 | 256  | 8192   | 126    | 0    |  4 | 8  | 2  | NA | NA  | 4  | 8  |  1  | 128 | 32 |
 | 512  | 8192   | 126    | 0    |  4 | 8  | 2  | NA | NA  | 8  | 8  |  1  | 256 | 32 |
 
+## B200
+* At least 128 GPUs with at least 180 GB memory each. Training of this 405-billion parameter variant of the workload will not fit on fewer GPUs with less memory.
+* The B200 recipes listed below progressively increase GPU count, with configurations weak-scaled to match.
+* This workload runs with FP8 and BF16 precision.
 
-**H100**:
+| GPUs | SeqLen | Layers | FSDP | TP | PP | CP | EP | ETP | DP | VP | MBS | GBS | GA |
+|------|:------:|:------:|:----:|:--:|:--:|:--:|:--:|:---:|:--:|:--:|:---:|:---:|:--:|
+| 128  | 8192   | 126    | 0    |  4 | 8  | 2  | NA | NA  | 2  | 8  |  1  | 64  | 32 |
+| 256  | 8192   | 126    | 0    |  4 | 8  | 2  | NA | NA  | 4  | 8  |  1  | 128 | 32 |
+| 512  | 8192   | 126    | 0    |  4 | 8  | 2  | NA | NA  | 8  | 8  |  1  | 256 | 32 |
+| 1024 | 8192   | 126    | 0    |  4 | 8  | 2  | NA | NA  | 16 | 8  |  1  | 512 | 32 |
+
+
+## H100
 * At least 512 GPUs with at least 80 GB memory each. Training of this 405-billion parameter variant of the workload will not fit on fewer GPUs with less memory.
 * This workload runs with FP8 and BF16 precision.
 
 | GPUs | SeqLen | Layers | FSDP | TP | PP | CP | EP | ETP | DP | VP | MBS | GBS | GA |
 |------|:------:|:------:|:----:|:--:|:--:|:--:|:--:|:---:|:--:|:--:|:---:|:---:|:--:|
-| 512  | 8192   | 126    | 0    |  8 | 8  | 2  | NA | NA  | 4  | 8  |  1  | 256 | 32 |
+| 512  | 8192   | 126    | 0    |  8 | 8  | 2  | NA | NA  | 4  | 8  |  1  | 256 | 64 |
 
-# Expected Performance
+# Performance Measurement and Analysis
 
 Performance for Llama3.1 405B training is measured by seconds per iteration, or in other words seconds per training step. This metric is logged for every training step in the main training log file [see Output Locations](#output-locations).
 
 Since the early training steps typically take much longer time (with input prefetch, activation memory allocation, and JIT compilation), we use the `parse_train_timing.sh` script to analyze iterations 11-44 and calculate mean and standard deviation for reliable performance metrics. We also get the achieved GPU FLOPS via `TFLOPS_per_GPU` metric.
+
+### Running the parse_train_timing.sh script
+
+To analyze training timing from your experiment results, run the script from the workload directory. Note, that `LLMB_REPO` is the directory containing the clone of the recipe repository.
+
+```bash
+# Basic usage - parses results in the directory named 'experiments' in the current folder
+$LLMB_REPO/common/parse_train_timing.sh
+
+# Specify a different experiments directory
+$LLMB_REPO/common/parse_train_timing.sh /path/to/experiments
+
+# Output in CSV format
+$LLMB_REPO/common/parse_train_timing.sh --format=csv
+
+# Output in JSON format
+$LLMB_REPO/common/parse_train_timing.sh --format=json
+
+# Show full filenames instead of shortened versions
+$LLMB_REPO/common/parse_train_timing.sh --full-names
+```
 
 ```shell
 # Run the parse_train_timing script to analyze all experiments
@@ -39,7 +72,7 @@ Train Step Timing and TFLOPS Analysis (iterations 11-44)
 ================================================================================
 Experiment                                                                                   Status Time Mean (s) Time Std (s) TFLOPS_per_GPU Mean TFLOPS_per_GPU Std
 ------------------------------------------------------------------------------------------ -------- ------------- ------------ ------------------- ------------------
-pretrain_llama31_405b_bf16_gpus256_tp4_pp8_cp2_vp8_mbs1_gbs128_384748                       Success         9.479        0.018             1134.50               2.13
+pretrain_llama3.1_405b_bf16_gpus256_tp4_pp8_cp2_vp8_mbs1_gbs128_384748                       Success         9.479        0.018             1134.50               2.13
 ```
 
 To obtain throughput as a tokens per second measurement, follow this formula: 
@@ -64,10 +97,10 @@ MFU = (global batch size) * (model flops) / (training step time) / (number of GP
 
 **Peak theoretical throughput across GPUs and Data Types (in TFLOPS)**
 
-| Data Type | GB200 | H100 |
-|-----------|:-----:|:----:|
-| BF16      | 2450  | 989  |
-| FP8       | 4900  | 1979 |
+| Data Type | GB200 | B200 | H100 |
+|-----------|:-----:|:----:|:----:|
+| BF16      | 2450  | 2250 | 989  |
+| FP8       | 4900  | 4500 | 1979 |
 
 
 The model flops for Llama3.1 405B for GBS=1 per GPU is 2.17E+16
@@ -75,43 +108,12 @@ The model flops for Llama3.1 405B for GBS=1 per GPU is 2.17E+16
 E.g. Llama3.1 405b BF16 on 128x GB200 GPUs (GBS=64)
 ```shell
 peak FLOPS for GB200 = 2.45 PFLOPS
-training step time = 9.469
+training step time = 9.347
 model flops = 2.17E+16
 
 MFU = 64 * 2.17E+16 / 9.347 / 128 / 2.45E+15 = 47.4%
 ```
 
-# GB200 Performance
-
-| Llama3.1 405b BF16                    | 128x GB200 GPUs | 256x GB200 GPUs | 512x GB200 GPUs |
-|---------------------------------------|:---------------:|:---------------:|:---------------:|
-| Training step time (seconds per step) | 9.347           | 9.484           | 9.508           |
-| Throughput in tokens per second       | 56092           | 110563          | 220567          |
-| Model flops utilization               | 47.4%           | 46.7%           | 46.6%           |
-| Time to train 1T tokens in days       | 206.34          | 104.68          | 52.47           |
-
-| Llama3.1 405b FP8                     | 128x GB200 GPUs | 256x GB200 GPUs | 512x GB200 GPUs |
-|---------------------------------------|:---------------:|:---------------:|:---------------:|
-| Training step time (seconds per step) | 6.131           | 6.183           | 6.244           |
-| Throughput in tokens per second       | 85514           | 169590          | 335867          |
-| Model flops utilization               | 36.1%           | 35.8%           | 35.5%           |
-| Time to train 1T tokens in days       | 135.35          | 68.25           | 34.46           |
-
-# H100 Performance
-
-| Llama3.1 405b BF16                    | 512x H100 GPUs |
-|---------------------------------------|:--------------:|
-| Training step time (seconds per step) |     19.810      |
-| Throughput in tokens per second       |     105863      |
-| Model flops utilization               |       55.34%    |
-| Time to train 1T tokens in days       |     109.33     |
-
-| Llama3.1 405b FP8                    | 512x H100 GPUs |
-|---------------------------------------|:--------------:|
-| Training step time (seconds per step) |     13.020      |
-| Throughput in tokens per second       |     161072      |
-| Model flops utilization               |      42.12%     |
-| Time to train 1T tokens in days       |     71.86     |
 
 
 # Prerequisites
@@ -138,18 +140,17 @@ These parameters can be set either by exporting the environment variable or usin
 
 ## Prepare environment
 
-The recommended way to prepare your environment is to use the **installer** referenced in the [main README](../README.md):
+Use the **installer** referenced in the [main README](../README.md) to prepare the recipe environment:
 
-Note, that a new directory layout and key variables are now used in the recipe:
+The following directory layout and key variables are used in the recipe:
 
 - `LLMB_INSTALL`: Top-level directory for all benchmarking artifacts (images, datasets, venvs, workloads, etc).
-- `LLMB_WORKLOAD`: Workload-specific directory, e.g. `${LLMB_INSTALL}/workloads/pretraining_llama3.1`.
+- `LLMB_WORKLOAD`: Workload-specific directory, e.g. `${LLMB_INSTALL}/workloads/pretrain_llama3.1`.
 - Results, logs, and checkpoints are stored under subfolders of `LLMB_WORKLOAD` (see below).
 
-If you are an advanced user and need to perform a manual environment setup (e.g., for debugging or custom environments), see the [Advanced/Manual Environment Setup](#advancedmanual-environment-setup) section at the end of this file.
 
 **Migration Note:**
-If you previously used `STAGE_PATH`, replace it with `LLMB_INSTALL` (top-level) and `LLMB_WORKLOAD` (workload-specific). All output, logs, and checkpoints are now under `LLMB_WORKLOAD`.
+If you previously used `STAGE_PATH`, replace it with `LLMB_INSTALL` (top-level). All output, logs, and checkpoints will be created under the workload's appropriate `LLMB_WORKLOAD` folder.
 
 # Prepare Dataset
 Since Llama3.1 training only uses synthetic datasets, this step is omitted.
@@ -186,13 +187,17 @@ Alternatively, you can run training directly using the launch script. This metho
 ### Command Template
 
 ```shell
-JOB_TOTAL_GPUS=<number> [DTYPE=<precision>] [GPU_TYPE=<type>] ./launch.sh
+JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] ./launch.sh
 ```
 
 ### Environment Variables
 
 **Required:**
-- `JOB_TOTAL_GPUS`: Number of GPUs to use (e.g., 128, 256)
+- `JOB_TOTAL_GPUS`: Number of GPUs to use (e.g., 128, 256, 512)
+- `GPU_TYPE`: Type of GPU hardware
+  - `gb200` - NVIDIA GB200 GPUs
+  - `b200` - NVIDIA B200 GPUs
+  - `h100` - NVIDIA H100 GPUs
 
 **Optional:**
 - `DTYPE`: Precision format (default: `fp8`)
@@ -200,30 +205,27 @@ JOB_TOTAL_GPUS=<number> [DTYPE=<precision>] [GPU_TYPE=<type>] ./launch.sh
   - `bf16` - BFloat16 precision
 - `MODEL_SIZE`: Model variant (fixed: `405b`)
   - `405b` - 405 billion parameter model (only supported size)
-- `GPU_TYPE`: Type of GPU hardware (default: `gb200`)
-  - `gb200` - NVIDIA GB200 GPUs
-  - `h100` - NVIDIA H100 GPUs
 
 ### Example Commands
 
-Train Llama3.1 405B with default settings (FP8, GB200) on 128 GPUs:
+Train Llama3.1 405B with default settings (FP8) on 128 GB200 GPUs:
 ```shell
-JOB_TOTAL_GPUS=128 ./launch.sh
+JOB_TOTAL_GPUS=128 GPU_TYPE=gb200 ./launch.sh
 ```
 
 Train with BF16 precision on 128 GB200 GPUs:
 ```shell
-JOB_TOTAL_GPUS=128 DTYPE=bf16 ./launch.sh
+JOB_TOTAL_GPUS=128 GPU_TYPE=gb200 DTYPE=bf16 ./launch.sh
 ```
 
 Train with FP8 precision on 256 GB200 GPUs:
 ```shell
-JOB_TOTAL_GPUS=256 ./launch.sh
+JOB_TOTAL_GPUS=256 GPU_TYPE=gb200 ./launch.sh
 ```
 
 Train with BF16 precision on 512 H100 GPUs:
 ```shell
-JOB_TOTAL_GPUS=512 DTYPE=bf16 GPU_TYPE=h100 ./launch.sh
+JOB_TOTAL_GPUS=512 GPU_TYPE=h100 DTYPE=bf16 ./launch.sh
 ```
 
 # Output Locations
@@ -242,7 +244,7 @@ experiments/
 │       └── [batch scripts and other files]
 ```
 
-The `<experiment_name>` typically follows the pattern: `pretraining_llama31_405b_<dtype>_<scale>_<config>`
+The `<experiment_name>` typically follows the pattern: `pretrain_llama3.1_405b_<dtype>_<scale>_<config>`
 
 **Key files:**
 - `log-<experiment_name>.out` - Contains training step timing and performance metrics analyzed by `parse_train_timing.sh`
@@ -255,19 +257,19 @@ We have two profiling methods supported: Nsight, and NCCL Trace.
 
 ## Run Nsight Profiling
 
-To enable profiling with Nsight Systems set variable `ENABLE_PROFILE=true` when submitting your job. The job will run for a total of 50 steps where steps 46-50 will be profiled.
+To enable profiling with Nsight Systems set variable `ENABLE_PROFILE=true` when submitting your job. The job will run for a total of 50 steps where steps 45-50 will be profiled.
 
 In order to view the resulting profiles, ensure you have the latest version of Nsight Systems installed. For more information visit: [Nsight Systems](https://docs.nvidia.com/nsight-systems/)
 
 ### Default Profiling Settings:
 * **MPI Ranks:** all ranks
-* **Job Steps:** 46-50
+* **Job Steps:** 45-50
 * **Output Location:** Profiling output saved alongside training results (see Output Locations)
 * **Filename format:** `profile_${SLURM_JOB_ID}_${SLURM_NODEID}_${SLURM_LOCALID}.nsys-rep`
 
 **Example command:**
 ```shell
-ENABLE_PROFILE=true JOB_TOTAL_GPUS=128 DTYPE=fp8 ./launch.sh
+ENABLE_PROFILE=true JOB_TOTAL_GPUS=128 DTYPE=fp8 GPU_TYPE=gb200 ./launch.sh
 ```
 ### Customizing profiling behavior:
 * Specify job steps to profile:
@@ -275,6 +277,16 @@ ENABLE_PROFILE=true JOB_TOTAL_GPUS=128 DTYPE=fp8 ./launch.sh
     Default: 45
   * `RUN_CONF_PROFILE_STOP_STEP`: stop profiling on this job step.
     Default: 50
+* Enable GPU metrics collection:
+  * `ENABLE_GPU_METRICS`: Enable GPU metrics collection during NSight profiling (default: false)
+  - When set to `true` along with `ENABLE_PROFILE=true`, captures detailed GPU performance metrics
+  - Provides additional GPU utilization, memory usage, and compute efficiency data
+  - May require additional system configuration for GPU device metrics to work properly
+
+**Example command with GPU metrics:**
+```shell
+ENABLE_PROFILE=true ENABLE_GPU_METRICS=true JOB_TOTAL_GPUS=128 GPU_TYPE=gb200  DTYPE=fp8 ./launch.sh
+```
 
 
 ### Troubleshooting:
@@ -309,7 +321,7 @@ To collect NCCL Trace information, set the environment variable `ENABLE_NCCLTRAC
 **Example command:**
 
 ```shell
-ENABLE_NCCLTRACE=true JOB_TOTAL_GPUS=128 DTYPE=fp8 ./launch.sh
+ENABLE_NCCLTRACE=true JOB_TOTAL_GPUS=128 DTYPE=fp8 GPU_TYPE=gb200 ./launch.sh
 ```
 
 ### Understanding NCCL Trace Results
@@ -356,80 +368,3 @@ Llama 3.1 405b calculation:
     model flops = 8129 * (659,545,915,392 + 1,978,637,746,176 + 12,608,077,824) = 2.17E16
 ```
 
-
-# Advanced/Manual Environment Setup
-
-> **Caution:** This section is for advanced users who need to manually set up the environment. Most users should use the common installer as described above.
-
-### Set the environment variables
-```shell
-# Set the path where all artifacts will be downloaded
-export LLMB_INSTALL=<path to your shared file system folder> (e.g. /lustre/myproject/nemo)
-```
-
-**Important:** `LLMB_INSTALL` used in this step must be used when running the workload.
-
-### Prepare python virtual environment
-
-The workload relies on python virtual environment in order ensure there are no conflicts between required dependencies and user's packages. We require Python 3.12.x for the workload to work.
-
-There are multiple choices available to set up virtual environment: 
-* conda
-* python venv
-
-#### Conda 
-
-To install and activate conda virtual environment
-```shell
-# pick INSTALL_PATH with sufficient disk space
-INSTALL_PATH=~
-wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O $INSTALL_PATH/miniconda.sh
-bash $INSTALL_PATH/miniconda.sh -b -p $INSTALL_PATH/miniconda3
-$INSTALL_PATH/miniconda3/bin/conda init
-source ~/.bashrc
-
-conda create -n nemo2-llama python=3.12
-conda activate nemo2-llama
-```
-
-When you are finished running this benchmark you can deactivate the environment, run this command
-```shell
-conda deactivate
-```
-
-#### Python venv
-
-To install and activate python venv 
-```shell
-python3 -m venv $LLMB_INSTALL/venvs/<venv_name>
-source $LLMB_INSTALL/venvs/<venv_name>/bin/activate
-```
-
-When you are finished running this benchmark you can deactivate the environment, run this command
-```shell
-deactivate
-```
-
-### Setup script
-
-Create a install directory by running the attached setup.sh. The script converts the docker image to a ```.sqsh``` file under the $LLMB_INSTALL/images folder and installs required packages to the python environment to enable NeMo-Run launcher functionality.
-
-**Important:** Make sure the previous step has been completed and python virtual environment is active. Run the setup script using the following command.
-
-**SLURM:**
-
-```shell
-# activate virtual python environment setup previously
-./setup.sh
-```
-To fetch the image ensure your virtual environment has been **deactivated**, then run:
-
-```shell
-srun --account ${SBATCH_ACCOUNT} --partition ${SBATCH_PARTITION} bash -c "enroot import --output ${LLMB_INSTALL}/images/nvidia+nemo+25.04.01.sqsh docker://nvcr.io#nvidia/nemo:25.04.01"
-```
-
-
-**Note**: output log from running `setup.sh` script may include an error about tritonclient dependency. The error can be ignored as it doesn't affect benchmark functionality. 
-It would look like this:
-`ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
-tritonclient 2.51.0 requires urllib3>=2.0.7, but you have urllib3 1.26.20 which is incompatible.`
