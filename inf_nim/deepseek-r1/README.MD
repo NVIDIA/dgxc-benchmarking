@@ -399,3 +399,56 @@ Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
 These usually mean that one of the GPUs is hanging. Possible resolutions: 
   * re-running the job on a different set of nodes
   * rebooting affected nodes.
+
+## Download model weights fails
+
+#### Problem
+```shell
+ngc registry model download-version nim/deepseek-ai/deepseek-r1-instruct:hf-5dde110-nim-fp8 --dest $STAGE_PATH
+
+...
+
+
+./ngc registry model download-version nim/deepseek-ai/deepseek-r1-instruct:hf-5dde110-nim-fp8 --dest /mnt/localdisk/mlperf/ds/ngc-cli
+⠸ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ • 0/0 bytes • Remaining: -:--:-- • ? • Elapsed: 0:00:00 •
+Client Error: 404 Response: 404 NOT_FOUND, ProblemDetail[type='urn:kaizen:problem-details:artifact-not-found', title='Not Found', status=404, detail='Model not found', instance='null', properties='null'] - Request Id: 1bae37d7-7818-41a8-9689-21103820908b Url: https://api.ngc.nvidia.com/v2/models/nim/deepseek-ai/deepseek-r1-instruct?resolve-labels=false
+```
+
+#### Symptoms
+```shell
+ngc registry model list *deepseek-r1-instruct*
+
+# Empty Table --> NOT WORKING
+
++-----------------+-----------------+----------------+-------------+-------------+-----------+---------------+------------+-------------+------------+------------+
+| Name            | Repository      | Latest Version | Application | Framework  | Precision | Last Modified | Permission | Access Type | Associated | Has Signed |
+|                 |                 |                |             |            |           |               |            |             | Products   | Version    |
++-----------------+-----------------+----------------+-------------+-------------+-----------+---------------+------------+-------------+------------+------------+
+|                 |                 |                |             |            |           |               |            |             |            |            |
++-----------------+-----------------+----------------+-------------+-------------+-----------+---------------+------------+-------------+------------+------------+
+
+```
+
+#### Resolution
+Configure NGC with a valid API Key
+
+```shell
+ngc config set
+```
+Follow the CLI prompts:
+```shell
+Enter API key [****]. Choices: [<VALID_APIKEY>, 'no-apikey']: 
+```
+You should now be able to see values in the table:
+```shell
+ngc registry model list *deepseek-r1-instruct*
+
++-------------+--------------+--------------+-------------+-----------+-----------+--------------+------------+-------------+------------+------------+
+| Name        | Repository   | Latest       | Application | Framework | Precision | Last         | Permission | Access Type | Associated | Has Signed |
+|             |              | Version      |             |           |           | Modified     |            |             | Products   | Version    |
++-------------+--------------+--------------+-------------+-----------+-----------+--------------+------------+-------------+------------+------------+
+| DeepSeek-R1 | nvstaging/ni | nvfp4_allmoe | Other       | Other     | N/A       | Mar 13, 2025 | unlocked   |             |            | False      |
+|             | m/deepseek-  |              |             |           |           |              |            |             |            |            |
+|             | r1-instruct  |              |             |           |           |              |            |             |            |            |
++-------------+--------------+--------------+-------------+-----------+-----------+--------------+------------+-------------+------------+------------+
+```

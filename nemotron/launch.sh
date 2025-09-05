@@ -29,11 +29,11 @@ fi
 set -eu -o pipefail
 
 export WORKLOAD_TYPE=pretrain
-export MODEL_NAME=nemotron
-export FW_VERSION=25.04.00
-export GSW_VERSION=25.05.04
+export MODEL_NAME=nemotron4
+export FW_VERSION=25.04.01
+export GSW_VERSION=25.07
 
-export OPENBLAS_NUM_THREADS=1 # optional, to avoid resource contention at the frontend node.
+export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 
 # Ensure STAGE_PATH is not set as it's been replaced by LLMB_INSTALL
 if [ -n "${STAGE_PATH+x}" ]; then
@@ -47,34 +47,25 @@ export LLMB_REPO=$PWD
 
 export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh}
 
-GPU_TYPE=${GPU_TYPE:-"gb200"}
+GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
 GPU_TYPE=${GPU_TYPE,,}
+JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
 CLUSTER_TYPE=${CLUSTER_TYPE:-slurm}
 CLUSTER_TYPE=${CLUSTER_TYPE,,}
 DTYPE=${DTYPE:-fp8}
-DYTPE=${DTYPE,,}
-JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:-16}
+DTYPE=${DTYPE,,}
 MODEL_SIZE=${MODEL_SIZE:-15b}
 MODEL_SIZE=${MODEL_SIZE,,}
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 PROFILE_ENABLED=${PROFILE_ENABLED,,}
+ENABLE_GPU_METRICS=${ENABLE_GPU_METRICS:-false}
+ENABLE_GPU_METRICS=${ENABLE_GPU_METRICS,,}
 STRONG_SCALING=${STRONG_SCALING:-false}
 STRONG_SCALING=${STRONG_SCALING,,}
 MAX_STEPS=${MAX_STEPS:-50}
 CPU_PER_TASK_PINNING=${CPU_PER_TASK_PINNING:-0}
 ENABLE_CHECKPOINT=${ENABLE_CHECKPOINT:-false}
 ENABLE_CHECKPOINT=${ENABLE_CHECKPOINT,,}
-
-if [[ $CLUSTER_TYPE != "slurm" ]]; then
-  echo "Only SLURM is supported for this workload"
-  exit 1
-fi
-
-# Validate that checkpointing features are only used with H100 GPUs
-if [[ $ENABLE_CHECKPOINT = true ]] && [[ $GPU_TYPE != "h100" ]]; then
-  echo "Error: ENABLE_CHECKPOINT=true is only supported with GPU_TYPE=h100. Current GPU_TYPE=$GPU_TYPE"
-  exit 1
-fi
 
 
 if [[ $MODEL_SIZE = 15b ]] && [[ $STRONG_SCALING = true ]]; then
@@ -83,68 +74,67 @@ if [[ $MODEL_SIZE = 15b ]] && [[ $STRONG_SCALING = true ]]; then
 fi
 
 if [[ $GPU_TYPE = h100 ]] && [[ $STRONG_SCALING = true ]]; then
-  echo "Strong scaling is only supported with GPU_TYPE=gb200. Current GPU_TYPE=$GPU_TYPE"
-  exit 1
-fi
-
-if [[ -n ${LOAD_CHECKPOINT_PATH-} ]] && [[ $GPU_TYPE != "h100" ]]; then
-  echo "Error: LOAD_CHECKPOINT_PATH is only supported with GPU_TYPE=h100. Current GPU_TYPE=$GPU_TYPE"
+  echo "Strong scaling is not supported for h100. Please use GPU_TYPE=<gb200, b200>"
   exit 1
 fi
 
 export PROFILE_START_STEP=${PROFILE_START_STEP:-45}
 export PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
 
-if [ $GPU_TYPE = gb200 ]; then
-  GPUS_PER_NODE=${GPUS_PER_NODE:-4}
+if [ $GPU_TYPE = gb200 -o $GPU_TYPE = b200 ]; then
+  if [ $GPU_TYPE = gb200 ]; then
+  	GPUS_PER_NODE=${GPUS_PER_NODE:-4}
+  else
+	GPUS_PER_NODE=${GPUS_PER_NODE:-8}
+  fi
+
   if [ $MODEL_SIZE = 15b ]; then
-	TP=1
-  	PP=1
-  	CP=1
-  	GBS=$(( $JOB_TOTAL_GPUS * 4 ))
-  	MBS=2
-  	VP=1
-	NUM_LAYERS=32
-        HIDDEN_SIZE=6144
+    TP=1
+    PP=1
+    CP=1
+    GBS=${GBS:-$(( JOB_TOTAL_GPUS * 4 ))}
+    MBS=2
+    VP=1
+    NUM_LAYERS=32
+    HIDDEN_SIZE=6144
   elif [ $MODEL_SIZE = 340b ]; then
-	TP=8
-  	PP=4
-  	CP=1
-	if [ $STRONG_SCALING = true ]; then
-		GBS=512
-		TIME_LIMIT=${TIME_LIMIT:-"00:35:00"}
-	else
-		GBS=$(( $JOB_TOTAL_GPUS / 4 ))
-	fi
-  	MBS=1
-  	VP=12
-  	NUM_LAYERS=96
-        HIDDEN_SIZE=18432
+    TP=8
+    PP=4
+    CP=1
+    if [ $STRONG_SCALING = true ]; then
+      GBS=512
+      TIME_LIMIT=${TIME_LIMIT:-"00:35:00"}
+    else
+      GBS=${GBS:-$(( JOB_TOTAL_GPUS / 4 ))}
+    fi
+    MBS=1
+    VP=12
+    NUM_LAYERS=96
+    HIDDEN_SIZE=18432
   fi
 elif [ $GPU_TYPE = h100 ]; then
   GPUS_PER_NODE=${GPUS_PER_NODE:-8}
   if [ $MODEL_SIZE = 15b ]; then
-  	TP=2
-  	PP=1
-  	CP=1
-  	GBS=$(( $JOB_TOTAL_GPUS * 4 ))
-  	MBS=2
-  	VP=0
-  	NUM_LAYERS=32
-  	HIDDEN_SIZE=6144
+    TP=2
+    PP=1
+    CP=1
+    GBS=${GBS:-$(( JOB_TOTAL_GPUS * 4 ))}
+    MBS=2
+    VP=0
+    NUM_LAYERS=32
+    HIDDEN_SIZE=6144
   elif [ $MODEL_SIZE = 340b ]; then
-  	TP=8
-  	PP=8
-  	CP=1
-  	GBS=$(( $JOB_TOTAL_GPUS / 4 ))
-  	MBS=1
-  	VP=12
-  	NUM_LAYERS=96
-  	HIDDEN_SIZE=18432
+    TP=8
+    PP=8
+    CP=1
+    GBS=${GBS:-$(( JOB_TOTAL_GPUS / 4 ))}
+    MBS=1
+    VP=12
+    NUM_LAYERS=96
+    HIDDEN_SIZE=18432
   fi
 else
     echo "${GPU_TYPE} is unsupported for this workload."
-
 fi
 
 
@@ -158,7 +148,7 @@ CONFIG_OVERRIDES=" -tp $TP \
   -ep 1 \
 "
 
-if [ $GPU_TYPE = gb200 ]; then
+if [ $GPU_TYPE = gb200 ] || [ $GPU_TYPE = b200 ]; then
   CONFIG_OVERRIDES+=" -fsdp 0 --cuda_graphs true "
 fi
 
@@ -170,6 +160,9 @@ if [ $PROFILE_ENABLED = true ]; then
   CONFIG_OVERRIDES+=" -en " 
   CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
   CONFIG_OVERRIDES+=" --profiling_stop_step=$PROFILE_STOP_STEP "
+  if [[ $ENABLE_GPU_METRICS = true ]]; then
+      CONFIG_OVERRIDES+=" -pgm "
+  fi
   MAX_STEPS=$PROFILE_STOP_STEP
 fi
 

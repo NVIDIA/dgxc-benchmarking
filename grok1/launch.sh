@@ -31,10 +31,10 @@ set -eu -o pipefail
 
 export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=grok1
+export GSW_VERSION=25.07
 export FW_VERSION=25.04.00
-export GSW_VERSION=25.05.04
 
-export OPENBLAS_NUM_THREADS=1 # optional, to avoid resource contention at the frontend node.
+export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 export HF_TOKEN=${HF_TOKEN?"Required variable HF_TOKEN"}
 
 # Ensure STAGE_PATH is not set as it's been replaced by LLMB_INSTALL
@@ -51,14 +51,17 @@ export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh
 
 CLUSTER_TYPE=${CLUSTER_TYPE:-slurm}
 DTYPE=${DTYPE:-fp8}
-JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:-128}
+DTYPE=${DTYPE,,}
 MODEL_SIZE=314b
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 PROFILE_ENABLED=${PROFILE_ENABLED,,}
+ENABLE_GPU_METRICS=${ENABLE_GPU_METRICS:-false}
+ENABLE_GPU_METRICS=${ENABLE_GPU_METRICS,,}
 NCCLTRACE_ENABLED=${ENABLE_NCCLTRACE:-false}
 NCCLTRACE_ENABLED=${NCCLTRACE_ENABLED,,}
-GPU_TYPE=${GPU_TYPE:-"gb200"}
+GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
 GPU_TYPE=${GPU_TYPE,,}
+JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
 
 TIME_LIMIT=${TIME_LIMIT:-"00:30:00"}
 MAX_STEPS=${MAX_STEPS:-50}
@@ -91,11 +94,11 @@ if [ $GPU_TYPE = "gb200" ]; then
 elif [ $GPU_TYPE = "b200" ]; then
   GPUS_PER_NODE=${GPUS_PER_NODE:-8}
   TP=${TP:-4}
-  PP=${PP:-1}
+  PP=${PP:-4}
   CP=${CP:-1}
   EP=${EP:-8}
-  VP=${VP:-1}
-  ET=${ET:-8}
+  VP=${VP:-8}
+  ET=${ET:-1}
   GBS=${GBS:-}
   if [ -z "$GBS" ]; then
     GBS=$(( JOB_TOTAL_GPUS * 2 ))
@@ -141,6 +144,9 @@ if [ $PROFILE_ENABLED = true ]; then
   CONFIG_OVERRIDES+=" -en "
   CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
   CONFIG_OVERRIDES+=" --profiling_stop_step=$PROFILE_STOP_STEP "
+  if [[ $ENABLE_GPU_METRICS = true ]]; then
+      CONFIG_OVERRIDES+=" -pgm "
+  fi
   MAX_STEPS=$PROFILE_STOP_STEP
 elif [ $NCCLTRACE_ENABLED = true ]; then
   CONFIG_OVERRIDES+=" -nt "

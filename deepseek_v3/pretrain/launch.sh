@@ -29,11 +29,11 @@ fi
 set -eu -o pipefail
 
 export WORKLOAD_TYPE=pretrain
-export MODEL_NAME=deepseek_v3
+export MODEL_NAME=deepseek-v3
 export FW_VERSION=25.04.01
-export GSW_VERSION=25.05.04
+export GSW_VERSION=25.07
 
-export OPENBLAS_NUM_THREADS=1 # optional, to avoid resource contention at the frontend node.
+export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 
 # Ensure STAGE_PATH is not set as it's been replaced by LLMB_INSTALL
 if [ -n "${STAGE_PATH+x}" ]; then
@@ -53,13 +53,15 @@ export HF_TOKEN=${HF_TOKEN?"Required variable HF_TOKEN"}
 
 export MAX_STEPS=${MAX_STEPS:-50}
 export DTYPE=bf16 # fp8 not supported currently
-export JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:-8}
-export GPU_TYPE=${GPU_TYPE:-"gb200"}
+export GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
 export GPU_TYPE=${GPU_TYPE,,}
+export JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
 export TIME_LIMIT=${TIME_LIMIT:-"00:55:00"}
 
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 PROFILE_ENABLED=${PROFILE_ENABLED,,}
+GPU_METRICS_ENABLED=${ENABLE_GPU_METRICS:-false}
+GPU_METRICS_ENABLED=${GPU_METRICS_ENABLED,,}
 NCCLTRACE_ENABLED=${ENABLE_NCCLTRACE:-false}
 NCCLTRACE_ENABLED=${NCCLTRACE_ENABLED,,}
 
@@ -79,6 +81,9 @@ if [[ "$PROFILE_ENABLED" = "true" ]]; then
   CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
   CONFIG_OVERRIDES+=" --profiling_stop_step=$PROFILE_STOP_STEP "
   MAX_STEPS=$PROFILE_STOP_STEP
+  if [[ $GPU_METRICS_ENABLED = true ]]; then
+    CONFIG_OVERRIDES+=" -pgm "
+  fi
 elif [[ "$NCCLTRACE_ENABLED" = "true" ]]; then
   CONFIG_OVERRIDES+=" -nt "
   MAX_STEPS=5
@@ -89,16 +94,12 @@ CP=1
 MBS=1
 NUM_LAYERS=61
 HIDDEN_SIZE=7168
-GBS=$(( $JOB_TOTAL_GPUS * 8 ))
+GBS=$(( JOB_TOTAL_GPUS * 8 ))
 
 if [[ $GPU_TYPE = "h100"  ]]; then
   GPUS_PER_NODE=${GPUS_PER_NODE:-8}
   TP=2
-  if [[ $JOB_TOTAL_GPUS -eq 512 ]]; then
-    PP=8
-  else
-    PP=16
-  fi
+  PP=16
   EP=64
   VP=1
   ETP=1
@@ -117,28 +118,42 @@ elif [[ $GPU_TYPE = "gb200" ]]; then
   ETP=1
   AOL=0
   RM='core_attn'
+elif [[ $GPU_TYPE = "b200" ]]; then
+  GPUS_PER_NODE=${GPUS_PER_NODE:-8}
+  EP=8
+  PP=16
+  if [[ $JOB_TOTAL_GPUS -eq 128 ]]; then
+    TP=2
+    RM='core_attn'
+  else
+    TP=1
+    RM='core_attn,mla_up_proj'
+  fi
+  VP=1
+  ETP=1
+  AOL=0
 fi
 
 #run command
 pushd $LLMB_WORKLOAD/NeMo
 
 python3 -m scripts.performance.llm.pretrain_deepseek_v3 \
-	-i $IMAGE \
-	-c $DTYPE \
-	-hf $HF_TOKEN \
-	-g $GPU_TYPE \
-	-ng $JOB_TOTAL_GPUS \
-	-gn $GPUS_PER_NODE \
- 	-ms $MAX_STEPS \
-	--num_layers $NUM_LAYERS \
-    --hidden_size $HIDDEN_SIZE \
-	-tp $TP -pp $PP -cp $CP -vp $VP -ep $EP -mb $MBS -gb $GBS \
-	--expert_tensor_parallel_size $ETP --activation_offload_layers $AOL --recompute_modules $RM \
-	${CONFIG_OVERRIDES} \
-	slurm \
-	--account $SBATCH_ACCOUNT \
-	--partition $SBATCH_PARTITION \
-	--log_dir $NEMORUN_HOME \
-	--time_limit $TIME_LIMIT 
+  -i $IMAGE \
+  -c $DTYPE \
+  -hf $HF_TOKEN \
+  -g $GPU_TYPE \
+  -ng $JOB_TOTAL_GPUS \
+  -gn $GPUS_PER_NODE \
+  -ms $MAX_STEPS \
+  --num_layers $NUM_LAYERS \
+  --hidden_size $HIDDEN_SIZE \
+  -tp $TP -pp $PP -cp $CP -vp $VP -ep $EP -mb $MBS -gb $GBS \
+  --expert_tensor_parallel_size $ETP --activation_offload_layers $AOL --recompute_modules $RM \
+  ${CONFIG_OVERRIDES} \
+  slurm \
+  --account $SBATCH_ACCOUNT \
+  --partition $SBATCH_PARTITION \
+  --log_dir $NEMORUN_HOME \
+  --time_limit $TIME_LIMIT 
 
 popd

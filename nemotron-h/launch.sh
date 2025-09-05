@@ -29,11 +29,11 @@ fi
 set -eu -o pipefail
 
 export WORKLOAD_TYPE=pretrain
-export MODEL_NAME=nemotronh
+export MODEL_NAME=nemotron-h
 export FW_VERSION=25.04.01
-export GSW_VERSION=25.05.04
+export GSW_VERSION=25.07
 
-export OPENBLAS_NUM_THREADS=1 # optional, to avoid resource contention at the frontend node.
+export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 
 # Ensure STAGE_PATH is not set as it's been replaced by LLMB_INSTALL
 if [ -n "${STAGE_PATH+x}" ]; then
@@ -49,14 +49,15 @@ export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh
 
 DTYPE=${DTYPE:-fp8}
 DTYPE=${DTYPE,,}
-GPU_TYPE=${GPU_TYPE:-h100}
+GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
 GPU_TYPE=${GPU_TYPE,,}
-GPUS_PER_NODE=${GPUS_PER_NODE:-8}
-JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:-256}
+JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
 MODEL_SIZE=${MODEL_SIZE:-56b}
 MODEL_SIZE=${MODEL_SIZE,,}
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 PROFILE_ENABLED=${PROFILE_ENABLED,,}
+GPU_METRICS_ENABLED=${ENABLE_GPU_METRICS:-false}
+GPU_METRICS_ENABLED=${GPU_METRICS_ENABLED,,}
 NCCLTRACE_ENABLED=${ENABLE_NCCLTRACE:-false}
 NCCLTRACE_ENABLED=${NCCLTRACE_ENABLED,,}
 
@@ -68,14 +69,28 @@ export PROFILE_START_STEP=${PROFILE_START_STEP:-45}
 export PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
 
 if [ $MODEL_SIZE = 56b ]; then
-  TP=8
+  if [ $GPU_TYPE = gb200 ]; then
+    DEF_GPUS_PER_NODE=4
+    TP=2
+  elif [ $GPU_TYPE = b200 ]; then
+    DEF_GPUS_PER_NODE=8
+    TP=2
+  elif [ $GPU_TYPE = h100 ]; then
+    DEF_GPUS_PER_NODE=8
+    TP=8
+  fi
+
+  GPUS_PER_NODE=${GPUS_PER_NODE:-$DEF_GPUS_PER_NODE}
+
   PP=1
   CP=1
-  GBS=$(( $JOB_TOTAL_GPUS * 3 ))
+  GBS=${GBS:-$(( JOB_TOTAL_GPUS * 3 ))}
   MBS=1
   VP=0
   NUM_LAYERS=118
   HIDDEN_SIZE=8192
+else
+  echo "MODEL_SIZE: ${MODEL_SIZE} is unsupported."
 fi
 
 CONFIG_OVERRIDES=" -tp $TP \
@@ -97,6 +112,9 @@ if [[ "$PROFILE_ENABLED" = "true" ]]; then
   CONFIG_OVERRIDES+=" --enable_nsys"
   CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
   CONFIG_OVERRIDES+=" --profiling_stop_step=$PROFILE_STOP_STEP "
+  if [[ $GPU_METRICS_ENABLED = true ]]; then
+    CONFIG_OVERRIDES+=" -pgm "
+  fi
   MAX_STEPS=$PROFILE_STOP_STEP
 elif [[ "$NCCLTRACE_ENABLED" = "true" ]]; then
   CONFIG_OVERRIDES+=" -nt "
@@ -107,7 +125,7 @@ fi
 pushd $LLMB_WORKLOAD/NeMo
 
 python -m scripts.performance.llm.pretrain_nemotronh_${MODEL_SIZE} \
-  --gpu h100 \
+  --gpu $GPU_TYPE \
   --container_image $IMAGE \
   --compute_dtype $DTYPE \
   --num_gpus $JOB_TOTAL_GPUS \

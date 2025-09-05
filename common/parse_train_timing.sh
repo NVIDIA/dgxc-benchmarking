@@ -231,10 +231,12 @@ output_header
 while IFS= read -r file; do
     filename=$(basename "$file")
     
-    # Skip nccltrace files - these are massive logs and aren't full runs.
-    if [[ "$filename" == *"nccltrace"* ]]; then
-        continue
-    fi
+    # Skip various non-workload log files.
+    case "$filename" in
+        *nccltrace*|*prepare_squad_dataset_exp*|*import_ckpt_exp*|*nsys_analysis*)
+            continue
+            ;;
+    esac
     
     # Check if file contains any train_step_timing data at all
     has_timing_data=$(grep -q "train_step_timing in s:" "$file" 2>/dev/null && echo "yes" || echo "no")
@@ -250,18 +252,22 @@ while IFS= read -r file; do
                 if (iteration >= min_iter && iteration <= max_iter) {
                     match($0, /train_step_timing in s: ([0-9]+\.?[0-9]*)/, timing_arr)
                     match($0, /TFLOPS_per_GPU: ([0-9]+\.?[0-9]*([eE][+-]?[0-9]+)?)/, tflops_arr)
-                    if (timing_arr[1] != "" && tflops_arr[1] != "") {
+                    if (timing_arr[1] != "") {
                         count++
                         time_values[count] = timing_arr[1]
-                        # Convert scientific notation to regular number
-                        tflops_val = tflops_arr[1]
-                        if (match(tflops_val, /[eE]/)) {
-                            # Handle scientific notation
-                            tflops_val = sprintf("%.10f", tflops_val)
-                        }
-                        tflops_values[count] = tflops_val
                         time_sum += timing_arr[1]
-                        tflops_sum += tflops_val
+                        
+                        if (tflops_arr[1] != "") {
+                            tflops_count++
+                            # Convert scientific notation to regular number
+                            tflops_val = tflops_arr[1]
+                            if (match(tflops_val, /[eE]/)) {
+                                # Handle scientific notation
+                                tflops_val = sprintf("%.10f", tflops_val)
+                            }
+                            tflops_values[tflops_count] = tflops_val
+                            tflops_sum += tflops_val
+                        }
                         if (iteration > max_found) max_found = iteration
                     }
                 }
@@ -272,22 +278,33 @@ while IFS= read -r file; do
                         print "INCOMPLETE:" max_found
                     } else {
                         time_mean = time_sum / count
-                        tflops_mean = tflops_sum / count
                         
-                        # Calculate standard deviations
+                        # Calculate time standard deviation
                         time_sum_sq_diff = 0
-                        tflops_sum_sq_diff = 0
                         for (i = 1; i <= count; i++) {
                             time_diff = time_values[i] - time_mean
                             time_sum_sq_diff += time_diff * time_diff
-                            
-                            tflops_diff = tflops_values[i] - tflops_mean
-                            tflops_sum_sq_diff += tflops_diff * tflops_diff
                         }
                         time_std_dev = sqrt(time_sum_sq_diff / count)
-                        tflops_std_dev = sqrt(tflops_sum_sq_diff / count)
                         
-                        printf "COMPLETE:%.3f:%.3f:%.2f:%.2f", time_mean, time_std_dev, tflops_mean, tflops_std_dev
+                        tflops_mean_str = "-"
+                        tflops_std_dev_str = "-"
+                        
+                        if (tflops_count > 0) {
+                            tflops_mean = tflops_sum / tflops_count
+                            
+                            # Calculate TFLOPS standard deviation
+                            tflops_sum_sq_diff = 0
+                            for (i = 1; i <= tflops_count; i++) {
+                                tflops_diff = tflops_values[i] - tflops_mean
+                                tflops_sum_sq_diff += tflops_diff * tflops_diff
+                            }
+                            tflops_std_dev = sqrt(tflops_sum_sq_diff / tflops_count)
+                            tflops_mean_str = sprintf("%.2f", tflops_mean)
+                            tflops_std_dev_str = sprintf("%.2f", tflops_std_dev)
+                        }
+                        
+                        printf "COMPLETE:%.3f:%.3f:%s:%s", time_mean, time_std_dev, tflops_mean_str, tflops_std_dev_str
                     }
                 }
             }')

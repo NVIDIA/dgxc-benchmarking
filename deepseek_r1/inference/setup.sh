@@ -20,6 +20,16 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
+# For each dataset a user elects to use, the user is responsible for
+# checking if the dataset license is fit for the intended purpose.
+
+# Parameters
+#SBATCH --exclusive
+#SBATCH --job-name="deepseek_r1_fp4:trtllm-setup"
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --time=01:00:00
+
 set -eu -o pipefail
 
 if [ ${BASH_VERSION:0:1} -lt 4 ] || [ ${BASH_VERSION:0:1} -eq 4 -a ${BASH_VERSION:2:1} -lt 2 ]; then
@@ -28,9 +38,9 @@ if [ ${BASH_VERSION:0:1} -lt 4 ] || [ ${BASH_VERSION:0:1} -eq 4 -a ${BASH_VERSIO
     exit 1
 fi
 
-export WORKLOAD_TYPE=pretrain
-export MODEL_NAME=nemotronh
-export FW_VERSION=25.04.01
+export WORKLOAD_TYPE=inference
+export MODEL_NAME=deepseek-r1
+export FW_VERSION=1.0.0rc1
 
 # Ensure STAGE_PATH is not set as it's been replaced by LLMB_INSTALL
 if [ -n "${STAGE_PATH+x}" ]; then
@@ -38,9 +48,10 @@ if [ -n "${STAGE_PATH+x}" ]; then
   exit 1
 fi
 
+MODEL_WEIGHTS_DIR="DeepSeek-R1-FP4"
 export LLMB_INSTALL=${LLMB_INSTALL:?Please set LLMB_INSTALL to the path of the installation directory for all workloads}
 export LLMB_WORKLOAD=$LLMB_INSTALL/workloads/${WORKLOAD_TYPE}_${MODEL_NAME}
-export NEMO_DIR=$LLMB_WORKLOAD/NeMo
+export MODEL_PATH=$LLMB_WORKLOAD/$MODEL_WEIGHTS_DIR
 
 # Build LLMB_INSTALL location 
 export MANUAL_INSTALL=${MANUAL_INSTALL:-true}
@@ -49,26 +60,71 @@ if [ "$MANUAL_INSTALL" = true ]; then
   mkdir -p $LLMB_WORKLOAD
 fi
 
-# -------- llmb-nemo commits
-export NEMO_COMMIT="7a8f1cc7bc40a84447c0681a9e4e956a135ae8a2"
-export MEGATRON_COMMIT="7094270c6fa1dbc6b2e99072171e3a559ca36d0f"
-export NEMO_RUN_COMMIT="f3c3ac22fe169acf93aa7647ab9785290537d4a4"
+ISL_OSL_COMBINATIONS=("reasoning:1000/1000 chat:128/128 summarization:8000/512 generation:512/8000")
+PROMT_REQUESTS=${PROMT_REQUESTS:-50000}
+TRT_COMMIT="1a7c6e79743f100954e0a2375f254e54d5717e52"
+TRT_DIR="TensorRT-LLM"
 
-# 1. Clone the NeMo source code
-#Setup NeMo 
-if [ ! -d "$NEMO_DIR" ]; then
-    git clone https://github.com/NVIDIA/NeMo.git $NEMO_DIR
+pushd $LLMB_WORKLOAD
+if [ ! -d "${MODEL_WEIGHTS_DIR}" ]; then
+  git clone https://huggingface.co/nvidia/DeepSeek-R1-FP4
 fi
-# Ensure we are on same commit and have dependencies installed.
-pushd $NEMO_DIR
+
+# clone the TRT-LLM repo 
+if [ ! -d "$TRT_DIR" ]; then
+    git clone https://github.com/NVIDIA/TensorRT-LLM.git
+fi
+
+pushd $TRT_DIR
 git fetch origin
-git checkout -f $NEMO_COMMIT
-./reinstall.sh
+git checkout -f $TRT_COMMIT
 popd
 
-# 2. Install dependencies
-pip install 'scipy<1.13.0' # a workaround for compatibility issue
-pip install 'bitsandbytes==0.46.0' # Future NeMo release 25.07/09 will have this fix.
-pip install 'transformers==4.55.4'
-pip install megatron-core@git+https://github.com/NVIDIA/Megatron-LM.git@$MEGATRON_COMMIT
-pip install nemo_run@git+https://github.com/NVIDIA/NeMo-Run.git@$NEMO_RUN_COMMIT
+# Install dependencies for dataset generation
+pip install click==8.2.1
+pip install transformers==4.52.4
+pip install pillow==11.2.1
+pip install datasets==3.6.0
+pip install pydantic==2.11.7
+
+cat <<EOF > config.yml
+enable_attention_dp: true 
+use_cuda_graph: true
+kv_cache_dtype: fp8
+cuda_graph_padding_enabled: true
+cuda_graph_batch_sizes:
+  - 1
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  - 128
+  - 256
+  - 384
+  - 420
+  - 450
+print_iter_log: true
+stream_interval: 4
+EOF
+
+for value in $ISL_OSL_COMBINATIONS; do
+    
+   use_case=$(echo "$value" | cut -d':' -f1)
+   ISL=$(echo "$value" | cut -d':' -f2 | cut -d'/' -f1)
+   OSL=$(echo "$value" | cut -d':' -f2 | cut -d'/' -f2)
+
+   echo "preparing dataset for:"
+   echo "Use Case: $use_case"
+   echo "ISL: $ISL"
+   echo "OSL: $OSL"
+
+   python TensorRT-LLM/benchmarks/cpp/prepare_dataset.py \
+        --stdout --tokenizer $MODEL_PATH \
+        token-norm-dist \
+        --input-mean $ISL --output-mean $OSL \
+        --input-stdev 0 --output-stdev 0 \
+        --num-requests $PROMT_REQUESTS > $LLMB_WORKLOAD/dataset_${use_case}_${ISL}_${OSL}.txt
+done
+popd

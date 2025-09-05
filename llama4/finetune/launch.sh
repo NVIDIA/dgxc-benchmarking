@@ -33,15 +33,15 @@ set -eu -o pipefail
 : "${SBATCH_ACCOUNT:?Required variable SBATCH_ACCOUNT}"
 : "${SBATCH_PARTITION:?Required variable SBATCH_PARTITION}"
 : "${HF_TOKEN:?Required variable Hugging Face token}"
-: "${GPU_TYPE:?Required variable GPU_TYPE (Eg: gb200, h100)}"
+: "${GPU_TYPE:?Required variable GPU_TYPE (Eg: b200, h100)}"
 : "${LLMB_INSTALL:?Required variable LLMB_INSTALL}"
 
-export WORKLOAD_TYPE=pretrain
-export MODEL_NAME=llama4_maverick
+export WORKLOAD_TYPE=finetune
+export MODEL_NAME=llama4-maverick
 export FW_VERSION=25.04.01
-export GSW_VERSION=25.05.04
+export GSW_VERSION=25.07
 
-export OPENBLAS_NUM_THREADS=1 # optional, to avoid resource contention at the frontend node.
+export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 
 # Ensure STAGE_PATH is not set as it's been replaced by LLMB_INSTALL
 if [ -n "${STAGE_PATH+x}" ]; then
@@ -52,14 +52,21 @@ fi
 export LLMB_WORKLOAD=$LLMB_INSTALL/workloads/${WORKLOAD_TYPE}_${MODEL_NAME}
 export LLMB_REPO=$PWD
 
-export IMAGE=${IMAGE:-${LLMB_INSTALL}/images/nvidia+nemo+${FW_VERSION}.sqsh}
+export IMAGE=${RUN_CONF_IMAGE:-${LLMB_INSTALL}/images/nvidia+nemo+${FW_VERSION}.sqsh}
 
 export NEMORUN_HOME=$LLMB_WORKLOAD
-export HF_HOME=${HF_HOME:-$LLMB_WORKLOAD}
-export NEMO_HOME=${NEMO_HOME:-$LLMB_WORKLOAD}
+if [ ! -d "$LLMB_WORKLOAD/checkpoint_and_dataset" ]; then
+  echo "Error: checkpoint_and_dataset folder not found in $LLMB_WORKLOAD"
+  echo "Please ensure you have downloaded both the dataset and checkpoint data. See the README for more details."
+  exit 1
+fi
+export HF_HOME=${HF_HOME:-$LLMB_WORKLOAD/checkpoint_and_dataset}
+export NEMO_HOME=${NEMO_HOME:-$LLMB_WORKLOAD/checkpoint_and_dataset}
 
 #Default values
+GPU_TYPE=${GPU_TYPE,,}
 DTYPE=${DTYPE:-bf16}
+JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
 MODEL_SIZE=${MODEL_SIZE:-400b}
 MODEL_SIZE=${MODEL_SIZE,,}
 MAX_STEPS=${MAX_STEPS:-50}
@@ -67,6 +74,8 @@ CPU_PER_TASK_PINNING=${CPU_PER_TASK_PINNING:-0}
 
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 PROFILE_ENABLED=${PROFILE_ENABLED,,}
+GPU_METRICS_ENABLED=${ENABLE_GPU_METRICS:-false}
+GPU_METRICS_ENABLED=${GPU_METRICS_ENABLED,,}
 NCCLTRACE_ENABLED=${ENABLE_NCCLTRACE:-false}
 NCCLTRACE_ENABLED=${NCCLTRACE_ENABLED,,}
 
@@ -74,40 +83,39 @@ export CONTAINER_MOUNTS="${LLMB_WORKLOAD}/NeMo:/opt/NeMo"
 export PROFILE_START_STEP=${PROFILE_START_STEP:-45}
 export PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
 
-if [ $GPU_TYPE = "gb200" ]; then
-  #Default launch configs for GB200
-  JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:-128}
-  GPUS_PER_NODE=${GPUS_PER_NODE:-4}
-  #Parallelism settings for GB200
-  TP=${TP:-1}
-  PP=${PP:-2}
-  CP=${CP:-1}
-  EP=${EP:-64}
-  VP=${VP:-12}
-  ETP=${ETP:-1}
-  MBS=${MBS:-1}
-  CUDA_GRAPH=${CUDA_GRAPH:-false}
-  GBS=${GBS:-1024}
-  TIME_LIMIT=${TIME_LIMIT:-"00:30:00"}
-elif [ $GPU_TYPE = "h100" ]; then
-  #Default launch config for GB200
-  JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:-512}
+NUM_LAYERS=${NUM_LAYERS:-48}
+HIDDEN_SIZE=${HIDDEN_SIZE:-5120}
+
+
+
+if [ $GPU_TYPE = "b200" ]; then
+  #Default launch configs for B200
   GPUS_PER_NODE=${GPUS_PER_NODE:-8}
-  #Parallelism settings for h100
-  TP=${TP:-4}
+  #Parallelism settings for B200
+  TP=${TP:-8}
   PP=${PP:-1}
   CP=${CP:-1}
-  EP=${EP:-128}
+  EP=${EP:-32}
   VP=${VP:-1}
-  ETP=${ETP:-4}
+  ETP=${ETP:-8}
   MBS=${MBS:-1}
-  GBS=${GBS:-1024}
-  if [ "$DTYPE" = "fp8" ]; then
-    CUDA_GRAPH=${CUDA_GRAPH:-true}
-  else
-    CUDA_GRAPH=${CUDA_GRAPH:-false}
-  fi
-  TIME_LIMIT=${TIME_LIMIT:-"00:55:00"}
+  GBS=${GBS:-32}
+  CUDA_GRAPH=${CUDA_GRAPH:-true}
+  TIME_LIMIT=${TIME_LIMIT:-"00:15:00"}
+elif [ $GPU_TYPE = "h100" ]; then
+  #Default launch config for H100
+  GPUS_PER_NODE=${GPUS_PER_NODE:-8}
+  #Parallelism settings for H100
+  TP=${TP:-8}
+  PP=${PP:-1}
+  CP=${CP:-1}
+  EP=${EP:-32}
+  VP=${VP:-1}
+  ETP=${ETP:-8}
+  MBS=${MBS:-1}
+  GBS=${GBS:-32}
+  CUDA_GRAPH=${CUDA_GRAPH:-true}
+  TIME_LIMIT=${TIME_LIMIT:-"00:15:00"}
 else
   echo "$GPU_TYPE not supported"
   exit 1
@@ -123,6 +131,8 @@ CONFIG_OVERRIDES=" -tp $TP \
   -gb $GBS \
   -mb $MBS \
   --cuda_graphs $CUDA_GRAPH \
+  --num_layers $NUM_LAYERS \
+  --hidden_size $HIDDEN_SIZE \
 "
 
 if [ $PROFILE_ENABLED = true ] && [ $NCCLTRACE_ENABLED = true ]; then
@@ -134,6 +144,9 @@ if [[ "$PROFILE_ENABLED" = "true" ]]; then
   CONFIG_OVERRIDES+=" -en "
   CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
   CONFIG_OVERRIDES+=" --profiling_stop_step=$PROFILE_STOP_STEP "
+  if [[ $GPU_METRICS_ENABLED = true ]]; then
+    CONFIG_OVERRIDES+=" -pgm "
+  fi
   MAX_STEPS=$PROFILE_STOP_STEP
 elif [[ "$NCCLTRACE_ENABLED" = "true" ]]; then
   CONFIG_OVERRIDES+=" -nt "
@@ -141,7 +154,7 @@ elif [[ "$NCCLTRACE_ENABLED" = "true" ]]; then
   TIME_LIMIT="00:15:00"
 fi
 
-SCRIPT_NAME="scripts.performance.llm.pretrain_llama4_e128"
+SCRIPT_NAME="scripts.performance.llm.finetune_llama4_e128"
 
 pushd "${LLMB_WORKLOAD}/NeMo"
 
@@ -154,6 +167,9 @@ python3 -m ${SCRIPT_NAME} \
     --compute_dtype "${DTYPE}" \
     --gpus_per_node "${GPUS_PER_NODE}" \
     --max_steps "${MAX_STEPS}" \
+    --finetuning "sft" \
+    --skip_dataset_download \
+    --skip_import_checkpoint \
     $CONFIG_OVERRIDES \
     slurm \
     --account "${SBATCH_ACCOUNT}" \
