@@ -8,7 +8,6 @@ The recipes listed below progressively increase GPU count, with configurations w
 
 | Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
 |------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
-| 56B  | FP8       | 32   | 8192   | 118    | 8   | 1   | 1   | NA  | 4   | NA  | 1   | 96   | 24  |
 | 56B  | FP8       | 64   | 8192   | 118    | 8   | 1   | 1   | NA  | 8   | NA  | 1   | 192  | 24  |
 | 56B  | FP8       | 128  | 8192   | 118    | 8   | 1   | 1   | NA  | 16  | NA  | 1   | 384  | 24  |
 | 56B  | FP8       | 256  | 8192   | 118    | 8   | 1   | 1   | NA  | 32  | NA  | 1   | 768  | 24  |
@@ -20,17 +19,17 @@ The recipes listed below progressively increase GPU count, with configurations w
 
 | Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
 |------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
-| 56B  | FP8       | 32   | 8192   | 118    | 2   | 1   | 1   | NA  | 16  | NA  | 1   | 96   | 6  |
-| 56B  | FP8       | 64   | 8192   | 118    | 2   | 1   | 1   | NA  | 32  | NA  | 1   | 192  | 6  |
-| 56B  | FP8       | 128  | 8192   | 118    | 2   | 1   | 1   | NA  | 64  | NA  | 1   | 384  | 6  |
-| 56B  | FP8       | 256  | 8192   | 118    | 2   | 1   | 1   | NA  | 128 | NA  | 1   | 768  | 6  |
-| 56B  | FP8       | 512  | 8192   | 118    | 2   | 1   | 1   | NA  | 256 | NA  | 1   | 1536 | 6  |
+| 56B  | FP8       | 32   | 8192   | 118    | 4   | 1   | 1   | NA  | 8   | NA  | 2   | 96   | 6  |
+| 56B  | FP8       | 64   | 8192   | 118    | 4   | 1   | 1   | NA  | 16  | NA  | 2   | 192  | 6  |
+| 56B  | FP8       | 128  | 8192   | 118    | 4   | 1   | 1   | NA  | 32  | NA  | 2   | 384  | 6  |
+| 56B  | FP8       | 256  | 8192   | 118    | 4   | 1   | 1   | NA  | 64  | NA  | 2   | 768  | 6  |
+| 56B  | FP8       | 512  | 8192   | 118    | 4   | 1   | 1   | NA  | 128 | NA  | 2   | 1536 | 6  |
 
 # Performance Measurement and Analysis
 
 Performance for Nemotron-H training is measured by seconds per iteration, or in other words seconds per training step. This metric is logged for every training step in the main training log file [see Output Locations](#output-locations).
 
-Since the early training steps typically take much longer time (with input prefetch, activation memory allocation, and JIT compilation), we use the `parse_train_timing.sh` script to analyze iterations 11-44 and calculate mean and standard deviation for reliable performance metrics.
+Since the early training steps typically take much longer time (with input prefetch, activation memory allocation, and JIT compilation), we use the `parse_train_timing.sh` script to analyze iterations 35-44 and calculate mean and standard deviation for reliable performance metrics.
 
 **Note:** TFLOPS_per_GPU not currently supported for this model, values returned by the results parser are **invalid**.
 
@@ -59,42 +58,60 @@ $LLMB_REPO/common/parse_train_timing.sh --full-names
 # Run the parse_train_timing script to analyze all experiments
 common/parse_train_timing.sh $LLMB_WORKLOAD/experiments
 
-# Example output:
-Train Step Timing Analysis (iterations 11-44)
+To analyze training timing from your experiment results, run the script from the workload directory. Note, that `LLMB_REPO` is the directory containing the clone of the recipe repository.
+
+```bash
+# Basic usage - parses results in the directory named 'experiments' in the current folder
+$LLMB_REPO/common/parse_train_timing.sh
+
+# Specify a different experiments directory
+$LLMB_REPO/common/parse_train_timing.sh /path/to/experiments
+
+# Output in CSV format
+$LLMB_REPO/common/parse_train_timing.sh --format=csv
+
+# Output in JSON format
+$LLMB_REPO/common/parse_train_timing.sh --format=json
+
+# Show full filenames instead of shortened versions
+$LLMB_REPO/common/parse_train_timing.sh --full-names
+```
+
+Example output:
+```shell
+Train Step Timing Analysis (iterations 35-44)
 ================================================================================
 Experiment                                                                         Status Time Mean (s) Time Std (s) TFLOPS_per_GPU Mean TFLOPS_per_GPU Std
 -------------------------------------------------------------------------------- -------- ------------- ------------ ------------------- ------------------
-pretrain_nemotron-h_56b_fp8_gpus256_tp8_pp1_cp1_vpNone_mbs1_gbs768_2967925         Success        15.714        2.989              957.90             148.67
+pretrain_nemotronh_56b_fp8_gpus128_tp8_pp1_cp1_vpNone_mbs1_gbs384_3281967         Success        11.874        0.027              877.20               2.03
 ```
 
 To obtain throughput as a tokens per second measurement, follow this formula: 
 ```shell
-(sequence length) * (global batch size) / (training_step_timing) = (throughput in tokens per second)
+throughput in tokens per second = (sequence length * global batch size) / training_step_timing
 ```
-E.g. 8192 * 768 / 15.714 = 400373
+E.g. 8192 * 384 / 11.874 = 264926
 
 To calculate time to train estimate:
 ```shell
-(total tokens) / (throughput in tokens per second) / (number of seconds in a day) = (time to train in days) 
+time to train in days = (total tokens) / (throughput in tokens per second) / (number of seconds in a day)
 ```
-E.g. 1e12 / 400373 / 86400 = 28.91 days
+E.g. 1e12 / 264926 / 86400 = 43.688 days
 
 
 To calculate the model flops utilization (MFU):
 ```shell
-MFU = (global batch size) * (model flops) / (training step time) / (number of GPUs) / (peak GPU FLOPS)
+MFU = (achieved TFLOPS_per_GPU) / (peak GPU FLOPS)
 ```
 
 The peak theoretical throughput for H100 FP8 is **1979** TFLOPS.
-The model flops for Nemotron-H 56b for GBS=1 is 2.816e15. Calculation shown [here](#notes).
 
 E.g. Nemotron-H 56b FP8 on 256x H100 GPUs (GBS=768)
 ```shell
 peak FLOPS for H100 FP8 = 1979 TFLOPS
-training step time = 15.714 s
-model flops = 2.816e15
+achieved TFLOPS_per_GPU = 877.200 TFLOPS
 
-MFU = 768 * 2.816e15 / 15.714 / 256 / 1979e+12 = 27.17%
+MFU =  877.200 / 1979 = 44.33%
 ```
 
 
@@ -162,7 +179,7 @@ Alternatively, you can run training directly using the launch script. This metho
 
 **Important**: 
 - Ensure your virtual environment is activated before running the training commands below. If you used the installer with conda, run `conda activate $LLMB_INSTALL/venvs/<env_name>`. If you used the installer with python venv, run `source $LLMB_INSTALL/venvs/<env_name>/bin/activate`.
-- Run the launch script from the recipe directory: `cd $LLMB_REPO/nemotronh/`
+- Run the launch script from the recipe directory: `cd $LLMB_REPO/nemotron-h/`
 
 ### Command Template
 
@@ -247,9 +264,9 @@ ENABLE_PROFILE=true JOB_TOTAL_GPUS=128 GPU_TYPE=gb200 ./launch.sh
 ### Customizing profiling behavior:
 * Specify job steps to profile:
   * `PROFILE_START_STEP`: start profiling on this job step.
-  - Default: 45
+	  - Default: 45
   * `PROFILE_STOP_STEP`: stop profiling on this job step.
-  - Default: 50
+    - Default: 50
 * Enable GPU metrics collection:
   * `ENABLE_GPU_METRICS`: Enable GPU metrics collection during NSight profiling (default: false)
   - When set to `true` along with `ENABLE_PROFILE=true`, captures detailed GPU performance metrics
@@ -273,88 +290,19 @@ Since most of the benchmarking jobs run on multiple GPUs, there will be multiple
 
 **See** these [tutorials](https://developer.nvidia.com/nsight-systems/get-started#tutorials) to get a quick start if you are new to Nsight profiling.
 
-## Run NCCL Trace (For Debugging)
+<!-- NCCL trace support removed. Documentation section deleted intentionally. -->
 
-NCCL traces are a tool for understanding communication patterns within your benchmarking job. They provide detailed information on the types of NCCL calls being made (like AllReduce, Broadcast, etc.) and the size of the messages being exchanged.
+# FAQ
 
-**Important:** This feature is primarily intended for **troubleshooting and debugging purposes only**. It is not typically used during normal benchmark runs.
-
-To collect NCCL Trace information, set the environment variable `ENABLE_NCCLTRACE=true` when submitting your job:
-
-**Defaults for Tracing:**
-*   **Duration:** Due to the large file sizes generated, tracing is limited to the first 5 steps of the job by default.
-*   **Output Location:** NCCL trace information is included directly within the standard job log file ([see Output Locations](#output-locations))
-
-**Example command:**
-
+For GB200 you may see the following error message
 ```shell
-ENABLE_NCCLTRACE=true JOB_TOTAL_GPUS=256 GPU_TYPE=gb200 ./launch.sh
+[rank368]:[E808 04:21:41.160918398 ProcessGroupNCCL.cpp:655] [Rank 368] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=5, OpType=ALLREDUCE, NumelIn=1, NumelOut=1, Timeout(ms)=600000) ran for 600001 milliseconds before timing out.
+[rank368]:[E808 04:21:41.161005534 ProcessGroupNCCL.cpp:2299] [PG ID 0 PG GUID 0(default_pg) Rank 368]  failure detected by watchdog at work sequence id: 5 PG status: last enqueued work: 5, last completed work: 4
+[rank368]:[E808 04:21:41.161011710 ProcessGroupNCCL.cpp:693] Stack trace of the failed collective not found, potentially because FlightRecorder is disabled. You can enable it by setting TORCH_NCCL_TRACE_BUFFER_SIZE to a non-zero value.
+[rank368]:[E808 04:21:41.161045406 ProcessGroupNCCL.cpp:2147] [PG ID 0 PG GUID 0(default_pg) Rank 368] First PG on this rank to signal dumping.
 ```
 
-### Understanding NCCL Trace Results
-
-Enabling NCCL tracing will generate a large volume of log messages labeled "NCCL Info". These messages provide details about individual communication operations. Be aware that these log files can be quite large, potentially exceeding 1GB.
-
-Look for messages including:
-
-```
-"NCCL INFO AllReduce: opCount"
-"NCCL INFO Broadcast: opCount"
-"NCCL INFO AllGather: opCount"
-"NCCL INFO ReduceScatter: opCount"
-```
-
-**Example Log Entry:**
-
-```
-[7] NCCL INFO AllReduce: opCount 2 sendbuff 0x7ffb4713c200 recvbuff 0x7ffb4713c200 count 1 datatype 1 op 0 root 0 comm 0x55556b100660 [nranks=128] stream 0x5555630c58b0
-```
-
-This example shows an `AllReduce` operation with details about the buffers, count, data type, and the participating ranks.
-
-# Notes
-
-```shell
-mlp_block_flops = (2 * seq_len * hidden_size * intermediate_size) * num_mlp_layers
-
-attn_block_flops = (
-    2 * seq_len * hidden_size * num_attention_heads * attention_head_dim +
-    2 * seq_len * hidden_size * num_key_value_heads * attention_head_dim +
-    2 * seq_len * seq_len * hidden_size
-  ) * num_attn_layers
-
-mamba_block_flops = (
-    seq_len * hidden_size * (mamba_num_heads * mamba_head_dim * 3 + n_groups * ssm_state_size * 2 + mamba_num_heads) +
-    seq_len * hidden_size * expand * chunk_size +
-    2 * seq_len * hidden_size * expand * ssm_state_size +
-    seq_len * chunk_size * ssm_state_size * n_groups
-  ) * num_mamba_layers
-
-lm_head_flops = seq_len * hidden_size * vocab_size
-
-total_flops = (mlp_block_flops + attn_block_flops + mamba_block_flops + lm_head_flops) * 6
-
-Nemotron-H 56b calculation:
-  seq_len = 8192
-  hidden_size = 8192
-  intermediate_size = 32768
-  num_mlp_layers = 54
-  num_mamba_layers = 54
-  num_attn_layers = 10
-  num_attention_heads = 64
-  num_key_value_heads = 8
-  attention_head_dim = 128
-  mamba_num_heads = 256
-  mamba_head_dim = 64
-  expand = 2
-  chunk_size = 256
-  ssm_state_size = 256
-  n_groups = 8
-  vocab_size = 131072
-
-  mlp_block_flops = (2 * 8192 * 8192 * 32768) * 54 = 237,494,511,599,616
-  attn_block_flops = (2 * 8192 * 8192 * 64 * 128 + 2 * 8192 * 8192 * 8 * 128 + 2 * 8192 * 8192 * 8192) * 10 = 23,364,622,090,240
-  mamba_block_flops = (8192 * 8192 * (256 * 64 * 3 + 8 * 256 * 2 + 256) + 8192 * 8192 * 2 * 256 + 2 * 8192 * 8192 * 2 * 256 + 8192 * 256 * 256 * 8) * 54 = 199,690,209,460,224
-  lm_head_flops = 8192 * 8192 * 131072 = 8,796,093,022,208
-  total_flops = (237,494,511,599,616 + 23,364,622,090,240 + 199,690,209,460,224 + 8,796,093,022,208) * 6 = 2.816e15
+To fix, try running with TP_COMM_OVERLAP disabled like so:
+```bash
+TP_COMM_OVERLAP=False llmb-run single -w pretrain_nemotron-h -s 56b --dtype fp8 --scale 512
 ```

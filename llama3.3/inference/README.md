@@ -6,30 +6,54 @@ The script uses TRT-LLM release containers to benchmark the [Llama-3.3-70B-Instr
   <strong>⚠️ WARNING:</strong> Currently this recipe only supports `nvidia/Llama-3.3-70B-Instruct-FP4` using a single GB200 GPU.
 </div> 
 
+# Benchmarking setup
+
+We consider two benchmarking scenarios:
+- **Maximum throughput**: the system is configured to generate as many tokens per second as possible. This typically involves large batch sizes, long generation lengths, and aggressive request packing to fully utilize GPU compute. While this approach increases overall efficiency and hardware utilization, it also results in higher latency for individual requests. It's ideal for offline processing, batch jobs, or queued summarization tasks.
+- **Minimum latency**: prioritizes fast response times for each individual request. This often involves smaller batch sizes (sometimes just one), shorter generation lengths, and minimal scheduling overhead. While this reduces GPU efficiency and overall throughput, it significantly lowers response time, making it suitable for real-time, interactive applications like chatbots or low-latency APIs.
+
+
 # Performance Measurement and Analysis 
 
 Llama3.3-70B model was benchmarked for maximum throughput performance. The goal is to reach the maximum number of output tokens per second per GPU.
 
 ## GB200
 
-### Configurations
+### Max throughput configurations
+
+| Use Case      |   GPUs | ISL   | OSL   | max_batch_size   | concurrency   | max_num_tokens   | kv_cache_free_gpu_mem_fraction   | Quantization   | num_requests   |   TP |   PP |   EP | attn_dp_enabled   |
+|:--------------|:------:|:-----:|:-----:|:----------------:|:-------------:|:----------------:|:--------------------------------:|:--------------:|:--------------:|:----:|:----:|:----:|:-----------------:|
+| reasoning     |   1    | 1,000 | 1,000 | 256              | 256           | 16,384           |            0.95                  | NVFP4          | 4,096          |    1 |    1 |    1 |       YES         |
+| chat          |   1    | 128   | 128   | 2,048            | 2,048         | 8,192            |            0.95                  | NVFP4          | 4,096          |    1 |    1 |    1 |       YES         |
+| summarization |   1    | 8,000 | 512   | 128              | 128           | 8,128            |            0.95                  | NVFP4          | 1,024          |    1 |    1 |    1 |       YES         |
+| generation    |   1    | 512   | 8,000 | 128              | 128           | 2,048            |            0.95                  | NVFP4          | 1,000          |    1 |    1 |    1 |       YES         |
 
 
-| Use Case   |   GPUs | ISL   | OSL   | max_batch_size   | concurrency   | max_num_tokens   | kv_cache_free_gpu_mem_fraction   | Quantization   | num_requests   |   TP |   PP |   EP | attn_dp_enabled   |
-|:-----------|-------:|:------|:------|:-----------------|:--------------|:-----------------|:---------------------------------|:---------------|:---------------|-----:|-----:|-----:|:------------------|
-| reasoning  |      1 | 1,000 | 1,000 | 640              | -1      | 2,048            |            0.95                      | NVFP4          | 4,000          |    1 |    1 |    1 |       YES            |
-| chat       |      1 | 128   | 128   | 4,096            | -1      | 8,192            |            0.95                      | NVFP4          | 4,000          |    1 |    1 |    1 |       YES            |
-| summarization |      1 | 8,000 | 512   | 128              | -1        | 8,128            |         0.95                         | NVFP4          | 1,500          |    1 |    1 |    1 |    YES               |
-| generation |      1 | 512   | 8,000 | 128              | -1        | 2,048            |            0.95                      | NVFP4          | 1,000          |    1 |    1 |    1 |        YES           |
+
+### Min latency configurations
+
+| Use Case      |   GPUs | ISL   | OSL   | max_batch_size | concurrency | max_num_tokens  | kv_cache_free_gpu_mem_fraction   | Quantization   | num_requests |   TP |   PP |   EP | attn_dp_enabled  |
+|:--------------|:------:|:-----:|:-----:|:--------------:|:-----------:|:---------------:|:--------------------------------:|:--------------:|:------------:|:----:|:----:|:----:|:----------------:|
+| reasoning     |   4    | 1,000 | 1,000 | 1              | 1           | 2,048           |            0.75                  | NVFP4          | 20           |    4 |    1 |    1 |       NO         |
+| chat          |   4    | 128   | 128   | 1              | 1           | 2,048           |            0.75                  | NVFP4          | 20           |    4 |    1 |    1 |       NO         |
+| summarization |   4    | 8,000 | 512   | 1              | 1           | 8,512           |            0.75                  | NVFP4          | 20           |    4 |    1 |    1 |       NO         |
+| generation    |   4    | 512   | 8,000 | 1              | 1           | 8,512           |            0.75                  | NVFP4          | 20           |    4 |    1 |    1 |       NO         |
 
 
-#### Configuration Notes
+
+### Configuration Notes
 - **kv_cache_free_gpu_mem_fraction**: fraction of memory allocated to store the kv cache values after loading the model weights.
 - **attn_dp_enabled**: This flag in the config.yml dictates whether `Data parallelism` is enabled or disabled for the attention layers.
-- **concurrency=-1**: finds the maximum possible concurrency during execution
 - You can find more information on the trt-llm build parameters here (https://nvidia.github.io/TensorRT-LLM/commands/trtllm-build.html)
 
 More details about the inference terms can be found in the [Appendix](../../APPENDIX.md)
+
+### Metric Notes
+- **TPS/GPU**: Output Token Throughput per second per GPU
+- **TPS/User**: Output Token Throughput per second per user
+- **Avg Request Latency**: Average time for a a request to be served
+- **TTFT**: Time to First Token
+- **TPOT**: Time Per Output Token
 
 # Prerequisites
 
@@ -87,6 +111,8 @@ These parameters can be set either by exporting the environment variable or usin
 
 The easiest way to run benchmarks is using the llmb-run launcher tool. This method handles configuration automatically and provides a streamlined interface.
 
+### Maximum throughput
+
 ```bash
 # Navigate to your installation directory
 cd $LLMB_INSTALL
@@ -94,17 +120,39 @@ cd $LLMB_INSTALL
 # Run a benchmark with llmb-run per use case (** Recommended **)
 
 # Reasoning
-MAX_NUM_TOKENS=2048 MAX_BATCH_SIZE=640 USE_CASES=reasoning:1000/1000 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
+MODE="max_throughput" MAX_NUM_TOKENS=16384 MAX_BATCH_SIZE=256 NUM_REQUESTS=4096 CONCURRENCY=256 USE_CASES=reasoning:1000/1000 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
 
 # Chat
-MAX_NUM_TOKENS=8192 MAX_BATCH_SIZE=4096 USE_CASES=chat:128/128 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
+MODE="max_throughput" MAX_NUM_TOKENS=8192 MAX_BATCH_SIZE=2048 NUM_REQUESTS=4096 CONCURRENCY=2048 USE_CASES=chat:128/128 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
 
 # Summarization
-SBATCH_TIMELIMIT=50:00 MAX_NUM_TOKENS=8128 MAX_BATCH_SIZE=128 USE_CASES=summarization:8000/512 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
+SBATCH_TIMELIMIT=50:00 MODE="max_throughput" MAX_NUM_TOKENS=8128 MAX_BATCH_SIZE=128 NUM_REQUESTS=1024 CONCURRENCY=128 USE_CASES=summarization:8000/512 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
 
 # Generation
-SBATCH_TIMELIMIT=50:00 MAX_NUM_TOKENS=2048 MAX_BATCH_SIZE=128 NUM_REQUESTS=1000 USE_CASES=generation:512/8000 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
+SBATCH_TIMELIMIT=50:00 MODE="max_throughput" MAX_NUM_TOKENS=2048 MAX_BATCH_SIZE=128 NUM_REQUESTS=1000 CONCURRENCY=128 USE_CASES=generation:512/8000 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
 ```
+
+### Minimum latency
+
+```bash
+# Navigate to your installation directory
+cd $LLMB_INSTALL
+
+# Run a benchmark with llmb-run per use case (** Recommended **)
+
+# Reasoning
+MODE="min_latency" USE_CASES=reasoning:1000/1000 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 4
+
+# Chat
+MODE="min_latency" USE_CASES=chat:128/128 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 4
+
+# Summarization
+MODE="min_latency" USE_CASES=summarization:8000/512 MAX_NUM_TOKENS=8512 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 4 
+
+# Generation
+MODE="min_latency" USE_CASES=generation:512/8000 MAX_NUM_TOKENS=8512 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 4
+```
+
 - Single use cases and their optimized parameters are listed above and work out of the box. Advanced users can add more use_cases in the `setup.sh` 
 - Advanced users can learn more about: 
   - [Tuning Max Batch Size and Max Num Tokens](https://nvidia.github.io/TensorRT-LLM/performance/performance-tuning-guide/tuning-max-batch-size-and-max-num-tokens.html#tuning-max-batch-size-and-max-num-tokens) to adjust the inflight batching scheduler 
@@ -195,6 +243,7 @@ should look like the section below:
 <summary>Llama3.3_70B</summary>
 
 Double check that your folder has the same 40GiB
+Note: `du -sh` includes hidden contents like `.git` and may report a larger total. To verify weights-only, inspect file sizes in this folder with `ls -lh`.
 
 ```
 total 40G

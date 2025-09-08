@@ -7,6 +7,8 @@ This recipe contains information and scripts to produce performance results for 
 |Model Size|Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  |ETP | MBS | GBS  | GA  |
 |:---------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|:---:|
 | 400b | BF16/FP8  | 256    | 4096   | 48     | 8   | 1   | 1   | 32  | 32   | 1 | 8  | 1   | 32  | 1 |
+| 400b | BF16/FP8  | 512    | 4096   | 48     | 8   | 1   | 1   | 32  | 64   | 1 | 8  | 1   | 64  | 1 |
+| 400b | BF16/FP8  | 1024    | 4096   | 48     | 8   | 1   | 1   | 32  | 128   | 1 | 8  | 1   | 128  | 1 |
 
 
 ## H100
@@ -20,7 +22,7 @@ This recipe contains information and scripts to produce performance results for 
 
 Performance for LLAMA4 Maverick finetuning is measured by seconds per iteration, or in other words seconds per finetuning step. This metric is logged for every finetuning step in the main finetuning log file [see Output Locations](#output-locations). 
 
-Since the early finetuning steps typically take much longer time (with input prefetch, activation memory allocation, and JIT compilation), we use the `parse_train_timing.sh` script to analyze iterations 11-44 and calculate mean and standard deviation for reliable performance metrics. We also get the achieved GPU FLOPS via `TFLOPS_per_GPU` metric.
+Since the early finetuning steps typically take much longer time (with input prefetch, activation memory allocation, and JIT compilation), we use the `parse_train_timing.sh` script to analyze iterations 35-44 and calculate mean and standard deviation for reliable performance metrics. We also get the achieved GPU FLOPS via `TFLOPS_per_GPU` metric.
 
 ### Running the parse_train_timing.sh script
 
@@ -43,8 +45,9 @@ $LLMB_REPO/common/parse_train_timing.sh --format=json
 $LLMB_REPO/common/parse_train_timing.sh --full-names
 ```
 
+Example output:
 ```shell
-Train Step Timing and TFLOPS Analysis (iterations 11-44)
+Train Step Timing and TFLOPS Analysis (iterations 35-44)
 ================================================================================
 Experiment                                                                         Status Time Mean (s) Time Std (s) TFLOPS_per_GPU Mean TFLOPS_per_GPU Std
 -------------------------------------------------------------------------------- -------- ------------- ------------ ------------------- ------------------
@@ -56,13 +59,13 @@ To obtain throughput as a tokens per second measurement, follow this formula:
 (sequence length) * (global batch size) / (training_step_timing) = (throughput in tokens per second)
 ```
 
-E.g. 4096 * 32 / 0.224 = 585143
+E.g. 4096 * 32 / 0.205 = 639376
 
 To calculate time to train estimate:
 ```shell
 (total tokens) / (throughput in tokens per second) / (number of seconds in a day) = (time to train in days) 
 ```
-E.g. 1e12 / 584375 / 86400 = 19.80 days 
+E.g. 1e12 / 639376 / 86400 = 18.11 days 
 
 
 To calculate the model flops utilization (MFU):
@@ -75,11 +78,12 @@ MFU = (global batch size) * (model flops) / (training step time) / (number of GP
 E.g. LLAMA4 Maverick BF16 on 256 B200 GPUs (GBS=32)
 ```shell
 The peak theoretical throughput for B200 BF16 is 2.25 PFLOPS
-training step time = 0.224 s
+training step time = 0.205 s
 model flops = 4.21e14
 
-MFU = 32 * 4.21e14 / 0.224 / 256 / 2.25E+15 = 10.47%
+MFU = 32 * 4.21e14 / 0.205 / 256 / 2.25E+15 = 10.44%
 ```
+
 
 # Prerequisites
 
@@ -255,43 +259,7 @@ Since most of the benchmarking jobs run on multiple GPUs, there will be multiple
 
 **See** these [tutorials](https://developer.nvidia.com/nsight-systems/get-started#tutorials) to get a quick start if you are new to Nsight profiling.
 
-## Run NCCL Trace (For Debugging)
-
-NCCL traces are a tool for understanding communication patterns within your benchmarking job. They provide detailed information on the types of NCCL calls being made (like AllReduce, Broadcast, etc.) and the size of the messages being exchanged.
-
-**Important:** This feature is primarily intended for **troubleshooting and debugging purposes only**. It is not typically used during normal benchmark runs.
-
-To collect NCCL Trace information, set the environment variable `ENABLE_NCCLTRACE=true` when submitting your job:
-
-**Defaults for Tracing:**
-*   **Duration:** Due to the large file sizes generated, tracing is limited to the first 5 steps of the job by default.
-*   **Output Location:** NCCL trace information is included directly within the standard job log file (see Output Locations)
-
-**Example command:**
-```shell
-ENABLE_NCCLTRACE=true JOB_TOTAL_GPUS=256 DTYPE=fp8 GPU_TYPE=b200 ./launch.sh
-```
-
-### Understanding NCCL Trace Results
-
-Enabling NCCL tracing will generate a large volume of log messages labeled "NCCL Info". These messages provide details about individual communication operations. Be aware that these log files can be quite large, potentially exceeding 1GB.
-
-Look for messages including:
-
-```
-"NCCL INFO AllReduce: opCount"
-"NCCL INFO Broadcast: opCount"
-"NCCL INFO AllGather: opCount"
-"NCCL INFO ReduceScatter: opCount"
-```
-
-**Example Log Entry:**
-
-```
-[7] NCCL INFO AllReduce: opCount 2 sendbuff 0x7ffb4713c200 recvbuff 0x7ffb4713c200 count 1 datatype 1 op 0 root 0 comm 0x55556b100660 [nranks=128] stream 0x5555630c58b0
-```
-
-This example shows an `AllReduce` operation with details about the buffers, count, data type, and the participating ranks.
+<!-- NCCL trace support removed. Documentation section deleted intentionally. -->
 
 # Storage Requirements and Verification
 

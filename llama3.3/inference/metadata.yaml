@@ -2,12 +2,12 @@
 general:
   workload: llama3.3
   workload_type: inference
-  gsw_version: '25.07'
+  gsw_version: '25.08'
   framework: trt-llm
 
 container:
   images:
-    - 'nvcr.io#nvidia/tensorrt-llm/release:1.0.0rc1'
+    - 'nvcr.io#nvidia/tensorrt-llm/release:1.0.0rc4'
 
 setup:
   setup_script: 'setup.sh'
@@ -23,4 +23,5 @@ run:
       model_configs:
         - model_size: '70b'
           dtypes: ['nvfp4']
-          scales: [1]
+          scales: [1, 4]
+          exact_scales: true

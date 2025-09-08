@@ -12,26 +12,46 @@ This recipe contains information and scripts to produce performance results for 
 
 - At least 128 GPUs with at least 80GB memory each.
 
-| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | VP  | MBS | GBS  | DP  | GA  |
-|------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|:---:|
-| 15b  | BF16/FP8 | 16    | 4096   | 32     | 2   | 1   | 1   | NA  | 2   | 64   | 8   | 4   |
-| 15b  | BF16/FP8 | 32    | 4096   | 32     | 2   | 1   | 1   | NA  | 2   | 128  | 8   | 4   |
-| 15b  | BF16/FP8 | 64    | 4096   | 32     | 2   | 1   | 1   | NA  | 2   | 256  | 8   | 4   |
-| 15b  | BF16/FP8 | 128   | 4096   | 32     | 2   | 1   | 1   | NA  | 2   | 512  | 8   | 4   |
-| 15b  | BF16/FP8 | 256   | 4096   | 32     | 2   | 1   | 1   | NA  | 2   | 1024 | 8   | 4   |
-| 15b  | BF16/FP8 | 512   | 4096   | 32     | 2   | 1   | 1   | NA  | 2   | 2048 | 8   | 4   |
-                                                                                        
-| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | VP  | MBS | GBS  | DP  | GA  |
-|------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|:---:|
-| 340b | BF16/FP8  | 256  | 4096   | 96     | 8   | 8   | 1   | 12  | 1   | 64   | 4   | 16  |
-| 340b | BF16/FP8  | 512  | 4096   | 96     | 8   | 8   | 1   | 12  | 1   | 128  | 4   | 16  |
+| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
+|------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
+| 15b   | BF16/FP8 | 16   | 4096  | 32     | 2   | 1   | 1   | NA  | 8   | NA  | 2   | 64   | 4 |
+| 15b   | BF16/FP8 | 32   | 4096  | 32     | 2   | 1   | 1   | NA  | 16   | NA  | 2   | 128   | 4 |
+| 15b   | BF16/FP8 | 64   | 4096  | 32     | 2   | 1   | 1   | NA  | 32   | NA  | 2   | 256   | 4 |
+| 15b   | BF16/FP8 | 128   | 4096  | 32     | 2   | 1   | 1   | NA  | 64   | NA  | 2   | 512   | 4 |
+| 15b   | BF16/FP8 | 256   | 4096  | 32     | 2   | 1   | 1   | NA  | 128   | NA  | 2   | 1024   | 4 |
+| 15b   | BF16/FP8 | 512   | 4096  | 32     | 2   | 1   | 1   | NA  | 256  | NA  | 2   | 2048   | 4 |
+| 15b   | BF16/FP8 | 1024   | 4096  | 32     | 2   | 1   | 1   | NA  | 512   | NA  | 2   | 4096   | 4 |
+| 15b   | BF16/FP8 | 2048   | 4096  | 32     | 2   | 1   | 1   | NA  | 1024   | NA  | 2   | 8192   | 4 |
+
+
+| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
+|------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
+| 340b | BF16/FP8  | 256  | 4096   | 96     | 8   | 8   | 1   | NA  | 4   | 12  | 1   | 64   | 16 |
+| 340b | BF16/FP8  | 512  | 4096   | 96     | 8   | 8   | 1   | NA  | 8   | 12  | 1   | 128   | 16 |
+| 340b | BF16/FP8  | 1024  | 4096   | 96     | 8   | 8   | 1   | NA  | 16   | 12  | 1   | 256   | 16 |
+| 340b | BF16/FP8  | 2048  | 4096   | 96     | 8   | 8   | 1   | NA  | 32   | 12  | 1   | 512   | 16 |
 
 ## GB200
+
+
+15 billion parameter variant (FP8/BF16)
+
+- At least 16 GPUs with at least 80GB memory each.
 
 340 billion parameter variant (FP8/BF16)
 
 - At least 128 GPUs with at least 80GB memory each.
 - The GB200 recipes listed below progressively increase GPU count, with configurations weak-scaled to match.
+
+
+| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
+|------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
+| 15b   | BF16/FP8 | 16   | 4096  | 32     | 1   | 1   | 1   | NA  | 16   | NA  | 2   | 64   | 2 |
+| 15b   | BF16/FP8 | 32   | 4096  | 32     | 1   | 1   | 1   | NA  | 32   | NA  | 2   | 128   | 2 |
+| 15b   | BF16/FP8 | 64   | 4096  | 32     | 1   | 1   | 1   | NA  | 64   | NA  | 2   | 256   | 2 |
+| 15b   | BF16/FP8 | 128   | 4096  | 32     | 1   | 1   | 1   | NA  |128   | NA  | 2   | 512   | 2 |
+| 15b   | BF16/FP8 | 256   | 4096  | 32     | 1   | 1   | 1   | NA  |256   | NA  | 2   | 1024   | 2 |
+| 15b   | BF16/FP8 | 512   | 4096  | 32     | 1   | 1   | 1   | NA  | 512   | NA  | 2   | 2048   | 2 |
 
 | Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | VP  | MBS | GBS | DP   | GA  |
 |------|:--------:|:------:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
@@ -49,10 +69,24 @@ This recipe contains information and scripts to produce performance results for 
 
 ## B200
 
+15 billion parameter variant (FP8/BF16)
+
+- At least 16 GPUs with at least 180GB memory each.
+
 340 billion parameter variant (FP8/BF16)
 
 - At least 128 GPUs with at least 180GB memory each.
 - The B200 recipes listed below progressively increase GPU count, with configurations weak-scaled to match.
+
+| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
+|------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
+| 15b   | BF16/FP8 | 16   | 4096  | 32     | 1   | 1   | 1   | NA  | 16   | NA  | 2   | 64   | 2 |
+| 15b   | BF16/FP8 | 32   | 4096  | 32     | 1   | 1   | 1   | NA  | 32   | NA  | 2   | 128   | 2 |
+| 15b   | BF16/FP8 | 64   | 4096  | 32     | 1   | 1   | 1   | NA  | 64   | NA  | 2   | 256   | 2 |
+| 15b   | BF16/FP8 | 128   | 4096  | 32     | 1   | 1   | 1   | NA  | 128   | NA  | 2   | 512   | 2 |
+| 15b   | BF16/FP8 | 256   | 4096  | 32     | 1   | 1   | 1   | NA  | 256   | NA  | 2   | 1024   | 2 |
+| 15b   | BF16/FP8 | 512   | 4096  | 32     | 1   | 1   | 1   | NA  | 512   | NA  | 2   | 2048   | 2 |
+| 15b   | BF16/FP8 | 1024   | 4096  | 32     | 1   | 1   | 1   | NA  | 1024   | NA  | 2   | 4096   | 2 |
 
 | Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | VP  | MBS | GBS | DP   | GA  |
 |------|:--------:|:------:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
@@ -77,7 +111,7 @@ Performance for Nemotron4 training is measured by seconds per iteration, or in o
 
 This recipe supports two cluster types: Slurm and Run:ai. We expect cluster type to have a negligible impact to performance. Application performance on a Run:ai cluster matches performance on a Slurm cluster.
 
-Since the early training steps typically take much longer time (with input prefetch, activation memory allocation, and JIT compilation), we use the `parse_train_timing.sh` script to analyze iterations 11-44 and calculate mean and standard deviation for reliable performance metrics. We also get the achieved GPU FLOPS via `TFLOPS_per_GPU` metric.
+Since the early training steps typically take much longer time (with input prefetch, activation memory allocation, and JIT compilation), we use the `parse_train_timing.sh` script to analyze iterations 35-44 and calculate mean and standard deviation for reliable performance metrics. We also get the achieved GPU FLOPS via `TFLOPS_per_GPU` metric.
 
 ### Running the parse_train_timing.sh script
 
@@ -100,8 +134,9 @@ $LLMB_REPO/common/parse_train_timing.sh --format=json
 $LLMB_REPO/common/parse_train_timing.sh --full-names
 ```
 
+Example output:
 ```shell
-Train Step Timing and TFLOPS Analysis (iterations 11-44)
+Train Step Timing and TFLOPS Analysis (iterations 35-44)
 ================================================================================
 Experiment                                                                                  Status Time Mean (s) Time Std (s) TFLOPS_per_GPU Mean TFLOPS_per_GPU Std
 ------------------------------------------------------------------------------------------ -------- ------------- ------------ ------------------- ------------------
@@ -126,7 +161,7 @@ To calculate the model flops utilization (MFU):
 ```shell
 MFU = (global batch size) * (model flops) / (training step time) / (number of GPUs) / (peak GPU FLOPS)
 ```
-The model flops for Nemotron4 15b for GBS=1 is 3.85e14. Calculation shown [here](#notes).
+The model flops for Nemotron4 15b for GBS=1 is 3.85e14. Calculation shown [here](#mfu-formula).
 
 E.g. NeMotron4 15b BF16 on 64x H100 GPUs (GBS=256)
 ```shell
@@ -147,6 +182,8 @@ MFU = 256 * 3.85e14 / 2.693 / 64 / 989e+12 = 57.82%
 
 
 # Prerequisites
+
+If using the checkpointing feature: a HuggingFace account is required and you will need to [create a HuggingFace access token](https://huggingface.co/settings/tokens). Add the generated token to your environment via ```export HF_TOKEN=<your token>```.
 
 Requires Python 3.12.x, or conda.
 
@@ -179,7 +216,7 @@ The following directory layout and key variables are used in the recipe:
 
 ## Run:ai
 
-Only Nemotron4 15b model has been tested on Run:ai cluster. Due to current limitations in LLMB installer the environment preparation steps must be performed via setup.sh script. 
+Only the Nemotron4 15b model has been tested on Run:ai clusters. The LLMB installer is not compatible with Run:ai environments, so you must use the setup.sh script for environment preparation instead.
 
 ### Run:ai Environment Setup
 
@@ -268,8 +305,8 @@ tritonclient 2.51.0 requires urllib3>=2.0.7, but you have urllib3 1.26.20 which 
 **Required environment variables:**
 
 Make sure that the environment variables below have been set before submitting recipe job on Run:AI cluster.
-- `CUSTOM_MOUNT` - PVCs that will be mounted into your environment. This should be in the form `name:path:k8s-claimName`. Confirm that the path to PVC exists in Run:ai UI under "Assets | Data Sources"
-  e.g., `export CUSTOM_MOUNT="workspace:/nemo2-workspace:nemo2-workspace-project-hprdj"`
+- `RUN_CONF_MOUNTS` - PVCs that will be mounted into your environment. This should be in the form `name:path:k8s-claimName`. Confirm that the path to PVC exists in Run:ai UI under "Assets | Data Sources"
+  e.g., `export RUN_CONF_MOUNTS="workspace:/nemo2-workspace:nemo2-workspace-project-hprdj"`
 - `BASE_URL`- NVIDIA Run:ai API url to use for experiment. Should look like `https://<base-url>/api/v1`. 
   e.g., `export BASE_URL=https://nvidia.run.ai/api/v1`
 - `APP_ID` - name of NVIDIA Run:ai Application. The APP_ID value should be listed in Run:ai web UI under "Access | Applications"
@@ -323,7 +360,7 @@ The training will run for the first 50 steps and will stop afterwards. Log files
 ### Command Template
 
 ```shell
-JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] [STRONG_SCALING=<bool>] ./launch.sh
+JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] [CLUSTER_TYPE=<type>] [STRONG_SCALING=<bool>] ./launch.sh
 ```
 
 ### Environment Variables
@@ -386,7 +423,7 @@ CLUSTER_TYPE=runai JOB_TOTAL_GPUS=16 GPU_TYPE=h100 MODEL_SIZE=15b ./launch.sh
 
 Train Nemotron4 with BF16 precision on 64 H100 GPUs on Run:ai cluster:
 ```shell
-CLUSTER_TYPE=runai JOB_TOTAL_GPUS=16 GPU_TYPE=h100 MODEL_SIZE=15b DTYPE=bf16 ./launch.sh
+CLUSTER_TYPE=runai JOB_TOTAL_GPUS=64 GPU_TYPE=h100 MODEL_SIZE=15b DTYPE=bf16 ./launch.sh
 ```
 
 Once the job has been successfully submitted you can monitor its progress via Run:ai Web UI under "Workload Manager" section.
@@ -482,7 +519,7 @@ Example directory where checkpoints are saved is ${LLMB_WORKLOAD}/experiments/$e
 ```
 Command to run nemotron4 with checkpoint save enabled
 ```shell
-ENABLE_CHECKPOINT=true DTYPE=<fp8,bf16> MODEL_SIZE=<15b/340b> JOB_TOTAL_GPUS=<16,..,2048> GPU_TYPE=<gb200,h100> STRONG_SCALING=<true/false> ./launch.sh
+ENABLE_CHECKPOINT=true DTYPE=<precision> MODEL_SIZE=<size> JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> STRONG_SCALING=<bool> ./launch.sh
 ```
 
 ### How to validate
@@ -514,7 +551,7 @@ E.g., if the checkpoint was saved under `${LLMB_WORKLOAD}/experiments/pretrain_n
 The scripts will restore configuration from the checkpoint and resume training process. Training will run for 1 step after checkpoint has been loaded.
 
 ```shell
-LOAD_CHECKPOINT_PATH=<your_path_to_checkpoint_directory> JOB_TOTAL_GPUS=<16,..,2048> GPU_TYPE=<h100,b200,gb200> DTYPE=<fp8,bf16> MODEL_SIZE=<15b/340b> STRONG_SCALING=<true/false> ./launch.sh
+LOAD_CHECKPOINT_PATH=<your_path_to_checkpoint_directory> JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> DTYPE=<precision> MODEL_SIZE=<size> STRONG_SCALING=<true/false> ./launch.sh
 ```
 
 ### How to validate
@@ -525,7 +562,24 @@ To validate that checkpoint was loaded successfully look for the entry like belo
 [NeMo I 2025-04-11 14:46:18 nemo_logging:393] Global Checkpoint Load : Rank : 0 : Start time : 1744407969.270s : Time spent in load_checkpoint: 9.712s
 ```
 
-# Notes
+# FAQ
+
+## Failure detected by watchdog
+
+For GB200 you may see the following error message
+```shell
+[rank368]:[E808 04:21:41.160918398 ProcessGroupNCCL.cpp:655] [Rank 368] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=5, OpType=ALLREDUCE, NumelIn=1, NumelOut=1, Timeout(ms)=600000) ran for 600001 milliseconds before timing out.
+[rank368]:[E808 04:21:41.161005534 ProcessGroupNCCL.cpp:2299] [PG ID 0 PG GUID 0(default_pg) Rank 368]  failure detected by watchdog at work sequence id: 5 PG status: last enqueued work: 5, last completed work: 4
+[rank368]:[E808 04:21:41.161011710 ProcessGroupNCCL.cpp:693] Stack trace of the failed collective not found, potentially because FlightRecorder is disabled. You can enable it by setting TORCH_NCCL_TRACE_BUFFER_SIZE to a non-zero value.
+[rank368]:[E808 04:21:41.161045406 ProcessGroupNCCL.cpp:2147] [PG ID 0 PG GUID 0(default_pg) Rank 368] First PG on this rank to signal dumping.
+```
+
+To fix, try running with TP_COMM_OVERLAP disabled like so:  
+```bash
+TP_COMM_OVERLAP=False llmb-run single -w pretrain_nemotron4 -s 340b --dtype bf16 --scale 256
+```
+
+# MFU formula
 
 ```shell
 model flops = (sequence length) * ((attention flops) + (mlp flops) + (embedding flops))

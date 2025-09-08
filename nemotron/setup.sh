@@ -22,7 +22,7 @@
 
 set -eu -o pipefail
 
-if [ ${BASH_VERSION:0:1} -lt 4 ] || [ ${BASH_VERSION:0:1} -eq 4 -a ${BASH_VERSION:2:1} -lt 2 ]; then
+if [ ${BASH_VERSION:0:1} -lt 4 ] || [ ${BASH_VERSION:0:1} -eq 4 ] && [ ${BASH_VERSION:2:1} -lt 2 ]; then
     printf "Unsupported %s version: %s\n" "${BASH}" "${BASH_VERSION}" >&2
     echo "Requires Bash 4.2 or greater." >&2
     exit 1
@@ -30,33 +30,32 @@ fi
 
 export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=nemotron4
-export FW_VERSION=25.04.01
+export FW_VERSION=25.07.01
 
 # Ensure STAGE_PATH is not set as it's been replaced by LLMB_INSTALL
 if [ -n "${STAGE_PATH+x}" ]; then
-  echo "Error: STAGE_PATH is deprecated and should not be set. Please use LLMB_INSTALL instead."
-  exit 1
+    echo "Error: STAGE_PATH is deprecated and should not be set. Please use LLMB_INSTALL instead."
+    exit 1
 fi
 
 export LLMB_INSTALL=${LLMB_INSTALL:?Please set LLMB_INSTALL to the path of the installation directory for all workloads}
 export LLMB_WORKLOAD=$LLMB_INSTALL/workloads/${WORKLOAD_TYPE}_${MODEL_NAME}
 export NEMO_DIR=$LLMB_WORKLOAD/NeMo
 
-# Build LLMB_INSTALL location 
+# Build LLMB_INSTALL location
 export MANUAL_INSTALL=${MANUAL_INSTALL:-true}
 if [ "$MANUAL_INSTALL" = true ]; then
-  mkdir -p $LLMB_INSTALL $LLMB_INSTALL/{datasets,images,venvs,workloads}
-  mkdir -p $LLMB_WORKLOAD
+    mkdir -p $LLMB_INSTALL $LLMB_INSTALL/{datasets,images,venvs,workloads}
+    mkdir -p $LLMB_WORKLOAD
 fi
 
 # -------- llmb-nemo commits
-# r2.3.0 llmb-nemo
-export NEMO_COMMIT="00b778eb5e98baf5042d7b08d3148ec3229b5754"
-export MEGATRON_COMMIT="64cb6bd7a155c4e742514ed1024407fb97d0a367"
-export NEMO_RUN_COMMIT="8d46493b76abdb0e145ac92606b3ed56e03ee28c"
+export NEMO_COMMIT="1f422a19d942fab0aa54e3099f4b5752d871cb5d"
+export MEGATRON_COMMIT="ac198fc0d60a8c748597e01ca4c6887d3a7bcf3d"
+export NEMO_RUN_COMMIT="2ca3b41a2276f1f24bd462e8baeb28c2536aa7b1"
 
 # 1. Clone the NeMo source code
-#Setup NeMo 
+#Setup NeMo
 if [ ! -d "$NEMO_DIR" ]; then
     git clone https://github.com/NVIDIA/NeMo.git $NEMO_DIR
 fi
@@ -64,11 +63,11 @@ fi
 pushd $NEMO_DIR
 git fetch origin
 git checkout -f $NEMO_COMMIT
-./reinstall.sh
+python3 -m pip install '.[all]'
 popd
 
 # 2. Install dependencies
-pip install 'scipy<1.13.0' # a workaround for compatibility issue
+pip install 'scipy<1.13.0'         # a workaround for compatibility issue
 pip install 'bitsandbytes==0.46.0' # Future NeMo release 25.07/09 will have this fix.
 pip install 'transformers==4.55.4'
 pip install megatron-core@git+https://github.com/NVIDIA/Megatron-LM.git@$MEGATRON_COMMIT

@@ -20,7 +20,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-if [ ${BASH_VERSION:0:1} -lt 4 ] || [ ${BASH_VERSION:0:1} -eq 4 -a ${BASH_VERSION:2:1} -lt 2 ]; then
+if [ ${BASH_VERSION:0:1} -lt 4 ] || [ ${BASH_VERSION:0:1} -eq 4 ] && [ ${BASH_VERSION:2:1} -lt 2 ]; then
     printf "Unsupported %s version: %s\n" "${BASH}" "${BASH_VERSION}" >&2
     echo "Requires Bash 4.2 or greater." >&2
     exit 1
@@ -29,18 +29,18 @@ fi
 set -eu -o pipefail
 
 check_pep668() {
-  # Create a temp file and ensure it’s cleaned up
-  tmpfile=$(mktemp)
-  trap 'rm -f "$tmpfile"' EXIT
+    # Create a temp file and ensure it’s cleaned up
+    tmpfile=$(mktemp)
+    trap 'rm -f "$tmpfile"' EXIT
 
-  # Do a no-op pip install and capture stderr
-  python3 -m pip install --disable-pip-version-check \
-    --no-deps --dry-run pip 2> "$tmpfile" || true
+    # Do a no-op pip install and capture stderr
+    python3 -m pip install --disable-pip-version-check \
+        --no-deps --dry-run pip 2> "$tmpfile" || true
 
-  if grep -q "externally-managed-environment" "$tmpfile"; then
-      cat <<EOF >&2
+    if grep -q "externally-managed-environment" "$tmpfile"; then
+        cat << EOF >&2
 
-ERROR: It looks like your system’s Python is “externally managed” (PEP 668).
+ERROR: It looks like your system’s Python is "externally managed" (PEP 668).
   • System-wide pip installs are blocked.
   • You must use a virtual environment (venv or conda)
 
@@ -52,8 +52,8 @@ Quick fix:
 IMPORTANT: You will need this virtual environment if you plan to use 'llmb-run' for launching workloads.
 
 EOF
-      exit 1
-	fi
+        exit 1
+    fi
 }
 check_pep668
 
@@ -67,6 +67,5 @@ pushd installer
 python3 -m pip install .
 
 # Run the interactive installer
-./installer.py
+./installer.py "$@"
 popd
-

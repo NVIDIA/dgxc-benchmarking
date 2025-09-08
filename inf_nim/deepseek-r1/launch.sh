@@ -33,13 +33,13 @@
 #SBATCH --time=01:00:00
 
 # Check if the NGC_API_KEY is empty
-if [[ -z "$NGC_API_KEY" ]]; then
+if [[ -z $NGC_API_KEY ]]; then
     echo "Error: NGC_API_KEY is empty." >&2
     exit 1
 fi
 
 #Check if the STAGE_PATH is empty
-if [[ -z "$STAGE_PATH" ]]; then
+if [[ -z $STAGE_PATH ]]; then
     echo "Error: STAGE_PATH is empty." >&2
     exit 1
 fi
@@ -51,8 +51,7 @@ export SLURM_UNBUFFEREDIO=1
 export TORCHX_MAX_RETRIES=0
 set +e
 
-nodes=( $( scontrol show hostnames $SLURM_JOB_NODELIST ) )
-nodes_array=($nodes)
+mapfile -t nodes_array < <(scontrol show hostnames "$SLURM_JOB_NODELIST")
 head_node=${nodes_array[0]}
 head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address)
 
@@ -81,15 +80,15 @@ srun --output $STAGE_PATH/logs/server_%j.out \
     bash ${CUR_REPO}/multi-node-worker.sh &
 
 export BENCHMARKING_IMAGE='nvidia+tritonserver+25.01.sqsh' # Tritonserver Container which runs benchmarking script
-export NIM_MODEL_TOKENIZER="deepseek-ai/DeepSeek-R1" # Tokenizer used by the Tritonserver
+export NIM_MODEL_TOKENIZER="deepseek-ai/DeepSeek-R1"       # Tokenizer used by the Tritonserver
 export HF_HOME=$STAGE_PATH'/HF_HOME/'
 export USE_CASES="chat:128/128"
-export CONCURRENCY_RANGE="1 5 10 25" # Concurrency levels to sweep over
-export total_request_multiplier=5 # total_request_multiplier * Concurrency_value = Total Requests sent per GenAI-Perf Command
-export SLEEP_TIME=60 # Time between GenAI-Perf Commands (in seconds)
+export CONCURRENCY_RANGE="1 5 10 25"                # Concurrency levels to sweep over
+export total_request_multiplier=5                   # total_request_multiplier * Concurrency_value = Total Requests sent per GenAI-Perf Command
+export SLEEP_TIME=60                                # Time between GenAI-Perf Commands (in seconds)
 export SERVER_SLEEP_TIME=${SERVER_SLEEP_TIME:-1600} # Wait time till model weights loading is complete (in seconds)
-export MIN_REQUESTS=20 # Minimum total requests per GenAI-Perf Command
-export NUM_GPUS=16 # metadata in output file
+export MIN_REQUESTS=20                              # Minimum total requests per GenAI-Perf Command
+export NUM_GPUS=16                                  # metadata in output file
 export RESULTS_PATH=$STAGE_PATH"/results"
 mkdir -vp $RESULTS_PATH
 

@@ -4,41 +4,46 @@ This recipe contains information and scripts to produce performance results for 
 
 Weak scaling methodology is used in the configurations below.
 
-**FP8 recipe is not currently supported and will be available in the future**
+FP8 supports multiple recipes:
+- `FP8-DS` (default): Delayed scaling FP8
+- `FP8-MX`: MXFP8
+- `FP8-SS`: Smooth scaling FP8
 
 ## H100
 
-- At least 1024 GPUs with at least 80GB memory each for BF16.
+- For BF16 and FP8, a minimum of 512 GPUs, each with at least 80GB of memory, is required.
 
-| Size  | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | ETP | DP | VP  | MBS | GBS  | GA  | RecomputeModule |
-|-------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|:---:|
-| 671B | BF16 | 1024  | 4096   | 61         | 2  | 16   | 1   | 64  | 1   | 32  | 1   | 1   | 8192 | 256 | mla_up_proj |
-
-## GB200 
-
-- At least 128 GPUs with at least 192GB memory each for BF16.
-
-| Size  | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | ETP | DP  | VP  | MBS | GBS  | GA  | RecomputeModule |
-|-------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|:---:|
-| 671B | BF16 | 128   | 4096   | 61         | 2  | 4   | 1   | 32  | 1   | 16  | 1   | 1   | 1024 | 64 | core_attn |
-| 671B | BF16 | 256   | 4096   | 61         | 2  | 4   | 1   | 64  | 1   | 32  | 1   | 1   | 2048 | 64 | core_attn |
-| 671B | BF16 | 512   | 4096   | 61         | 2  | 4   | 1   | 64  | 1   | 64  | 1   | 1   | 4096 | 64 | core_attn |
+| Size  | Precision     | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | ETP | DP  | VP  | MBS | GBS  | GA  | RecomputeModule     |
+|-------|:-------------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|:-------------------:|
+| 671B  | BF16          | 512  | 4096   | 61     | 1   | 8   | 1   | 64  | 1   | 64  | 2   | 1   | 4096 | 64  | mla_up_proj,mlp,moe |
+| 671B  | FP8-DS/FP8-SS | 512  | 4096   | 61     | 2   | 8   | 1   | 64  | 1   | 32  | 2   | 1   | 4096 | 128 | mla_up_proj,mlp,moe |
+| 671B  | BF16/FP8-DS   | 1024 | 4096   | 61     | 1   | 8   | 1   | 64  | 1   | 128 | 2   | 1   | 8192 | 64  | mla_up_proj,mlp,moe |
+| 671B  | FP8-SS        | 1024 | 4096   | 61     | 2   | 8   | 1   | 64  | 1   | 64  | 2   | 1   | 8192 | 128 | mla_up_proj,mlp,moe |
 
 ## B200
+- For BF16 and FP8-DS, a minimum of 128 GPUs, each with at least 180GB of memory, is required. For FP8-MX, the requirement increases to a minimum of 256 GPUs, each also possessing at least 180GB of memory.
 
-- At least 128 GPUs with at least 192GB memory each for BF16.
+| Size  | Precision          | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | ETP | DP | VP  | MBS | GBS  | GA  | RecomputeModule    |
+|-------|:------------------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:--:|:---:|:---:|:----:|:---:|:------------------:|
+| 671B  | BF16/FP8-DS        | 128  | 4096   | 61     | 1   | 16  | 1   | 8   | 1   | 8  | 1   | 1   | 1024 | 128 | mla_up_proj        |
+| 671B  | BF16/FP8-DS/FP8-MX | 256  | 4096   | 61     | 1   | 16  | 1   | 8   | 1   | 16 | 1   | 1   | 2048 | 128 | mla_up_proj        |
+| 671B  | BF16/FP8-DS/FP8-MX | 512  | 4096   | 61     | 1   | 16  | 1   | 8   | 1   | 32 | 1   | 1   | 4096 | 128 | mla_up_proj        |
 
-| Size  | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | ETP | DP  | VP  | MBS | GBS  | GA  | RecomputeModule |
-|-------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|:---:|
-| 671B | BF16 | 128   | 4096   | 61         | 2  | 16   | 1   | 8   | 1   | 4   | 1   | 1   | 1024 | 256  | core_attn             |
-| 671B | BF16 | 256   | 4096   | 61         | 1  | 16   | 1   | 8   | 1   | 16  | 1   | 1   | 2048 | 128  | core_attn,mla_up_proj |
-| 671B | BF16 | 512   | 4096   | 61         | 1  | 16   | 1   | 8   | 1   | 32  | 1   | 1   | 4096 | 128  | core_attn,mla_up_proj |
+## GB200
+
+- For BF16 and FP8-DS, a minimum of 128 GPUs, each with at least 188GB of memory, is required. For FP8-MX, the requirement increases to a minimum of 256 GPUs, each also possessing at least 188GB of memory.
+
+| Size  | Precision          | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | ETP | DP | VP  | MBS | GBS  | GA  | RecomputeModule    |
+|-------|:------------------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:--:|:---:|:---:|:----:|:---:|:------------------:|
+| 671B  | BF16/FP8-DS        | 128  | 4096   | 61     | 1   | 4   | 1   | 32  | 1   | 32 | 1   | 1   | 1024 | 64  | mla_up_proj        |
+| 671B  | BF16/FP8-DS/FP8-MX | 256  | 4096   | 61     | 1   | 8   | 1   | 32  | 1   | 32 | 2   | 1   | 2048 | 64  | mla_up_proj        |
+| 671B  | BF16/FP8-DS/FP8-MX | 512  | 4096   | 61     | 1   | 8   | 1   | 32  | 1   | 64 | 2   | 1   | 4096 | 64  | mla_up_proj        |
 
 # Performance Measurement and Analysis
 
 Performance for Deepseek-v3 training is measured by seconds per iteration, or in other words seconds per training step. This metric is logged for every training step in the main training log file [see Output Locations](#output-locations).
 
-Since the early training steps typically take much longer time (with input prefetch, activation memory allocation, and JIT compilation), we use the `parse_train_timing.sh` script to analyze iterations 11-44 and calculate mean and standard deviation for reliable performance metrics. We also get the achieved GPU FLOPS via `TFLOPS_per_GPU` metric.
+Since the early training steps typically take much longer time (with input prefetch, activation memory allocation, and JIT compilation), we use the `parse_train_timing.sh` script to analyze iterations 35-44 and calculate mean and standard deviation for reliable performance metrics. We also get the achieved GPU FLOPS via `TFLOPS_per_GPU` metric.
 
 ### Running the parse_train_timing.sh script
 
@@ -61,16 +66,13 @@ $LLMB_REPO/common/parse_train_timing.sh --format=json
 $LLMB_REPO/common/parse_train_timing.sh --full-names
 ```
 
+Example output:
 ```shell
-# Run the parse_train_timing script to analyze all experiments
-common/parse_train_timing.sh $LLMB_WORKLOAD/experiments
-
-# Example output:
-Train Step Timing Analysis (iterations 11-44)
+Train Step Timing Analysis (iterations 35-44)
 ================================================================================
 Experiment                                                                         Status Time Mean (s) Time Std (s) TFLOPS_per_GPU Mean TFLOPS_per_GPU Std
 -------------------------------------------------------------------------------- -------- ------------- ------------ ------------------- ------------------
-pretrain_deepseek_v3_bf16_32nodes_tp2_pp4_cp1_vp1_ep32_1mbs_1024gbs_386556        Success        34.229        0.096              248.85               0.69
+pretrain_deepseek_v3_bf16_gpus1024_tp1_pp8_cp1_vp2_ep64_mbs1_gbs8192_3418260      Success        36.189        0.300              235.43               1.95
 ```
 
 To obtain throughput as a tokens per second measurement, follow this formula: 
@@ -78,13 +80,13 @@ To obtain throughput as a tokens per second measurement, follow this formula:
 (sequence length) * (global batch size) / (training_step_timing) = (throughput in tokens per second)
 ```
 
-E.g. 4096 * 8192 / 52.04 = 644781.55
+E.g. 4096 * 8192 / 36.189 = 927200
 
 To calculate time to train estimate:
 ```shell
 (total tokens) / (throughput in tokens per second) / (number of seconds in a day) = (time to train in days) 
 ```
-E.g. 1e12 / 644781.55 / 86400 = 17.95 days 
+E.g. 1e12 / 927200 / 86400 = 12.48 days
 
 
 To calculate the model flops utilization (MFU):
@@ -92,13 +94,13 @@ To calculate the model flops utilization (MFU):
 MFU = (achieved TFLOPS_per_GPU) / (peak GPU FLOPS)
 ```
 
-E.g. Deepseek V3 BF16 on 1024x H100 GPUs (GBS=8192)
+E.g. DeepSeek-V3 BF16 on 1024x H100 GPUs (GBS=8192)
 ```shell
 peak FLOPS for H100 BF16 = 989 TFLOPS
-training step time = 52.04 s
-achieved TFLOPS_per_GPU = 163.7 TFLOPS
+training step time = 36.189 s
+achieved TFLOPS_per_GPU = 235.43 TFLOPS
 
-MFU = 163.7e+12 / 989e+12 = 16.55%
+MFU = 235.43e+12 / 989e+12 = 23.80%
 ```
 
 
@@ -158,6 +160,15 @@ llmb-run single -w pretrain_deepseek-v3 -s 671b --dtype bf16 --scale 128
 
 # Example with different scale
 llmb-run single -w pretrain_deepseek-v3 -s 671b --dtype bf16 --scale 256
+
+# Example with FP8-DS precision (default)
+llmb-run single -w pretrain_deepseek-v3 -s 671b --dtype fp8 --scale 256
+
+# Example with FP8-MX precision for GB200 and B200
+FP8_RECIPE=mxfp8 llmb-run single -w pretrain_deepseek-v3 -s 671b --dtype fp8 --scale 256
+
+# Example with FP8-SS precision for H100
+FP8_RECIPE=ss llmb-run single -w pretrain_deepseek-v3 -s 671b --dtype fp8 --scale 1024
 ```
 
 For more details on llmb-run usage, see the [llmb-run documentation](../../llmb-run/README.md).
@@ -173,7 +184,7 @@ Alternatively, you can run training directly using the launch script. This metho
 ### Command Template
 
 ```shell
-JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] ./launch.sh
+JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] [FP8_RECIPE=<type>] ./launch.sh
 ```
 
 ### Environment Variables
@@ -188,7 +199,12 @@ JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] 
 **Optional:**
 - `DTYPE`: Precision format (default: `bf16`)
   - `bf16` - BFloat16 precision
-  - Note: FP8 recipe is not currently supported
+  - `fp8`  - FP8 precision (supports DS/MX/SS)
+- `FP8_RECIPE`: FP8 variant selector (default: `ds`)
+  - **Note:** Available FP8_RECIPE options vary by GPU type. See the [Supported Configs](#overview).
+  - `ds`   - FP8-DS
+  - `mxfp8`- FP8-MX
+  - `ss`   - FP8-SS
 - `MODEL_SIZE`: Model variant (fixed: `671b`)
   - `671b` - 671 billion parameter model (only supported size)
 
@@ -276,44 +292,4 @@ Since most of the benchmarking jobs run on multiple GPUs, there will be multiple
 
 **See** these [tutorials](https://developer.nvidia.com/nsight-systems/get-started#tutorials) to get a quick start if you are new to Nsight profiling.
 
-## Run NCCL Trace (For Debugging)
-
-NCCL traces are a tool for understanding communication patterns within your benchmarking job. They provide detailed information on the types of NCCL calls being made (like AllReduce, Broadcast, etc.) and the size of the messages being exchanged.
-
-**Important:** This feature is primarily intended for **troubleshooting and debugging purposes only**. It is not typically used during normal benchmark runs.
-
-To collect NCCL Trace information, set the environment variable `ENABLE_NCCLTRACE=true` when submitting your job:
-
-**Defaults for Tracing:**
-*   **Duration:** Due to the large file sizes generated, tracing is limited to the first 5 steps of the job by default.
-*   **Output Location:** NCCL trace information is included directly within the standard job log file (see Output Locations)
-
-**Example command:**
-
-```shell
-ENABLE_NCCLTRACE=true JOB_TOTAL_GPUS=256 GPU_TYPE=gb200 ./launch.sh
-```
-
-### Understanding NCCL Trace Results
-
-Enabling NCCL tracing will generate a large volume of log messages labeled "NCCL Info". These messages provide details about individual communication operations. Be aware that these log files can be quite large, potentially exceeding 1GB.
-
-Look for messages including:
-
-```
-"NCCL INFO AllReduce: opCount"
-"NCCL INFO Broadcast: opCount"
-"NCCL INFO AllGather: opCount"
-"NCCL INFO ReduceScatter: opCount"
-```
-
-**Example Log Entry:**
-
-```
-[7] NCCL INFO AllReduce: opCount 2 sendbuff 0x7ffb4713c200 recvbuff 0x7ffb4713c200 count 1 datatype 1 op 0 root 0 comm 0x55556b100660 [nranks=128] stream 0x5555630c58b0
-```
-
-This example shows an `AllReduce` operation with details about the buffers, count, data type, and the participating ranks.
-
-
-
+<!-- NCCL trace support removed. Documentation section deleted intentionally. -->
