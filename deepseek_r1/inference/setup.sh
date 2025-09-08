@@ -32,7 +32,7 @@
 
 set -eu -o pipefail
 
-if [ ${BASH_VERSION:0:1} -lt 4 ] || [ ${BASH_VERSION:0:1} -eq 4 -a ${BASH_VERSION:2:1} -lt 2 ]; then
+if [ ${BASH_VERSION:0:1} -lt 4 ] || [ ${BASH_VERSION:0:1} -eq 4 ] && [ ${BASH_VERSION:2:1} -lt 2 ]; then
     printf "Unsupported %s version: %s\n" "${BASH}" "${BASH_VERSION}" >&2
     echo "Requires Bash 4.2 or greater." >&2
     exit 1
@@ -44,8 +44,8 @@ export FW_VERSION=1.0.0rc1
 
 # Ensure STAGE_PATH is not set as it's been replaced by LLMB_INSTALL
 if [ -n "${STAGE_PATH+x}" ]; then
-  echo "Error: STAGE_PATH is deprecated and should not be set. Please use LLMB_INSTALL instead."
-  exit 1
+    echo "Error: STAGE_PATH is deprecated and should not be set. Please use LLMB_INSTALL instead."
+    exit 1
 fi
 
 MODEL_WEIGHTS_DIR="DeepSeek-R1-FP4"
@@ -53,27 +53,29 @@ export LLMB_INSTALL=${LLMB_INSTALL:?Please set LLMB_INSTALL to the path of the i
 export LLMB_WORKLOAD=$LLMB_INSTALL/workloads/${WORKLOAD_TYPE}_${MODEL_NAME}
 export MODEL_PATH=$LLMB_WORKLOAD/$MODEL_WEIGHTS_DIR
 
-# Build LLMB_INSTALL location 
+# Build LLMB_INSTALL location
 export MANUAL_INSTALL=${MANUAL_INSTALL:-true}
 if [ "$MANUAL_INSTALL" = true ]; then
-  mkdir -p $LLMB_INSTALL $LLMB_INSTALL/{datasets,images,venvs,workloads}
-  mkdir -p $LLMB_WORKLOAD
+    mkdir -p $LLMB_INSTALL $LLMB_INSTALL/{datasets,images,venvs,workloads}
+    mkdir -p $LLMB_WORKLOAD
 fi
 
-ISL_OSL_COMBINATIONS=("reasoning:1000/1000 chat:128/128 summarization:8000/512 generation:512/8000")
+ISL_OSL_COMBINATIONS=("reasoning:1000/1000" "chat:128/128" "summarization:8000/512" "generation:512/8000")
 PROMT_REQUESTS=${PROMT_REQUESTS:-50000}
 TRT_COMMIT="1a7c6e79743f100954e0a2375f254e54d5717e52"
 TRT_DIR="TensorRT-LLM"
 
 pushd $LLMB_WORKLOAD
 if [ ! -d "${MODEL_WEIGHTS_DIR}" ]; then
-  git clone https://huggingface.co/nvidia/DeepSeek-R1-FP4
+    git clone https://huggingface.co/nvidia/DeepSeek-R1-FP4
 fi
 
-# clone the TRT-LLM repo 
+# clone the TRT-LLM repo
 if [ ! -d "$TRT_DIR" ]; then
     git clone https://github.com/NVIDIA/TensorRT-LLM.git
 fi
+
+ulimit -u 65535 || echo "Could not raise ulimit"
 
 pushd $TRT_DIR
 git fetch origin
@@ -87,11 +89,13 @@ pip install pillow==11.2.1
 pip install datasets==3.6.0
 pip install pydantic==2.11.7
 
-cat <<EOF > config.yml
-enable_attention_dp: true 
-use_cuda_graph: true
+cat << EOF > config_max_throughput.yml
 kv_cache_dtype: fp8
 cuda_graph_padding_enabled: true
+print_iter_log: true
+stream_interval: 4
+enable_attention_dp: true 
+use_cuda_graph: true
 cuda_graph_batch_sizes:
   - 1
   - 2
@@ -102,25 +106,43 @@ cuda_graph_batch_sizes:
   - 64
   - 128
   - 256
-  - 384
-  - 420
-  - 450
-print_iter_log: true
-stream_interval: 4
+  - 512
+  - 816
+  - 1024
+  - 2048
+  - 3600
 EOF
 
-for value in $ISL_OSL_COMBINATIONS; do
-    
-   use_case=$(echo "$value" | cut -d':' -f1)
-   ISL=$(echo "$value" | cut -d':' -f2 | cut -d'/' -f1)
-   OSL=$(echo "$value" | cut -d':' -f2 | cut -d'/' -f2)
+cat << EOF > config_min_latency.yml
+kv_cache_dtype: fp8
+cuda_graph_padding_enabled: true
+print_iter_log: true
+stream_interval: 4
+enable_attention_dp: false
+use_cuda_graph: true
+cuda_graph_batch_sizes:
+  - 1
+moe_backend: TRTLLM
+speculative_config:
+  decoding_type: MTP
+  num_nextn_predict_layers: 3
+  use_relaxed_acceptance_for_thinking: true
+  relaxed_topk: 10
+  relaxed_delta: 0.6
+EOF
 
-   echo "preparing dataset for:"
-   echo "Use Case: $use_case"
-   echo "ISL: $ISL"
-   echo "OSL: $OSL"
+for value in "${ISL_OSL_COMBINATIONS[@]}"; do
 
-   python TensorRT-LLM/benchmarks/cpp/prepare_dataset.py \
+    use_case=$(echo "$value" | cut -d':' -f1)
+    ISL=$(echo "$value" | cut -d':' -f2 | cut -d'/' -f1)
+    OSL=$(echo "$value" | cut -d':' -f2 | cut -d'/' -f2)
+
+    echo "preparing dataset for:"
+    echo "Use Case: $use_case"
+    echo "ISL: $ISL"
+    echo "OSL: $OSL"
+
+    python TensorRT-LLM/benchmarks/cpp/prepare_dataset.py \
         --stdout --tokenizer $MODEL_PATH \
         token-norm-dist \
         --input-mean $ISL --output-mean $OSL \

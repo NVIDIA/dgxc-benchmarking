@@ -20,6 +20,9 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
+# For each dataset a user elects to use, the user is responsible for
+# checking if the dataset license is fit for the intended purpose.
+
 # This script is intended to be run by the LLMB installer as a *setup task*
 # (job_type: nemo2) after dependencies have already been installed.
 # It imports the base checkpoint and downloads the training dataset for
@@ -29,7 +32,7 @@ set -eu -o pipefail
 
 export WORKLOAD_TYPE=finetune
 export MODEL_NAME=llama4-maverick
-export FW_VERSION=25.04.01
+export FW_VERSION=25.07.01
 
 # --- Required environment variables (provided by the installer) ---
 : "${HF_TOKEN:?Required variable Hugging Face token}"

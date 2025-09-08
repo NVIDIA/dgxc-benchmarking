@@ -8,39 +8,40 @@ This variant of the workload is best-suited for clusters with GPUs below:
 * The GB200 recipes listed below progressively increase GPU count, with configurations weak-scaled to match.
 * This workload runs with FP8 and BF16 precision.
 
+| GPUs | SeqLen | Layers | FSDP  | TP | PP | CP | EP | ETP | DP | VP | MBS | GBS | GA |
+|------|:------:|:------:|:----: |:--:|:--:|:--:|:--:|:---:|:--:|:--:|:---:|:---:|:--:|
+| 128  | 8192   | 126    | False |  4 | 8  | 2  | NA | NA  | 2  | 8  |  1  | 64  | 32 |
+| 256  | 8192   | 126    | False |  4 | 8  | 2  | NA | NA  | 4  | 8  |  1  | 128 | 32 |
+| 512  | 8192   | 126    | False |  4 | 8  | 2  | NA | NA  | 8  | 8  |  1  | 256 | 32 |
 
-| GPUs | SeqLen | Layers | FSDP | TP | PP | CP | EP | ETP | DP | VP | MBS | GBS | GA |
-|------|:------:|:------:|:----:|:--:|:--:|:--:|:--:|:---:|:--:|:--:|:---:|:---:|:--:|
-| 128  | 8192   | 126    | 0    |  4 | 8  | 2  | NA | NA  | 2  | 8  |  1  | 64  | 32 |
-| 256  | 8192   | 126    | 0    |  4 | 8  | 2  | NA | NA  | 4  | 8  |  1  | 128 | 32 |
-| 512  | 8192   | 126    | 0    |  4 | 8  | 2  | NA | NA  | 8  | 8  |  1  | 256 | 32 |
 
 ## B200
 * At least 128 GPUs with at least 180 GB memory each. Training of this 405-billion parameter variant of the workload will not fit on fewer GPUs with less memory.
 * The B200 recipes listed below progressively increase GPU count, with configurations weak-scaled to match.
 * This workload runs with FP8 and BF16 precision.
 
-| GPUs | SeqLen | Layers | FSDP | TP | PP | CP | EP | ETP | DP | VP | MBS | GBS | GA |
-|------|:------:|:------:|:----:|:--:|:--:|:--:|:--:|:---:|:--:|:--:|:---:|:---:|:--:|
-| 128  | 8192   | 126    | 0    |  4 | 8  | 2  | NA | NA  | 2  | 8  |  1  | 64  | 32 |
-| 256  | 8192   | 126    | 0    |  4 | 8  | 2  | NA | NA  | 4  | 8  |  1  | 128 | 32 |
-| 512  | 8192   | 126    | 0    |  4 | 8  | 2  | NA | NA  | 8  | 8  |  1  | 256 | 32 |
-| 1024 | 8192   | 126    | 0    |  4 | 8  | 2  | NA | NA  | 16 | 8  |  1  | 512 | 32 |
+| GPUs | SeqLen | Layers | FSDP  | TP | PP | CP | EP | ETP | DP | VP | MBS | GBS | GA |
+|------|:------:|:------:|:-----:|:--:|:--:|:--:|:--:|:---:|:--:|:--:|:---:|:---:|:--:|
+| 128  | 8192   | 126    | False |  4 | 8  | 2  | NA | NA  | 2  | 8  |  1  | 64  | 32 |
+| 256  | 8192   | 126    | False |  4 | 8  | 2  | NA | NA  | 4  | 8  |  1  | 128 | 32 |
+| 512  | 8192   | 126    | False |  4 | 8  | 2  | NA | NA  | 8  | 8  |  1  | 256 | 32 |
+| 1024 | 8192   | 126    | False |  4 | 8  | 2  | NA | NA  | 16 | 8  |  1  | 512 | 32 |
 
 
 ## H100
 * At least 512 GPUs with at least 80 GB memory each. Training of this 405-billion parameter variant of the workload will not fit on fewer GPUs with less memory.
 * This workload runs with FP8 and BF16 precision.
 
-| GPUs | SeqLen | Layers | FSDP | TP | PP | CP | EP | ETP | DP | VP | MBS | GBS | GA |
-|------|:------:|:------:|:----:|:--:|:--:|:--:|:--:|:---:|:--:|:--:|:---:|:---:|:--:|
-| 512  | 8192   | 126    | 0    |  8 | 8  | 2  | NA | NA  | 4  | 8  |  1  | 256 | 64 |
+| GPUs | SeqLen | Layers | FSDP  | TP | PP | CP | EP | ETP | DP | VP | MBS | GBS  | GA |
+|------|:------:|:------:|:-----:|:--:|:--:|:--:|:--:|:---:|:--:|:--:|:---:|:----:|:--:|
+| 512  | 8192   | 126    | False |  8 | 8  | 2  | NA | NA  | 4  | 8  |  1  | 256  | 64 |
+| 1024 | 8192   | 126    | False |  8 | 8  | 2  | NA | NA  | 8  | 8  |  1  | 512  | 64 |
 
 # Performance Measurement and Analysis
 
 Performance for Llama3.1 405B training is measured by seconds per iteration, or in other words seconds per training step. This metric is logged for every training step in the main training log file [see Output Locations](#output-locations).
 
-Since the early training steps typically take much longer time (with input prefetch, activation memory allocation, and JIT compilation), we use the `parse_train_timing.sh` script to analyze iterations 11-44 and calculate mean and standard deviation for reliable performance metrics. We also get the achieved GPU FLOPS via `TFLOPS_per_GPU` metric.
+Since the early training steps typically take much longer time (with input prefetch, activation memory allocation, and JIT compilation), we use the `parse_train_timing.sh` script to analyze iterations 35-44 and calculate mean and standard deviation for reliable performance metrics. We also get the achieved GPU FLOPS via `TFLOPS_per_GPU` metric.
 
 ### Running the parse_train_timing.sh script
 
@@ -63,16 +64,13 @@ $LLMB_REPO/common/parse_train_timing.sh --format=json
 $LLMB_REPO/common/parse_train_timing.sh --full-names
 ```
 
+Example output:
 ```shell
-# Run the parse_train_timing script to analyze all experiments
-common/parse_train_timing.sh $LLMB_WORKLOAD/experiments
-
-# Example output:
-Train Step Timing and TFLOPS Analysis (iterations 11-44)
+Train Step Timing and TFLOPS Analysis (iterations 35-44)
 ================================================================================
 Experiment                                                                                   Status Time Mean (s) Time Std (s) TFLOPS_per_GPU Mean TFLOPS_per_GPU Std
 ------------------------------------------------------------------------------------------ -------- ------------- ------------ ------------------- ------------------
-pretrain_llama3.1_405b_bf16_gpus256_tp4_pp8_cp2_vp8_mbs1_gbs128_384748                       Success         9.479        0.018             1134.50               2.13
+pretrain_llama3.1_405b_bf16_gpus128_tp4_pp8_cp2_vp8_mbs1_gbs128_384748                       Success         9.473        0.018             1134.50               2.13
 ```
 
 To obtain throughput as a tokens per second measurement, follow this formula: 
@@ -80,16 +78,16 @@ To obtain throughput as a tokens per second measurement, follow this formula:
 (sequence length) * (global batch size) / (training_step_timing) = (throughput in tokens per second)
 ```
 
-E.g. 8192 * 64 / 9.347 = 56092
+E.g. 8192 * 64 / 9.473 = 55346
 
 To calculate time to train with 1T tokens estimate:
 ```shell
 (total tokens) / (throughput in tokens per second) / (number of seconds in a day) = (time to train in days) 
 ```
-E.g. 1e12 / 56092 / 86400 = 206.34 days 
+E.g. 1e12 / 55346 / 86400 = 209.12 days 
 
 
-To calculate the model flops utilization (MFU). Calculation shown [here](#notes).
+To calculate the model flops utilization (MFU). Calculation shown [here](#mfu-formula).
 ```shell
 MFU = (global batch size) * (model flops) / (training step time) / (number of GPUs) / (peak GPU FLOPS)
 ```
@@ -111,7 +109,7 @@ peak FLOPS for GB200 = 2.45 PFLOPS
 training step time = 9.347
 model flops = 2.17E+16
 
-MFU = 64 * 2.17E+16 / 9.347 / 128 / 2.45E+15 = 47.4%
+MFU = 64 * 2.17E+16 / 9.473 / 128 / 2.45E+15 = 46.75%
 ```
 
 
@@ -251,9 +249,7 @@ The `<experiment_name>` typically follows the pattern: `pretrain_llama3.1_405b_<
 - `nsys_profile/` - Contains profiling traces when `ENABLE_PROFILE=true`
 
 # Profiling
-We have two profiling methods supported: Nsight, and NCCL Trace.
-
-**Note:** Profiling and NCCL Trace are currently mutually exclusive.
+Profiling is supported with Nsight Systems.
 
 ## Run Nsight Profiling
 
@@ -306,51 +302,26 @@ Since most of the benchmarking jobs run on multiple GPUs, there will be multiple
 **See** these [tutorials](https://developer.nvidia.com/nsight-systems/get-started#tutorials) to get a quick start if you are new to Nsight profiling.
 
 
-## Run NCCL Trace (For Debugging)
+<!-- NCCL trace support removed. Documentation section deleted intentionally. -->
 
-NCCL traces are a tool for understanding communication patterns within your benchmarking job. They provide detailed information on the types of NCCL calls being made (like AllReduce, Broadcast, etc.) and the size of the messages being exchanged.
 
-**Important:** This feature is primarily intended for **troubleshooting and debugging purposes only**. It is not typically used during normal benchmark runs.
-
-To collect NCCL Trace information, set the environment variable `ENABLE_NCCLTRACE=true` when submitting your job:
-
-**Defaults for Tracing:**
-*   **Duration:** Due to the large file sizes generated, tracing is limited to the first 5 steps of the job by default.
-*   **Output Location:** NCCL trace information is included directly within the standard job log file (see Output Locations)
-
-**Example command:**
-
+# FAQ
+## Failure detected by watchdog messages
+For GB200 you may see the following error message
 ```shell
-ENABLE_NCCLTRACE=true JOB_TOTAL_GPUS=128 DTYPE=fp8 GPU_TYPE=gb200 ./launch.sh
+[rank368]:[E808 04:21:41.160918398 ProcessGroupNCCL.cpp:655] [Rank 368] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=5, OpType=ALLREDUCE, NumelIn=1, NumelOut=1, Timeout(ms)=600000) ran for 600001 milliseconds before timing out.
+[rank368]:[E808 04:21:41.161005534 ProcessGroupNCCL.cpp:2299] [PG ID 0 PG GUID 0(default_pg) Rank 368]  failure detected by watchdog at work sequence id: 5 PG status: last enqueued work: 5, last completed work: 4
+[rank368]:[E808 04:21:41.161011710 ProcessGroupNCCL.cpp:693] Stack trace of the failed collective not found, potentially because FlightRecorder is disabled. You can enable it by setting TORCH_NCCL_TRACE_BUFFER_SIZE to a non-zero value.
+[rank368]:[E808 04:21:41.161045406 ProcessGroupNCCL.cpp:2147] [PG ID 0 PG GUID 0(default_pg) Rank 368] First PG on this rank to signal dumping.
 ```
 
-### Understanding NCCL Trace Results
-
-Enabling NCCL tracing will generate a large volume of log messages labeled "NCCL Info". These messages provide details about individual communication operations. Be aware that these log files can be quite large, potentially exceeding 1GB.
-
-Look for messages including:
-
-```
-"NCCL INFO AllReduce: opCount"
-"NCCL INFO Broadcast: opCount"
-"NCCL INFO AllGather: opCount"
-"NCCL INFO ReduceScatter: opCount"
-```
-
-**Example Log Entry:**
-
-```
-[7] NCCL INFO AllReduce: opCount 2 sendbuff 0x7ffb4713c200 recvbuff 0x7ffb4713c200 count 1 datatype 1 op 0 root 0 comm 0x55556b100660 [nranks=128] stream 0x5555630c58b0
-```
-
-This example shows an `AllReduce` operation with details about the buffers, count, data type, and the participating ranks.
-```shell
-ENABLE_NCCLTRACE=true JOB_TOTAL_GPUS=128 DTYPE=bf16 ./launch.sh
+To fix, try running with TP_COMM_OVERLAP disabled like so:
+```bash
+TP_COMM_OVERLAP=False llmb-run single -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128
 ```
 
 
-# Notes
-
+## MFU formula
 ```shell
 model flops = (sequence length) * ((attention flops) + (mlp flops) + (embedding flops))
 
@@ -365,6 +336,5 @@ Llama 3.1 405b calculation:
     mlp flops = 18 * 126 * 53248 * 16384 = 1,978,637,746,176
     embedding flops = 6 * 128256 * 16384 = 12,608,077,824
 
-    model flops = 8129 * (659,545,915,392 + 1,978,637,746,176 + 12,608,077,824) = 2.17E16
+    model flops = 8192 * (659,545,915,392 + 1,978,637,746,176 + 12,608,077,824) = 2.17E16
 ```
-

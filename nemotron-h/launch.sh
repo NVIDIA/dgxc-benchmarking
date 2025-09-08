@@ -20,7 +20,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-if [ ${BASH_VERSION:0:1} -lt 4 ] || [ ${BASH_VERSION:0:1} -eq 4 -a ${BASH_VERSION:2:1} -lt 2 ]; then
+if [ ${BASH_VERSION:0:1} -lt 4 ] || [ ${BASH_VERSION:0:1} -eq 4 ] && [ ${BASH_VERSION:2:1} -lt 2 ]; then
     printf "Unsupported %s version: %s\n" "${BASH}" "${BASH_VERSION}" >&2
     echo "Requires Bash 4.2 or greater." >&2
     exit 1
@@ -30,15 +30,15 @@ set -eu -o pipefail
 
 export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=nemotron-h
-export FW_VERSION=25.04.01
-export GSW_VERSION=25.07
+export FW_VERSION=25.07.01
+export GSW_VERSION=25.08
 
 export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 
 # Ensure STAGE_PATH is not set as it's been replaced by LLMB_INSTALL
 if [ -n "${STAGE_PATH+x}" ]; then
-  echo "Error: STAGE_PATH is deprecated and should not be set. Please use LLMB_INSTALL instead."
-  exit 1
+    echo "Error: STAGE_PATH is deprecated and should not be set. Please use LLMB_INSTALL instead."
+    exit 1
 fi
 
 export LLMB_WORKLOAD=$LLMB_INSTALL/workloads/${WORKLOAD_TYPE}_${MODEL_NAME}
@@ -58,8 +58,8 @@ PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 PROFILE_ENABLED=${PROFILE_ENABLED,,}
 GPU_METRICS_ENABLED=${ENABLE_GPU_METRICS:-false}
 GPU_METRICS_ENABLED=${GPU_METRICS_ENABLED,,}
-NCCLTRACE_ENABLED=${ENABLE_NCCLTRACE:-false}
-NCCLTRACE_ENABLED=${NCCLTRACE_ENABLED,,}
+ENABLE_VBOOST=${ENABLE_VBOOST:-false}
+ENABLE_VBOOST=${ENABLE_VBOOST,,}
 
 MAX_STEPS=${MAX_STEPS:-50}
 TIME_LIMIT=${TIME_LIMIT:-"00:25:00"}
@@ -68,29 +68,40 @@ CPU_PER_TASK_PINNING=${CPU_PER_TASK_PINNING:-0}
 export PROFILE_START_STEP=${PROFILE_START_STEP:-45}
 export PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
 
+CONTAINER_MOUNTS=""
+if [[ -n ${RUN_CONF_MOUNTS:-""} ]]; then
+    if [[ -n ${CONTAINER_MOUNTS} ]]; then
+        CONTAINER_MOUNTS+=","
+    fi
+    CONTAINER_MOUNTS+="${RUN_CONF_MOUNTS}"
+fi
+
 if [ $MODEL_SIZE = 56b ]; then
-  if [ $GPU_TYPE = gb200 ]; then
-    DEF_GPUS_PER_NODE=4
-    TP=2
-  elif [ $GPU_TYPE = b200 ]; then
-    DEF_GPUS_PER_NODE=8
-    TP=2
-  elif [ $GPU_TYPE = h100 ]; then
-    DEF_GPUS_PER_NODE=8
-    TP=8
-  fi
+    if [ $GPU_TYPE = gb200 ]; then
+        DEF_GPUS_PER_NODE=4
+        TP=4
+        MBS=2
+    elif [ $GPU_TYPE = b200 ]; then
+        DEF_GPUS_PER_NODE=8
+        TP=4
+        MBS=2
+    elif [ $GPU_TYPE = h100 ]; then
+        DEF_GPUS_PER_NODE=8
+        TP=8
+        MBS=1
+    fi
 
-  GPUS_PER_NODE=${GPUS_PER_NODE:-$DEF_GPUS_PER_NODE}
+    GPUS_PER_NODE=${GPUS_PER_NODE:-$DEF_GPUS_PER_NODE}
 
-  PP=1
-  CP=1
-  GBS=${GBS:-$(( JOB_TOTAL_GPUS * 3 ))}
-  MBS=1
-  VP=0
-  NUM_LAYERS=118
-  HIDDEN_SIZE=8192
+    PP=1
+    CP=1
+    GBS=${GBS:-$((JOB_TOTAL_GPUS * 3))}
+    # VP=0 # For reference
+    CUDA_GRAPH=true
+    NUM_LAYERS=118
+    HIDDEN_SIZE=8192
 else
-  echo "MODEL_SIZE: ${MODEL_SIZE} is unsupported."
+    echo "MODEL_SIZE: ${MODEL_SIZE} is unsupported."
 fi
 
 CONFIG_OVERRIDES=" -tp $TP \
@@ -98,44 +109,44 @@ CONFIG_OVERRIDES=" -tp $TP \
   -cp $CP \
   -gb $GBS \
   -mb $MBS \
+  --cuda_graphs $CUDA_GRAPH \
   --num_layers $NUM_LAYERS \
   --hidden_size $HIDDEN_SIZE \
   -ep 1 \
 "
 
-if [ $PROFILE_ENABLED = true ] && [ $NCCLTRACE_ENABLED = true ]; then
-  echo "Cannot both profile and get NCCL traces"
-  exit 1
+if [[ $PROFILE_ENABLED == "true" ]]; then
+    CONFIG_OVERRIDES+=" --enable_nsys"
+    CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
+    CONFIG_OVERRIDES+=" --profiling_stop_step=$PROFILE_STOP_STEP "
+    MAX_STEPS=$PROFILE_STOP_STEP
+    if [[ $GPU_METRICS_ENABLED == true ]]; then
+        CONFIG_OVERRIDES+=" -pgm "
+    fi
 fi
 
-if [[ "$PROFILE_ENABLED" = "true" ]]; then
-  CONFIG_OVERRIDES+=" --enable_nsys"
-  CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
-  CONFIG_OVERRIDES+=" --profiling_stop_step=$PROFILE_STOP_STEP "
-  if [[ $GPU_METRICS_ENABLED = true ]]; then
-    CONFIG_OVERRIDES+=" -pgm "
-  fi
-  MAX_STEPS=$PROFILE_STOP_STEP
-elif [[ "$NCCLTRACE_ENABLED" = "true" ]]; then
-  CONFIG_OVERRIDES+=" -nt "
-  MAX_STEPS=5
-  TIME_LIMIT="00:15:00"
+if [[ -n ${CONTAINER_MOUNTS} ]]; then
+    CONFIG_OVERRIDES+=" --custom_mounts $CONTAINER_MOUNTS"
+fi
+
+if [[ $ENABLE_VBOOST == true ]]; then
+    CONFIG_OVERRIDES+=" --enable_vboost true "
 fi
 
 pushd $LLMB_WORKLOAD/NeMo
 
 python -m scripts.performance.llm.pretrain_nemotronh_${MODEL_SIZE} \
-  --gpu $GPU_TYPE \
-  --container_image $IMAGE \
-  --compute_dtype $DTYPE \
-  --num_gpus $JOB_TOTAL_GPUS \
-  --gpus_per_node $GPUS_PER_NODE \
-  --max_steps $MAX_STEPS \
-  $CONFIG_OVERRIDES \
-  slurm \
-  --account $SBATCH_ACCOUNT \
-  --partition $SBATCH_PARTITION \
-  --log_dir ${NEMORUN_HOME} \
-  --time_limit $TIME_LIMIT
+    --gpu $GPU_TYPE \
+    --container_image $IMAGE \
+    --compute_dtype $DTYPE \
+    --num_gpus $JOB_TOTAL_GPUS \
+    --gpus_per_node $GPUS_PER_NODE \
+    --max_steps $MAX_STEPS \
+    $CONFIG_OVERRIDES \
+    slurm \
+    --account $SBATCH_ACCOUNT \
+    --partition $SBATCH_PARTITION \
+    --log_dir ${NEMORUN_HOME} \
+    --time_limit $TIME_LIMIT
 
 popd

@@ -1,36 +1,59 @@
 # Overview
 This recipe provides instructions and scripts for benchmarking the performance of the Llama4 model with Nvidia TRT-LLM (TensorRT-LLM) benchmark suite.
 
-The script uses TRT-LLM release containers to benchmark the [Llama-4-Maverick-17B-128E-Instruct-FP8](https://huggingface.co/nvidia/Llama-4-Maverick-17B-128E-Instruct-FP8) inference workload for maximum throughput bencharking.
+The script uses TRT-LLM release containers to benchmark the [Llama-4-Maverick-17B-128E-Instruct-FP8](https://huggingface.co/nvidia/Llama-4-Maverick-17B-128E-Instruct-FP8) inference workload for maximum throughput and min latency scenario bencharking.
 
 <div style="background-color: #ffeeba; padding: 10px; border-left: 6px solid #f0ad4e;">
-  <strong>⚠️ WARNING:</strong> Currently this recipe only supports Llama-4-Maverick-17B-128E-Instruct-FP8 on 8x GB200 GPUs.
+  <strong>⚠️ WARNING:</strong> Currently this recipe only supports Llama-4-Maverick-17B-128E-Instruct-FP8 on 4x/8x GB200 GPUs.
 </div> 
 
 
+# Benchmarking setup
+
+We consider two benchmarking scenarios:
+- **Maximum throughput**: the system is configured to generate as many tokens per second as possible. This typically involves large batch sizes, long generation lengths, and aggressive request packing to fully utilize GPU compute. While this approach increases overall efficiency and hardware utilization, it also results in higher latency for individual requests. It's ideal for offline processing, batch jobs, or queued summarization tasks.
+- **Minimum latency**: prioritizes fast response times for each individual request. This often involves smaller batch sizes (sometimes just one), shorter generation lengths, and minimal scheduling overhead. While this reduces GPU efficiency and overall throughput, it significantly lowers response time, making it suitable for real-time, interactive applications like chatbots or low-latency APIs.
+ 
 # Performance Measurement and Analysis 
 
 Llama4 model was benchmarked for maximum throughput performance. The goal is to reach the maximum number of output tokens per second per GPU.
 
 ## GB200
 
-### Configurations
+### Max throughput configurations
 
 | Use Case      |   GPUs | ISL   | OSL   |   max_batch_size | concurrency   | max_num_tokens   | kv_cache_free_gpu_mem_fraction   | Quantization   | num_requests   |   TP |   PP |   EP | attn_dp_enabled   |
-|:--------------|-------:|:------|:------|-----------------:|:--------------|:-----------------|:---------------------------------|:---------------|:---------------|-----:|-----:|-----:|:------------------|
-| reasoning     |      8 | 1,000 | 1,000 |              896 | -1      | 8,192            |          0.9                        | FP8            | 4,000          |    8 |    1 |    8 |       YES            |
-| chat          |      8 | 128   | 128   |              896 | -1      | 8,192            |         0.9                         | FP8            | 4,000          |    8 |    1 |    8 |       YES            |
-| summarization |      8 | 8,000 | 512   |              896 | -1      | 22,528           |          0.9                        | FP8            | 4,000          |    8 |    1 |    8 |       YES            |
-| generation    |      8 | 512   | 8,000 |              896 | -1      | 2,048            |          0.9                        | FP8            | 4,000          |    8 |    1 |    8 |        YES           |
+|:--------------|:------:|:-----:|:-----:|:----------------:|:-------------:|:----------------:|:--------------------------------:|:--------------:|:--------------:|:----:|:----:|:----:|:-----------------:|
+| reasoning     |      8 | 1,000 | 1,000 |        896       | 4,096         | 8,192            |          0.9                     | FP8            | 16,384         |    8 |    1 |    8 |       YES         |
+| chat          |      8 | 128   | 128   |        896       | 4,096         | 8,192            |          0.9                     | FP8            | 16,384         |    8 |    1 |    8 |       YES         |
+| summarization |      8 | 8,000 | 512   |        896       | 1,024         | 22,528           |          0.85                    | FP8            | 4,096          |    8 |    1 |    8 |       YES         |
+| generation    |      8 | 512   | 8,000 |        896       | 1,024         | 2,048            |          0.9                     | FP8            | 2,048          |    8 |    1 |    8 |       YES         |
 
 
-#### Configuration Notes
+### Min latency configurations
+
+| Use Case      |   GPUs | ISL   | OSL   |   max_batch_size | concurrency   | max_num_tokens   | kv_cache_free_gpu_mem_fraction   | Quantization   | num_requests   |   TP |   PP |   EP | attn_dp_enabled   |
+|:--------------|:------:|:-----:|:-----:|:----------------:|:-------------:|:----------------:|:--------------------------------:|:--------------:|:--------------:|:----:|:----:|:----:|:-----------------:|
+| reasoning     |      4 | 1,000 | 1,000 |        1         | 1             | 3,072            |          0.75                    | FP8            | 20             |    4 |    1 |    1 |       NO          |
+| chat          |      4 | 128   | 128   |        1         | 1             | 8,192            |          0.75                    | FP8            | 20             |    4 |    1 |    1 |       NO          |
+| summarization |      4 | 8,000 | 512   |        1         | 1             | 8,384            |          0.75                    | FP8            | 20             |    4 |    1 |    1 |       NO          |
+| generation    |      4 | 512   | 8,000 |        1         | 1             | 2,048            |          0.75                    | FP8            | 20             |    4 |    1 |    1 |       NO          |
+
+
+
+### Configuration Notes
 - **kv_cache_free_gpu_mem_fraction**: fraction of memory allocated to store the kv cache values after loading the model weights.
 - **attn_dp_enabled**: This flag in the config.yml dictates whether `Data parallelism` is enabled or disabled for the attention layers.
-- **concurrency=-1**: finds the maximum possible concurrency during execution
 - You can find more information on the trt-llm build parameters here (https://nvidia.github.io/TensorRT-LLM/commands/trtllm-build.html)
 
 More details about the inference terms can be found in the [Appendix](../../APPENDIX.md)
+
+### Metric Notes
+- **TPS/GPU**: Output Token Throughput per second per GPU
+- **TPS/User**: Output Token Throughput per second per user
+- **Avg Request Latency**: Average time for a a request to be served
+- **TTFT**: Time to First Token
+- **TPOT**: Time Per Output Token
 
 # Prerequisites
 
@@ -69,24 +92,48 @@ If you previously used `STAGE_PATH`, replace it with `LLMB_INSTALL` (top-level).
 
 The easiest way to run benchmarks is using the llmb-run launcher tool. This method handles configuration automatically and provides a streamlined interface.
 
+### Maximum throughput
+
 ```bash
 # Navigate to your installation directory
 cd $LLMB_INSTALL
 
-# Run a benchmark with llmb-run per use case (** Recommended **)
+# Run a benchmark with llmb-run per use case for the maximum throughput scenario (** Recommended **)
 
 # Reasoning
-USE_CASES=reasoning:1000/1000 llmb-run single -w inference_llama4 -s 17b --dtype fp8 --scale 8
+MODE="max_throughput" USE_CASES=reasoning:1000/1000 CONCURRENCY=4096 NUM_REQUESTS=16384 llmb-run single -w inference_llama4 -s 17b --dtype fp8 --scale 8
 
 # Chat
-USE_CASES=chat:128/128 llmb-run single -w inference_llama4 -s 17b --dtype fp8 --scale 8
+MODE="max_throughput" USE_CASES=chat:128/128 CONCURRENCY=4096 NUM_REQUESTS=16384 llmb-run single -w inference_llama4 -s 17b --dtype fp8 --scale 8
 
 # Summarization
-USE_CASES=summarization:8000/512 llmb-run single -w inference_llama4 -s 17b --dtype fp8 --scale 8
+MODE="max_throughput" USE_CASES=summarization:8000/512 KV_CACHE_FRACTION=0.85 CONCURRENCY=1024 NUM_REQUESTS=4096 llmb-run single -w inference_llama4 -s 17b --dtype fp8 --scale 8
 
 # Generation
-SBATCH_TIMELIMIT=40:00 USE_CASES=generation:512/8000 llmb-run single -w inference_llama4 -s 17b --dtype fp8 --scale 8
+SBATCH_TIMELIMIT=40:00 MODE="max_throughput" USE_CASES=generation:512/8000 CONCURRENCY=1024 NUM_REQUESTS=2048 llmb-run single -w inference_llama4 -s 17b --dtype fp8 --scale 8
 ```
+
+### Minimum latency
+
+```bash
+# Navigate to your installation directory
+cd $LLMB_INSTALL
+
+# Run a benchmark with llmb-run per use case for the min latency scenario (** Recommended **)
+
+# Reasoning
+MODE="min_latency" USE_CASES=reasoning:1000/1000 llmb-run single -w inference_llama4 -s 17b --dtype fp8 --scale 4
+
+# Chat
+MODE="min_latency" USE_CASES=chat:128/128 llmb-run single -w inference_llama4 -s 17b --dtype fp8 --scale 4
+
+# Summarization
+MODE="min_latency" USE_CASES=summarization:8000/512 llmb-run single -w inference_llama4 -s 17b --dtype fp8 --scale 4
+
+# Generation
+MODE="min_latency" USE_CASES=generation:512/8000 llmb-run single -w inference_llama4 -s 17b --dtype fp8 --scale 4
+```
+
 - Single use cases and their optimized parameters are listed above and work out of the box. Advanced users can add more use_cases in the `setup.sh` 
 - Advanced users can learn more about: 
   - [Tuning Max Batch Size and Max Num Tokens](https://nvidia.github.io/TensorRT-LLM/performance/performance-tuning-guide/tuning-max-batch-size-and-max-num-tokens.html#tuning-max-batch-size-and-max-num-tokens) to adjust the inflight batching scheduler 
@@ -130,14 +177,14 @@ sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} ./launch.sh
 ```
 
 ### Results/Log files 
-Results for the workload are stored at `$LLMB_INSTALL/workloads/inference_<model>/experiments/<model>_TP_EP_PP_CON_USECASE`
+Results for the workload are stored at `$LLMB_INSTALL/workloads/inference_<model>/experiments/<model>_<mode>_TP_EP_PP_CON_USECASE`
 
 You should expect to see result directories for each use case:
 
-- `<model>_TP_EP_PP_CON_reasoning`
-- `<model>_TP_EP_PP_CON_chat`
-- `<model>_TP_EP_PP_CON_summarization`
-- `<model>_TP_EP_PP_CON_generation`
+- `<model>_<mode>_TP_EP_PP_CON_reasoning`
+- `<model>_<mode>_TP_EP_PP_CON_chat`
+- `<model>_<mode>_TP_EP_PP_CON_summarization`
+- `<model>_<mode>_TP_EP_PP_CON_generation`
 
 Each directory will contain SLURM output and error logs:
 
@@ -177,7 +224,8 @@ The model weights directory will look like below
 
 <summary>Llama-4-Maverick-17B-128E-Instruct-FP8</summary>
 
-Llama-4-Maverick-17B-128E-Instruct-FP8 weights directory looks like below and should be of size 376G
+Llama-4-Maverick-17B-128E-Instruct-FP8 weights directory looks like below and should be approximately 376G
+Note: `du -sh` includes hidden contents like `.git` and may report a larger total. To verify weights-only, inspect file sizes in this folder with `ls -lh`.
 ```
 total 376G
 drwxrwsr-x 3 nlevin infra_rd_gsw 4.0K Jun 30 16:57 .

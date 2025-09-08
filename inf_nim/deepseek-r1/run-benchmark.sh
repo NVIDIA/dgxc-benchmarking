@@ -23,7 +23,6 @@
 # For each dataset a user elects to use, the user is responsible for
 # checking if the dataset license is fit for the intended purpose.
 
-
 TIMESTAMP=$(date +%s)
 
 COMMAND=" \
@@ -49,26 +48,27 @@ genai-perf profile \
 sleep $SERVER_SLEEP_TIME
 
 for CONCURRENCY in ${CONCURRENCY_RANGE}; do
-  for value in $USE_CASES; do
-    # Extract the use case name and values
-    use_case=$(echo "$value" | cut -d':' -f1)
-    ISL=$(echo "$value" | cut -d':' -f2 | cut -d'/' -f1)
-    OSL=$(echo "$value" | cut -d':' -f2 | cut -d'/' -f2)
+    for value in $USE_CASES; do
+        # Extract the use case name and values
+        use_case=$(echo "$value" | cut -d':' -f1)
+        ISL=$(echo "$value" | cut -d':' -f2 | cut -d'/' -f1)
+        OSL=$(echo "$value" | cut -d':' -f2 | cut -d'/' -f2)
 
-    echo "Concurrency: $CONCURRENCY"
-    echo "Use Case: $use_case"
-    echo "ISL: $ISL"
-    echo "OSL: $OSL"
-    echo "----------------"
+        echo "Concurrency: $CONCURRENCY"
+        echo "Use Case: $use_case"
+        echo "ISL: $ISL"
+        echo "OSL: $OSL"
+        echo "----------------"
 
-    EXPORT_FILE=${NIM_MODEL_NAME_cleaned}_${NUM_GPUS}_${CONCURRENCY}_${use_case}_${ISL}_${OSL}_${SLURM_JOB_ID}_${TIMESTAMP}
-    total_requests=$((total_request_multiplier * CONCURRENCY))
-    if [ "$total_requests" -lt $MIN_REQUESTS ]; then
-      total_requests=$MIN_REQUESTS
-    fi
-    eval "$COMMAND"
-  done
+        # shellcheck disable=SC2154
+        export EXPORT_FILE=${NIM_MODEL_NAME_cleaned}_${NUM_GPUS}_${CONCURRENCY}_${use_case}_${ISL}_${OSL}_${SLURM_JOB_ID}_${TIMESTAMP}
+        # shellcheck disable=SC2154
+        total_requests=$((total_request_multiplier * CONCURRENCY))
+        if [ "$total_requests" -lt $MIN_REQUESTS ]; then
+            total_requests=$MIN_REQUESTS
+        fi
+        eval "$COMMAND"
+    done
 done
-
 
 echo "Finished Benchmarking"

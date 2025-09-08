@@ -19,10 +19,10 @@ To use the Performance Recipes, make sure you have the following prerequisites i
 *   [NGC Registry Access](https://org.ngc.nvidia.com/setup)
 *   NGC CLI 3.148.1 or newer (Optional, required for NIM Inference workloads)
 *   Python 3.12.x
-*   CUDA 12.3 or newer
-*   [NV Driver: 535.129.03 or newer](https://www.nvidia.com/en-us/drivers/)
-*   [OFED: 5.9-0.5.6.0.127 or newer](https://network.nvidia.com/products/infiniband-drivers/linux/mlnx_ofed/)
-*   [NCCL: 2.19.4 or newer](https://developer.nvidia.com/nccl/nccl-download)
+*   [CUDA](https://developer.nvidia.com/cuda-downloads): at least 12.3, recommended: 12.8 or newer
+*   [NV Driver](https://www.nvidia.com/en-us/drivers/): at least 535.129.03, recommended 570.172.08 or newer
+*   [OFED](https://network.nvidia.com/products/infiniband-drivers/linux/mlnx_ofed/): 5.9-0.5.6.0.127 or newer
+*   [NCCL](https://developer.nvidia.com/nccl/nccl-download): 2.19.4 or newer
 
 ### Cluster-Specific Prerequisites
 
@@ -151,24 +151,30 @@ The following tables list each benchmark used to evaluate the model's performanc
 
 | Type | Framework | Model | Container Version | Model Size | Scale (# of GPUs) | Precision | Model Access Required | Checkpointing | Cluster Type |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Pretrain | NeMo | [Nemotron4](nemotron/README.md) | 25.04.00 | 340B | 128-256 | FP8, BF16 | No | No | Slurm |
-| Pretrain | NeMo | [Llama 3.1](llama3.1/README.md) | 25.04.01 | 405B | 128-256 | FP8, BF16 | Yes | No | Slurm |
-| Pretrain | NeMo | [DeepSeek V3](deepseek_v3/pretrain/README.md) | 25.04.01 | 671B | 128-256 | BF16 | Yes | No | Slurm |
-| Pretrain | NeMo | [Grok1](grok1/README.md) | 25.04.00 | 314B | 128-256 | FP8, BF16 | Yes | No | Slurm |
-| Pretrain | NeMo | [Llama4 Maverick](llama4/pretrain/README.md) | 25.04.01 | 400B | 128-512 | FP8, BF16 | Yes | No | Slurm |
-| Pretrain | NeMo | [Nemotron-H](nemotron-h/README.md) | 25.04.01 | 56B | 32-2048 | FP8 | No | No | Slurm |
+| Pretrain | NeMo | [Nemotron4](nemotron/README.md) | 25.07.01 | 15B | 16-512 | FP8, BF16 | No | No | Slurm |
+| Pretrain | NeMo | [Nemotron4](nemotron/README.md) | 25.07.01 | 340B | 128-512 | FP8, BF16 | No | No | Slurm |
+| Pretrain | NeMo | [Llama 3.1](llama3.1/README.md) | 25.07.01 | 405B | 128-512 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | NeMo | [DeepSeek V3](deepseek_v3/pretrain/README.md) | 25.07.01 | 671B | 128-512 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | NeMo | [Grok1](grok1/README.md) | 25.07.01 | 314B | 128-512 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | NeMo | [Llama4 Maverick](llama4/pretrain/README.md) | 25.07.01 | 400B | 128-512 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | NeMo | [Nemotron-H](nemotron-h/README.md) | 25.07.01 | 56B | 32-512 | FP8 | No | No | Slurm |
+| Inference | TRT-LLM | [DeepSeek R1](deepseek_r1/inference/README.md) | 1.0.0rc1 | 671B | 4 | nvfp4 | No | No | Slurm |
+| Inference | TRT-LLM | [Llama 3.3](llama3.3/inference/README.md) | 1.0.0rc1 | 70b | 1 | nvfp4 | Yes | No | Slurm |
+| Inference | TRT-LLM | [Llama 4](llama4/inference/README.md) | 1.0.0rc1 | 17b | 8 | nvfp4 | Yes | No | Slurm |
 
 
 ### B200 Workloads
 
 | Type | Framework | Model | Container Version | Model Size | Scale (# of GPUs) | Precision | Model Access Required | Checkpointing | Cluster Type |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Pretrain | NeMo | [Nemotron4](nemotron/README.md) | 25.04.00 | 340B | 128-256 | FP8, BF16 | No | No | Slurm |
-| Pretrain | NeMo | [Llama 3.1](llama3.1/README.md) | 25.04.01 | 405B | 128-256 | FP8, BF16 | Yes | No | Slurm |
-| Pretrain | NeMo | [DeepSeek V3](deepseek_v3/pretrain/README.md) | 25.04.01 | 671B | 128-256 | BF16 | Yes | No | Slurm |
-| Pretrain | NeMo | [Grok1](grok1/README.md) | 25.04.00 | 314B | 128-256 | FP8, BF16 | Yes | No | Slurm |
-| Pretrain | NeMo | [Nemotron-H](nemotron-h/README.md) | 25.04.01 | 56B | 32-2048 | FP8 | No | No | Slurm |
-| Finetune | NeMo | [Llama4 Maverick](llama4/finetune/README.md) | 25.04.01 | 400B | 256 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | NeMo | [Nemotron4](nemotron/README.md) | 25.07.01 | 15B | 16-1024 | FP8, BF16 | No | No | Slurm |
+| Pretrain | NeMo | [Nemotron4](nemotron/README.md) | 25.07.01 | 340B | 128-1024 | FP8, BF16 | No | No | Slurm |
+| Pretrain | NeMo | [Llama 3.1](llama3.1/README.md) | 25.07.01 | 405B | 128-1024 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | NeMo | [DeepSeek V3](deepseek_v3/pretrain/README.md) | 25.07.01 | 671B | 128-1024 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | NeMo | [Grok1](grok1/README.md) | 25.07.01 | 314B | 256-1024 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | NeMo | [Llama4 Maverick](llama4/pretrain/README.md) | 25.07.01 | 400B | 128-1024 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | NeMo | [Nemotron-H](nemotron-h/README.md) | 25.07.01 | 56B | 32-512 | FP8 | No | No | Slurm |
+| Finetune | NeMo | [Llama 4](llama4/finetune/README.md) | 25.07.01 | 400B | 256 | FP8, BF16 | Yes | No | Slurm |
 
 ### H100 Workloads
 
@@ -176,16 +182,19 @@ Baseline performance metrics were using workloads on the NVIDIA DGX H100 Referen
 
 | Type | Framework | Model | FW Container Version | Model Size | Scale (# of GPUs) | Precision | Model Access Required | Checkpointing | Cluster Type |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Pretrain | NeMo | [Nemotron4](nemotron/README.md) | 25.04.00 | 15B | 16 | FP8, BF16 | No | Yes | Slurm, Run:ai |
-| Pretrain | NeMo | [Nemotron4](nemotron/README.md) | 25.04.00 | 340B | 256 | FP8, BF16 | No | Yes | Slurm, Run:ai |
-| Pretrain | NeMo | [DeepSeek V3](deepseek_v3/pretrain/README.md) | 25.04.01 | 671B | 1024 | BF16 | Yes | No | Slurm |
-| Pretrain | NeMo | [Llama4 Maverick](llama4/pretrain/README.md) | 25.04.01 | 400B | 512 | FP8, BF16 | Yes | No | Slurm |
-| Pretrain | NeMo | [Nemotron-H](nemotron-h/README.md) | 25.04.01 | 56B | 32-2048 | FP8 | No | No | Slurm |
-| Pretrain | NeMo | [Llama 3.1](llama3.1/README.md) | 25.04.01 | 405B | 512 | FP8, BF16 | Yes | No | Slurm |
-| Pretrain | NeMo | [Grok1](grok1/README.md) | 25.04.00 | 314B | 512 | FP8, BF16 | Yes | No | Slurm |
-| Finetune | NeMo | [Llama4 Maverick](llama4/finetune/README.md) | 25.04.01 | 400B | 256 | FP8, BF16 | Yes | No | Slurm |
-| Inference | NIM | [Llama 3.1 and 3.2](inf_blueprint/README.md) | instruct:1.3.3, rerank:1.3, embed:1.3.1 | 70b, 1b | 1-8 | n/a | Yes | No | K8s |
-| Inference | NIM | [DeepSeek R1](inf_nim/deepseek-r1/README.md) | 1.7.2 | 671B | 16 | FP8 | Yes | No | Slurm |
+| Pretrain | NeMo | [Nemotron4](nemotron/README.md) | 25.07.01 | 15B | 16-2048 | FP8, BF16 | No | Yes | Slurm, Run:ai |
+| Pretrain | NeMo | [Nemotron4](nemotron/README.md) | 25.07.01 | 340B | 256-2048 | FP8, BF16 | No | Yes | Slurm, Run:ai |
+| Pretrain | NeMo | [Llama 3.1](llama3.1/README.md) | 25.07.01 | 405B | 512-2048 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | NeMo | [DeepSeek V3](deepseek_v3/pretrain/README.md) | 25.07.01 | 671B | 1024 | BF16 | Yes | No | Slurm |
+| Pretrain | NeMo | [Grok1](grok1/README.md) | 25.07.01 | 314B | 512-2048 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | NeMo | [Llama4 Maverick](llama4/pretrain/README.md) | 25.07.01 | 400B | 512-2048 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | NeMo | [Nemotron-H](nemotron-h/README.md) | 25.07.01 | 56B | 64-2048 | FP8 | No | No | Slurm |
+| Finetune | NeMo | [Llama 4](llama4/finetune/README.md) | 25.07.01 | 400B | 256 | FP8, BF16 | Yes | No | Slurm |
+| Inference | NIM & NeMo Retriever (NVIDIA Enterprise RAG) | [Llama 3.1 and 3.2](inf_blueprint/README.md) | instruct:1.3.3, rerank:1.3, embed:1.3.1 | 70b, 1b | 1-8 | n/a | Yes | No | Slurm |
+| Inference | NIM, SGLang | [DeepSeek R1](inf_nim/deepseek-r1/README.md) | 1.7.2 | 671B | 16 | fp8 | No | No | Slurm |
+| Inference | TRT-LLM | [DeepSeek R1](deepseek_r1/inference/README.md) | 1.0.0rc1 | 671B | 16 | fp8 | No | No | Slurm |
+| Inference | TRT-LLM | [Llama 3.3](llama3.3/inference/README.md) | 1.0.0rc1 | 70b | 2 | fp8 | Yes | No | Slurm |
+| Inference | TRT-LLM | [Llama 4](llama4/inference/README.md) | 1.0.0rc1 | 17b | 8 | fp8 | Yes | No | Slurm |
 
 ### Deprecated
 
@@ -210,15 +219,16 @@ Some models require a HuggingFace account and HF_TOKEN, others require repo spec
 
 **Note:** approval processes are not immediate and may take some time.
 
-| Recipe Type | Recipe Name      | HF Token Required | Additional Approval Required | Details/Link for Approval                                             |
-| :---------- | :--------------- | :---------------- | :--------------------------- | :-------------------------------------------------------------------- |
-| Pretrain    | Llama 3.1        | Yes               | Yes                          | [HuggingFace Llama 3.1](https://huggingface.co/meta-llama/Llama-3.1-405B) |
-| Pretrain    | DeepSeek V3      | Yes               | No                           | N/A                                                                   |
-| Pretrain    | Grok1            | Yes               | Yes                          | [HuggingFace Llama 3](https://huggingface.co/meta-llama/Meta-Llama-3-70B) |
-| Pretrain    | Llama4 Maverick  | Yes               | Yes                          | [HuggingFace Llama 4](https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct) |
-| Inference   | Llama 3.3        | Yes               | Yes                          | [HuggingFace Llama 3.3 70B Instruct](https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct) |
-| Inference   | Llama 4          | Yes               | Yes                          | [HuggingFace Llama 4](https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct) |
-| Inference   | NIM Llama 3      | Yes               | Yes                          | [HuggingFace Llama 3.1](https://huggingface.co/meta-llama/Meta-Llama-3.1-405B) |
+| Recipe Type | Recipe Name      | HF Token Required        | Additional Approval Required | Details/Link for Approval                                             |
+| :---------- | :--------------- | :----------------------- | :--------------------------- | :-------------------------------------------------------------------- |
+| Pretrain    | Llama 3.1        | Yes                      | Yes                          | [HuggingFace Llama 3.1](https://huggingface.co/meta-llama/Llama-3.1-405B) |
+| Pretrain    | DeepSeek V3      | Yes                      | No                           | N/A                                                                   |
+| Pretrain    | Grok1            | Yes                      | Yes                          | [HuggingFace Llama 3](https://huggingface.co/meta-llama/Meta-Llama-3-70B) |
+| Pretrain    | Nemotron4        | Yes - Checkpointing Only | No                           | N/A
+| Pretrain    | Llama4 Maverick  | Yes                      | Yes                          | [HuggingFace Llama 4](https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct) |
+| Inference   | Llama 3.3        | Yes                      | Yes                          | [HuggingFace Llama 3.3 70B Instruct](https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct) |
+| Inference   | Llama 4          | Yes                      | Yes                          | [HuggingFace Llama 4](https://huggingface.co/meta-llama/Llama-4-Maverick-17B-128E-Instruct) |
+| Inference   | NIM Llama 3      | Yes                      | Yes                          | [HuggingFace Llama 3.1](https://huggingface.co/meta-llama/Meta-Llama-3.1-405B) |
 
 # Reference Infrastructure
 
@@ -306,26 +316,22 @@ export NCCL_P2P_NET_CHUNKSIZE=2097152
 
 # Release Notes
 
-## Performance Recipes version 25.07
+## Performance Recipes version v25.08 
 
 ### Added
-  - B200 Support
-    - Pretrain recipes: Nemotron4 340B, Llama 3.1 405B, DeepSeek V3 671B, Grok1 314B, Nemotron-H 56B
-    - Finetune recipes: Llama4 Maverick 400B
-  - TensorRT-LLM Inference recipes for GB200:
-    - DeepSeek R1
-    - Llama 3.3
-    - Llama 4
-  - Nemotron-H GB200 support
-  - Nemotron4 checkpointing support GB200
-  - Nemotron4 support for Run:ai clusters
-  - GPU metrics collection during NSight profiling (ENABLE_GPU_METRICS variable)
+  - GB200 support
+    - Pretrain recipe: Nemotron4 15B
+    - Expanded scales support for pretrain recipes: Nemotron 4 340B, Llama 3.1 405B, DeepSeek V3 671B, Grok1 314B
+  - B200 support
+    - Pretrain recipes: Nemotron4 15B, Llama 4 Maverick 400B
+    - Expanded scales support for pretrain recipes: Nemotron 4 340B, Llama 3.1 405B, DeepSeek V3 671B, Grok1 314B, Llama4 Maverick
+  - H100 support
+    - Inference recipes: DeepSeek R1, Llama 3.3, Llama 4
+    - Expanded scales support for pretrain recipes: Llama 3.1 405B, Llama 4 Maverick, Grok1 314B, Nemotron4 15B/340B
 
-### Changed
-  - Grok1 314B - GB200 Config
+### Changed 
+  - Pretrain and finetune NeMo based recipes have been updated to 25.07.01 image
 
-### Removed
-  - Llama3 70b inference NIM recipe
 
 # FAQ
 

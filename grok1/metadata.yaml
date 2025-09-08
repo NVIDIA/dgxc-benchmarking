@@ -2,7 +2,7 @@
 general:
   workload: grok1
   workload_type: pretrain
-  gsw_version: '25.07'
+  gsw_version: '25.08'
   framework: nemo2
 
 container:
@@ -12,7 +12,7 @@ container:
 repositories:
   nemo:
     url: "https://github.com/NVIDIA/NeMo.git"
-    commit: "00b778eb5e98baf5042d7b08d3148ec3229b5754"
+    commit: "6f2c6fdaffcc0af97a9e2219fcc104e2399627e4"
   megatron_core:
     url: "https://github.com/NVIDIA/Megatron-LM.git"
     commit: "64cb6bd7a155c4e742514ed1024407fb97d0a367"
@@ -58,5 +58,5 @@ run:
       model_configs:
         - model_size: '314b'
           dtypes: ['fp8', 'bf16']
-          scales: [512]
+          scales: [512, 1024, 2048]
 

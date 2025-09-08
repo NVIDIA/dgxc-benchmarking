@@ -1,32 +1,53 @@
 # Overview
 This recipe provides instructions and scripts for benchmarking the performance of the DeepSeek-R1 model with Nvidia TRT-LLM (TensorRT-LLM) benchmark suite.
 
-The script uses TRT-LLM release containers to benchmark the [DeepSeek-R1-FP4](https://huggingface.co/nvidia/DeepSeek-R1-FP4) inference workload for maximum throughput bencharking. 
+The script uses TRT-LLM release containers to benchmark the [DeepSeek-R1-FP4](https://huggingface.co/nvidia/DeepSeek-R1-FP4) inference workload. We consider two benchmarking scenarios
+- **Maximum throughput**: the system is configured to generate as many tokens per second as possible. This typically involves large batch sizes, long generation lengths, and aggressive request packing to fully utilize GPU compute. While this approach increases overall efficiency and hardware utilization, it also results in higher latency for individual requests. It's ideal for offline processing, batch jobs, or queued summarization tasks.
+- **Minimum latency**: prioritizes fast response times for each individual request. This often involves smaller batch sizes (sometimes just one), shorter generation lengths, and minimal scheduling overhead. While this reduces GPU efficiency and overall throughput, it significantly lowers response time, making it suitable for real-time, interactive applications like chatbots or low-latency APIs.
 
 <div style="background-color: #ffeeba; padding: 10px; border-left: 6px solid #f0ad4e;">
   <strong>⚠️ WARNING:</strong> Currently this recipe only supports DeepSeek-R1-FP4 using 4x GB200 GPUs.
 </div> 
 
 # Performance Measurement and Analysis 
+
 DeepSeek-R1 model was benchmarked for maximum throughput performance. The goal is to reach the maximum number of output tokens per second per GPU.
 
-### Inference Use case configs
+## 4x GB200
+
+### Max throughput configurations
+
+| Use Case      | GPUs | ISL   | OSL   |   max_batch_size | concurrency | max_num_tokens | kv_cache_free_gpu_mem_fraction | Quantization | num_requests |   TP |   PP |   EP | attn_dp_enabled |
+|:--------------|:----:|:-----:|:-----:|:----------------:|:------------|:--------------:|:------------------------------:|:------------:|:------------:|:----:|:----:|:----:|:---------------:|
+| reasoning     |    4 | 1,000 | 1,000 |              816 | 3,264       | 6,000          |         0.85                   | NVFP4        | 32,640       |    4 |    1 |    4 |     Yes         |
+| chat          |    4 | 128   | 128   |            3,600 | 14,400      | 16,000         |         0.50                   | NVFP4        | 144,000      |    4 |    1 |    4 |     Yes         |
+| summarization |    4 | 8,000 | 512   |              256 | 1,024       | 9,000          |         0.85                   | NVFP4        | 10,240       |    4 |    1 |    4 |     Yes         |
+| generation    |    4 | 512   | 8,000 |              256 | 1,024       | 2,000          |         0.85                   | NVFP4        | 10,240       |    4 |    1 |    4 |     Yes         |
 
 
-| Use Case      |   GPUs | ISL   | OSL   |   max_batch_size | concurrency   | max_num_tokens   | kv_cache_free_gpu_mem_fraction   | Quantization   | num_requests   |   TP |   PP |   EP | attn_dp_enabled   |
-|:--------------|-------:|:------|:------|-----------------:|:--------------|:-----------------|:---------------------------------|:---------------|:---------------|-----:|-----:|-----:|:------------------|
-| reasoning     |      4 | 1,000 | 1,000 |              384 | -1      | 6,000            |          0.85                          | NVFP4          | 7,680          |    4 |    1 |    4 |      Yes             |
-| chat          |      4 | 128   | 128   |              384 | -1      | 7,000            |         0.80                           | NVFP4          | 7,680          |    4 |    1 |    4 |     Yes              |
-| summarization |      4 | 8,000 | 512   |              384 | -1      | 9,000            |         0.85                           | NVFP4          | 7,680          |    4 |    1 |    4 |     Yes              |
-| generation    |      4 | 512   | 8,000 |              384 | -1      | 3,000            |         0.85                         | NVFP4          | 7,680          |    4 |    1 |    4 |     Yes              |
+### Min latency configurations
+
+|      Use Case      | GPUs |   ISL   |   OSL   | max_batch_size  | concurrency | max_num_tokens  | kv_cache_free_gpu_mem_fraction  | Quantization  | num_requests  | TP | PP | EP | attn_dp_enabled  |
+|:-------------------|:----:|:-------:|:-------:|:---------------:|:-----------:|:---------------:|:-------------------------------:|:-------------:|:-------------:|:--:|:--:|:--:|:----------------:|
+|     reasoning      |  4   | 1,000   | 1,000   |       1         |      1      |      1000       |              0.1                |    NVFP4      |      10       | 4  | 1  | 1  |       No         |
+|       chat         |  4   | 128     | 128     |       1         |      1      |       128       |              0.1                |    NVFP4      |      10       | 4  | 1  | 1  |       No         |
+|   summarization    |  4   | 8,000   | 512     |       1         |      1      |      8000       |              0.1                |    NVFP4      |      10       | 4  | 1  | 1  |       No         | 
+|    generation      |  4   | 512     | 8,000   |       1         |      1      |       512       |              0.1                |    NVFP4      |      10       | 4  | 1  | 1  |       No         |
 
 
-**Note**
-- kv_cache_free_gpu_mem_fraction: fraction of memory allocated to store the kv cache values after loading the model weights.
-- attn_dp_enabled: This flag in the config.yml dictates whether `Data parallelism` is enabled or disabled for the attention layers.
-- you can find more information on the trt-llm build parameters here (https://nvidia.github.io/TensorRT-LLM/commands/trtllm-build.html)
+### Configuration Notes
+- **kv_cache_free_gpu_mem_fraction**: fraction of memory allocated to store the kv cache values after loading the model weights.
+- **attn_dp_enabled**: This flag in the config.yml dictates whether `Data parallelism` is enabled or disabled for the attention layers.
+- You can find more information on the trt-llm build parameters here (https://nvidia.github.io/TensorRT-LLM/commands/trtllm-build.html)
 
-More details about the inference terms can be found here [Appendix](../../APPENDIX.md)
+More details about the inference terms can be found in the [Appendix](../../APPENDIX.md)
+
+### Metric Notes
+- **TPS/GPU**: Output Token Throughput per second per GPU
+- **TPS/User**: Output Token Throughput per second per user
+- **Average Latency**: Average time for a request to be served
+- **TTFT**: Time to First Token
+- **TPOT**: Time Per Output Token
 
 # Prepare Environment
 
@@ -37,8 +58,6 @@ The following directory layout and key variables are used in the recipe:
 - `LLMB_INSTALL`: Top-level directory for all benchmarking artifacts (images, datasets, venvs, workloads, etc).
 - `LLMB_WORKLOAD`: Workload-specific directory, e.g. `${LLMB_INSTALL}/workloads/deepseek-r1`.
 - Results, logs, and checkpoints are stored under subfolders of `LLMB_WORKLOAD` (see below).
-
-
 
 
 **Migration Note:**
@@ -60,24 +79,46 @@ These parameters can be set either by exporting the environment variable or usin
 
 The easiest way to run benchmarks is using the llmb-run launcher tool. This method handles configuration automatically and provides a streamlined interface.
 
+### Maximum throughput
 ```bash
 # Navigate to your installation directory
 cd $LLMB_INSTALL
 
-# Run a benchmark with llmb-run per use case (** Recommended **)
+# Run a benchmark with llmb-run per use case for the maximum throughput scenario (** Recommended **)
 
 # Reasoning
-MAX_NUM_TOKENS=6000 USE_CASES=reasoning:1000/1000 llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
+MODE="max_throughput" MAX_NUM_TOKENS=6000 MAX_BATCH_SIZE=816 USE_CASES=reasoning:1000/1000 llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
 
 # Chat
-MAX_NUM_TOKENS=7000 KV_CACHE_FRACTION=0.8 USE_CASES=chat:128/128 llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
+MODE="max_throughput" MAX_NUM_TOKENS=16000 MAX_BATCH_SIZE=3600 KV_CACHE_FRACTION=0.5 USE_CASES=chat:128/128 llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
 
 # Summarization
-SBATCH_TIMELIMIT=45:00 MAX_NUM_TOKENS=9000 USE_CASES=summarization:8000/512 llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
+MODE="max_throughput" SBATCH_TIMELIMIT=40:00 MAX_NUM_TOKENS=9000 USE_CASES=summarization:8000/512 llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
 
 # Generation
-SBATCH_TIMELIMIT=1:40:00 MAX_NUM_TOKENS=3000 USE_CASES=generation:512/8000 llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
+MODE="max_throughput" SBATCH_TIMELIMIT=1:40:00 USE_CASES=generation:512/8000 llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
 ```
+
+### Minimum latency
+```bash
+# Navigate to your installation directory
+cd $LLMB_INSTALL
+
+# Run a benchmark with llmb-run per use case for the minimum latency scenario (** Recommended **)
+
+# Reasoning
+MODE="min_latency" MAX_NUM_TOKENS=1000 USE_CASES=reasoning:1000/1000 llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
+
+# Chat
+MODE="min_latency" MAX_NUM_TOKENS=128 USE_CASES=chat:128/128 llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
+
+# Summarization
+MODE="min_latency" MAX_NUM_TOKENS=8000 USE_CASES=summarization:8000/512 llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
+
+# Generation
+MODE="min_latency" MAX_NUM_TOKENS=512 USE_CASES=generation:512/8000 llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
+```
+
 - Single use cases and their optimized parameters are listed above and work out of the box. Advanced users can add more use_cases in the `setup.sh` 
 - Advanced users can learn more about: 
   - [Tuning Max Batch Size and Max Num Tokens](https://nvidia.github.io/TensorRT-LLM/performance/performance-tuning-guide/tuning-max-batch-size-and-max-num-tokens.html#tuning-max-batch-size-and-max-num-tokens) to adjust the inflight batching scheduler 
@@ -121,14 +162,14 @@ sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} ./launch.sh
 ```
 
 ### Results/Log files 
-Results for the workload are stored at `$LLMB_INSTALL/workloads/inference_<model>/experiments/<model>_TP_EP_PP_CON_USECASE`
+Results for the workload are stored at `$LLMB_INSTALL/workloads/inference_<model>/experiments/<model>_<mode>_TP_EP_PP_CON_USECASE`
 
 You should expect to see result directories for each use case:
 
-- `<model>_TP_EP_PP_CON_reasoning`
-- `<model>_TP_EP_PP_CON_chat`
-- `<model>_TP_EP_PP_CON_summarization`
-- `<model>_TP_EP_PP_CON_generation`
+- `<model>_<mode>_TP_EP_PP_CON_reasoning`
+- `<model>_<mode>_TP_EP_PP_CON_chat`
+- `<model>_<mode>_TP_EP_PP_CON_summarization`
+- `<model>_<mode>_TP_EP_PP_CON_generation`
 
 Each directory will contain SLURM output and error logs:
 
@@ -169,6 +210,7 @@ should look like the section below:
 <summary>DeepSeek-R1-FP4</summary>
 
 Double check that your folder has the same 395GiB size
+Note: `du -sh` includes hidden contents like `.git` and may report a larger total. To verify weights-only, inspect file sizes in this folder with `ls -lh`.
 ```
 total 395G
 drwxr-xr-x  3 <user> dip  12K Jun 18 19:45 .

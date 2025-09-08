@@ -1,4 +1,3 @@
-
 #!/bin/bash
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
@@ -27,6 +26,7 @@ export VDB_and_RERANKER_K="20/4"
 declare -A USE_CASES=(
     ["chat"]="128/128"
 )
+export USE_CASES
 
 # RAG Pipeline Meta Data
 export GPU="H100"
@@ -34,13 +34,13 @@ export CLUSTER="Your-Cluster"
 export EXPERIMENT_NAME="RAG-Blueprint"
 export OUTPUT="/tmp/output/"
 
-export RAG_SERVICE="" # <service-name>:<port>
+export RAG_SERVICE=""     # <service-name>:<port>
 export NON_RAG_SERVICE="" # <service-name>:<port>
 export NIM_MODEL_NAME="meta/llama-3.1-70b-instruct"
 export NIM_MODEL_NAME_cleaned="meta-llama-3.1-70b-instruct"
 export NIM_MODEL_TOKENIZER="meta-llama/Meta-Llama-3-70B-Instruct"
 export NAMESPACE="wikipedia"
-export CHUNK_SIZE=420 # Number of tokens
+export CHUNK_SIZE=420       # Number of tokens
 export RAG_PROMPT_EXTRA=100 # Number of Tokens
 
 export total_request_multiplier=5

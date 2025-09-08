@@ -8,22 +8,22 @@ The GB200 jobs listed below progressively increase GPU count, with configuration
 
 |Model Size|Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  |ETP | MBS | GBS  | GA  |
 |:---------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|:---:|
-| 400b | BF16/FP8  | 128    | 8192   | 48     | 1   | 2   | 1   | 64  | 64   | 12 | 1  | 1   | 1024  | 16 |
-| 400b | BF16/FP8  | 256    | 8192   | 48     | 1   | 2   | 1   | 64  | 128   | 12 | 1  | 1   | 2048  | 16 |
-| 400b | BF16/FP8  | 512    | 8192   | 48     | 1   | 2   | 1   | 64  | 256   | 12 | 1  | 1   | 4096  | 16 |
+| 400b | BF16/FP8-MX  | 128    | 8192   | 48     | 1   | 2   | 1   | 64  | 64   | 12 | 1  | 1   | 1024  | 16 |
+| 400b | BF16/FP8-MX  | 256    | 8192   | 48     | 1   | 2   | 1   | 64  | 128   | 12 | 1  | 1   | 2048  | 16 |
+| 400b | BF16/FP8-MX  | 512    | 8192   | 48     | 1   | 2   | 1   | 64  | 256   | 12 | 1  | 1   | 4096  | 16 |
 
 ## H100
 
 |Model Size|Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP | ETP  | MBS | GBS  | GA  |
 |:---------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|:---:|
-| 400b | BF16/FP8  | 512    | 8192   | 48     | 4   | 1   | 1   | 128  | 128   | 1  | 4 | 1   | 1024  | 8 |
-
+| 400b | BF16/FP8-DS  | 512    | 8192   | 48     | 4   | 1   | 1   | 128  | 128   | 1  | 4 | 1   | 1024  | 8 |
+| 400b | BF16/FP8-DS  | 1024    | 8192   | 48     | 4   | 1   | 1   | 128  | 128   | 1  | 4 | 1   | 2048  | 8 |
 
 # Performance Measurement and Analysis
 
 Performance for LLAMA4 Maverick training is measured by seconds per iteration, or in other words seconds per training step. This metric is logged for every training step in the main training log file [see Output Locations](#output-locations). 
 
-Since the early training steps typically take much longer time (with input prefetch, activation memory allocation, and JIT compilation), we use the `parse_train_timing.sh` script to analyze iterations 11-44 and calculate mean and standard deviation for reliable performance metrics. We also get the achieved GPU FLOPS via `TFLOPS_per_GPU` metric.
+Since the early training steps typically take much longer time (with input prefetch, activation memory allocation, and JIT compilation), we use the `parse_train_timing.sh` script to analyze iterations 35-44 and calculate mean and standard deviation for reliable performance metrics. We also get the achieved GPU FLOPS via `TFLOPS_per_GPU` metric.
 
 ### Running the parse_train_timing.sh script
 
@@ -46,12 +46,13 @@ $LLMB_REPO/common/parse_train_timing.sh --format=json
 $LLMB_REPO/common/parse_train_timing.sh --full-names
 ```
 
+Example output:
 ```shell
-Train Step Timing and TFLOPS Analysis (iterations 11-44)
+Train Step Timing and TFLOPS Analysis (iterations 35-44)
 ================================================================================
 Experiment                                                                         Status Time Mean (s) Time Std (s) TFLOPS_per_GPU Mean TFLOPS_per_GPU Std
 -------------------------------------------------------------------------------- -------- ------------- ------------ ------------------- ------------------
-pretrain_llama4_e128_fp8_64nodes_tp4_pp1_cp1_vp1_ep128_etp4_1mbs_1024gbs_2784318  Success         3.685        0.008              527.78               1.11
+pretrain_llama4_e128_bf16_64nodes_tp1_pp12_cp1_vp12_ep64_etp1_1mbs_1024gbs_2784318  Success         7.359        0.008              527.78               1.11
 ```
 
 To obtain throughput as a tokens per second measurement, follow this formula: 
@@ -59,13 +60,13 @@ To obtain throughput as a tokens per second measurement, follow this formula:
 (sequence length) * (global batch size) / (training_step_timing) = (throughput in tokens per second)
 ```
 
-E.g. 8192 * 1024 / 7.781 = 1077749
+E.g. 8192 * 1024 / 7.359 = 1139911
 
 To calculate time to train estimate:
 ```shell
 (total tokens) / (throughput in tokens per second) / (number of seconds in a day) = (time to train in days) 
 ```
-E.g. 1e12 / 1077749 / 86400 = 10.74 days 
+E.g. 1e12 / 1139911 / 86400 = 10.15 days 
 
 
 To calculate the model flops utilization (MFU):
@@ -81,7 +82,7 @@ peak FLOPS for GB200 BF16 = 2.45 PFLOPS
 training step time = 7.781 s
 model flops = 8.92e14
 
-MFU = 1024 * 8.92e14 / 7.781 / 128 / 2.45e15 = 37.4%
+MFU = 1024 * 8.92e14 / 7.359 / 128 / 2.45e15 = 39.58%
 ```
 
 # Prerequisites
@@ -259,43 +260,7 @@ Since most of the benchmarking jobs run on multiple GPUs, there will be multiple
 
 **See** these [tutorials](https://developer.nvidia.com/nsight-systems/get-started#tutorials) to get a quick start if you are new to Nsight profiling.
 
-## Run NCCL Trace (For Debugging)
-
-NCCL traces are a tool for understanding communication patterns within your benchmarking job. They provide detailed information on the types of NCCL calls being made (like AllReduce, Broadcast, etc.) and the size of the messages being exchanged.
-
-**Important:** This feature is primarily intended for **troubleshooting and debugging purposes only**. It is not typically used during normal benchmark runs.
-
-To collect NCCL Trace information, set the environment variable `ENABLE_NCCLTRACE=true` when submitting your job:
-
-**Defaults for Tracing:**
-*   **Duration:** Due to the large file sizes generated, tracing is limited to the first 5 steps of the job by default.
-*   **Output Location:** NCCL trace information is included directly within the standard job log file (see Output Locations)
-
-**Example command:**
-```shell
-ENABLE_NCCLTRACE=true JOB_TOTAL_GPUS=256 DTYPE=fp8 GPU_TYPE=gb200 ./launch.sh
-```
-
-### Understanding NCCL Trace Results
-
-Enabling NCCL tracing will generate a large volume of log messages labeled "NCCL Info". These messages provide details about individual communication operations. Be aware that these log files can be quite large, potentially exceeding 1GB.
-
-Look for messages including:
-
-```
-"NCCL INFO AllReduce: opCount"
-"NCCL INFO Broadcast: opCount"
-"NCCL INFO AllGather: opCount"
-"NCCL INFO ReduceScatter: opCount"
-```
-
-**Example Log Entry:**
-
-```
-[7] NCCL INFO AllReduce: opCount 2 sendbuff 0x7ffb4713c200 recvbuff 0x7ffb4713c200 count 1 datatype 1 op 0 root 0 comm 0x55556b100660 [nranks=128] stream 0x5555630c58b0
-```
-
-This example shows an `AllReduce` operation with details about the buffers, count, data type, and the participating ranks.
+<!-- NCCL trace support removed. Documentation section deleted intentionally. -->
 
 # Notes
 
