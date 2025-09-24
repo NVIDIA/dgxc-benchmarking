@@ -96,5 +96,6 @@ srun --output $STAGE_PATH/logs/benchmarking_%j.out \
     --container-image ${STAGE_PATH}/${BENCHMARKING_IMAGE} \
     --container-mounts ${STAGE_PATH},${CUR_REPO} \
     --wait=60 \
+    --ntasks-per-node=1 --ntasks=1 --nodes=1 \
     --container-env=NIM_LEADER_IP_ADDRESS,NIM_MODEL_TOKENIZER,SERVED_MODEL_NAME,NGC_API_KEY,HF_HOME,HF_TOKEN,CONCURRENCY_RANGE,USE_CASES,RESULTS_PATH,MIN_REQUESTS,total_request_multiplier,NUM_GPUS \
     bash ${CUR_REPO}/run-benchmark.sh
