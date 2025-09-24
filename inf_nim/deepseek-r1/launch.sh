@@ -56,7 +56,7 @@ head_node=${nodes_array[0]}
 head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address)
 
 export CUR_REPO=$PWD
-container=${STAGE_PATH}/nim+deepseek+r1+1.7.2.sqsh
+export SERVER_IMAGE="nim+deepseek+r1+1.7.2.sqsh"
 export NIM_SERVED_MODEL_NAME="deepseek-ai/deepseek-r1"
 
 export NIM_MULTI_NODE=1
@@ -71,8 +71,8 @@ export NVIDIA_VISIBLE_DEVICES=all
 export NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
 srun --output $STAGE_PATH/logs/server_%j.out \
-    --container-image $container \
-    --container-mounts /lustre,${CUR_REPO} \
+    --container-image ${STAGE_PATH}/${SERVER_IMAGE} \
+    --container-mounts ${STAGE_PATH},${CUR_REPO} \
     --wait=60 \
     --kill-on-bad-exit=1 \
     --no-container-mount-home --overlap --mpi=pmix --wait=10 --ntasks-per-node=1 --ntasks=2 --nodes=2 \
