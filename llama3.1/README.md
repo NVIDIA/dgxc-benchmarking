@@ -22,7 +22,7 @@ This variant of the workload is best-suited for GPU clusters with
 
 | GPUs | SeqLen | Layers | FSDP | TP | PP | CP | EP | ETP | DP | VP | MBS | GBS | GA |
 |------|:------:|:------:|:----:|:--:|:--:|:--:|:--:|:---:|:--:|:--:|:---:|:---:|:--:|
-| 512  | 8192   | 126    | 0    |  8 | 8  | 2  | NA | NA  | 4  | 8  |  1  | 256 | 32 |
+| 512  | 8192   | 126    | 0    |  8 | 8  | 2  | NA | NA  | 4  | 8  |  1  | 256 | 64 |
 
 # Expected Performance
 
