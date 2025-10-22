@@ -1,4 +1,9 @@
-## [v25.05.04] - 2025-09-05
+## [v25.05.05] - 2025-10-22
+
+### Changed
+  - Llama3.1 Documentation - GA parameter fix
+
+## [v25.05.04] - 2025-09-04
 
 ### Added
   - H100 512 GPU support for DeepSeek V3 Pretrain
