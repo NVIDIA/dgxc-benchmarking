@@ -94,7 +94,7 @@ Depending on your cluster's job scheduler, ensure the following are met:
    - Let you select workloads to install
    - Prepare all necessary dependencies
 
-   > **Note:** For detailed installation options, workload-specific virtual environments, and troubleshooting, see the [Installer README](installer/README.md).
+   > **Note:** For detailed installation options, workload-specific virtual environments, and troubleshooting, see the [Installer README](cli/llmb-install/README.md).
 
 5. Run a benchmark:
    ```bash
@@ -316,22 +316,7 @@ export NCCL_P2P_NET_CHUNKSIZE=2097152
 
 # Release Notes
 
-## Performance Recipes version v25.08 
-
-### Added
-  - GB200 support
-    - Pretrain recipe: Nemotron4 15B
-    - Expanded scales support for pretrain recipes: Nemotron 4 340B, Llama 3.1 405B, DeepSeek V3 671B, Grok1 314B
-  - B200 support
-    - Pretrain recipes: Nemotron4 15B, Llama 4 Maverick 400B
-    - Expanded scales support for pretrain recipes: Nemotron 4 340B, Llama 3.1 405B, DeepSeek V3 671B, Grok1 314B, Llama4 Maverick
-  - H100 support
-    - Inference recipes: DeepSeek R1, Llama 3.3, Llama 4
-    - Expanded scales support for pretrain recipes: Llama 3.1 405B, Llama 4 Maverick, Grok1 314B, Nemotron4 15B/340B
-
-### Changed 
-  - Pretrain and finetune NeMo based recipes have been updated to 25.07.01 image
-
+For the latest updates, improvements, and breaking changes, see the [CHANGELOG](CHANGELOG).
 
 # FAQ
 

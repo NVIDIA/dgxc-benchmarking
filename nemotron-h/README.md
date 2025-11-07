@@ -171,7 +171,7 @@ llmb-run single -w pretrain_nemotron-h -s 56b --dtype fp8 --scale 128
 llmb-run single -w pretrain_nemotron-h -s 56b --dtype fp8 --scale 1024
 ```
 
-For more details on llmb-run usage, see the [llmb-run documentation](../llmb-run/README.md).
+For more details on llmb-run usage, see the [llmb-run documentation](../cli/llmb-run/README.md).
 
 ## Direct Method
 

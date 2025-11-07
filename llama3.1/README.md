@@ -172,7 +172,7 @@ llmb-run single -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128
 llmb-run single -w pretrain_llama3.1 -s 405b --dtype bf16 --scale 256
 ```
 
-For more details on llmb-run usage, see the [llmb-run documentation](../llmb-run/README.md).
+For more details on llmb-run usage, see the [llmb-run documentation](../cli/llmb-run/README.md).
 
 ## Direct Method
 

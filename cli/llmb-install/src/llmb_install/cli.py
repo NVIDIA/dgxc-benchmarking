@@ -1,0 +1,156 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: MIT
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+
+"""Command-line interface for LLMB installer.
+
+This module handles CLI argument parsing and provides the entry point for the installer.
+"""
+
+import argparse
+
+
+def parse_arguments() -> argparse.Namespace:
+    """Parse command line arguments.
+
+    Returns:
+        argparse.Namespace: Parsed command line arguments
+    """
+    # Main parser
+    parser = argparse.ArgumentParser(
+        description="LLMB Workload Installer",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  llmb-install                           # Interactive installation
+  llmb-install -d                        # Interactive installation in dev mode
+  llmb-install express /lustre/work      # Express mode with install path
+  llmb-install express -d --workloads all   # Express mode in dev mode
+  llmb-install --play config.yaml       # Fully automated from config file
+        """,
+    )
+
+    # Global options (apply to all subcommands)
+    parser.add_argument(
+        '-v',
+        '--verbose',
+        action='store_true',
+        help="Enable verbose output with debug logging",
+    )
+
+    parser.add_argument(
+        '-i',
+        '--image-folder',
+        type=str,
+        default=None,
+        help="Path to a shared folder for container images. If provided, images will be stored here and symlinked into the installation directory.",
+    )
+
+    parser.add_argument(
+        '-d',
+        '--dev-mode',
+        action='store_true',
+        help="Development mode: Skip repository copying and use original repository location. Allows for version-controlled changes during development.",
+    )
+
+    # Subcommands
+    subparsers = parser.add_subparsers(dest='command', help='Installation workflow', metavar='COMMAND')
+
+    # Interactive mode (default) - no subcommand needed
+    # Global options for when no subcommand is used
+    interactive_group = parser.add_mutually_exclusive_group()
+
+    interactive_group.add_argument(
+        '--record',
+        type=str,
+        metavar='CONFIG_FILE',
+        help="Record mode: Save user inputs to CONFIG_FILE without performing installation",
+    )
+
+    interactive_group.add_argument(
+        '--play',
+        type=str,
+        metavar='CONFIG_FILE',
+        help="Headless mode: Load configuration from CONFIG_FILE and install without prompts",
+    )
+
+    parser.add_argument(
+        '--ui-mode',
+        type=str,
+        choices=['simple', 'rich'],
+        default='simple',
+        help="UI style for interactive mode: 'simple' for basic text, 'rich' for enhanced UI",
+    )
+
+    # Express subcommand
+    express_parser = subparsers.add_parser(
+        'express',
+        help='Express installation using saved system configuration',
+        description='Express mode performs minimal-prompt installation using previously saved system configuration. Requires a successful prior installation to create the saved config.',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  llmb-install express /lustre/work                    # Prompt for workloads
+  llmb-install express --install-path /lustre/work    # Prompt for workloads  
+  llmb-install express --workloads all                # Prompt for install path
+  llmb-install express /work --workloads nemotron     # Fully specified
+  llmb-install express -d /work --workloads all       # Dev mode, no repo copy
+        """,
+    )
+
+    express_parser.add_argument(
+        'install_path_pos', nargs='?', help='Installation directory (can also use --install-path)'
+    )
+
+    express_parser.add_argument(
+        '--install-path',
+        type=str,
+        dest='install_path_flag',
+        help='Installation directory (alternative to positional argument)',
+    )
+
+    express_parser.add_argument(
+        '-w',
+        '--workloads',
+        type=str,
+        help="Workloads to install: 'all' or comma-separated list (e.g. 'nemotron,llama3.1')",
+    )
+
+    express_parser.add_argument(
+        '--list-workloads', action='store_true', help="List all available workloads for the saved GPU type and exit"
+    )
+
+    return parser.parse_args()
+
+
+def main() -> None:
+    """Main entry point for the LLMB installer."""
+    from llmb_install.core.installer import Installer
+
+    args = parse_arguments()
+    installer = Installer()
+
+    try:
+        installer.run(args)
+    except KeyboardInterrupt:
+        print("\n\nInstallation cancelled by user.")
+    except Exception as e:
+        print(f"\nError: {e}")
+        raise SystemExit(1) from e

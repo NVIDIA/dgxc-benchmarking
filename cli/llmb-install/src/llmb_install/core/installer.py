@@ -1,0 +1,2571 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: MIT
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+
+"""Main LLMB installer orchestrator.
+
+This module provides the main Installer class that coordinates all aspects of the
+LLMB workload installation process, from configuration gathering to final installation.
+"""
+
+import argparse
+import os
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from llmb_install.cluster.gpu import filter_workloads_by_gpu_type, resolve_gpu_overrides
+from llmb_install.config.cluster import create_cluster_config
+from llmb_install.config.headless import (
+    load_installation_config,
+    save_installation_config,
+)
+from llmb_install.config.models import InstallConfig, SlurmConfig
+from llmb_install.config.system import (
+    clear_install_state,
+    install_state_exists,
+    load_install_state,
+    load_system_config,
+    save_install_state,
+    save_system_config,
+)
+from llmb_install.container.image import fetch_container_images, get_required_images
+from llmb_install.core.dependency import (
+    _resolve_dependencies,
+    clone_git_repos,
+    group_workloads_by_dependencies,
+    install_dependencies,
+    print_dependency_group_summary,
+)
+from llmb_install.core.tools import fetch_and_install_tools, get_required_tools
+from llmb_install.core.workload import (
+    build_workload_dict,
+    filter_tools_from_workload_list,
+    install_scripted_workload,
+    run_post_install_script,
+    run_setup_tasks,
+)
+from llmb_install.environment.cache import setup_cache_directories
+from llmb_install.environment.venv_manager import (
+    create_virtual_environment,
+    get_venv_environment,
+)
+from llmb_install.ui.interface import UIInterface
+
+# Import prompt functions from our new modular UI system
+from llmb_install.ui.prompts.environment import (
+    prompt_environment_type,
+    prompt_environment_variables,
+)
+from llmb_install.ui.prompts.installation import (
+    prompt_install_location,
+    prompt_install_method,
+)
+from llmb_install.ui.prompts.workload import prompt_workload_selection
+from llmb_install.ui.rich_ui import RichUI
+from llmb_install.ui.simple import SimpleUI
+from llmb_install.utils.filesystem import (
+    check_repository_state,
+    clean_repository_directory,
+    copy_repository_working_files,
+    create_llmb_run_symlink,
+    find_llmb_repo_root,
+)
+
+# Import utility functions from our new modules
+from llmb_install.utils.git import ensure_git_lfs_configured, is_git_lfs_installed
+from llmb_install.utils.logging import get_logger, setup_logging
+
+
+class Installer:
+    """Main installer class that orchestrates the LLMB installation process."""
+
+    def __init__(self):
+        """Initialize the installer."""
+        self.root_dir: Optional[str] = None
+        self.workloads: Dict[str, Dict[str, Any]] = {}
+        self.force_fresh_repo_copy: bool = False  # Flag to force repository recopy
+        self.logger = get_logger(__name__)  # Add logger for cleaner messaging
+
+    def create_ui(self, ui_mode: str) -> UIInterface:
+        """Create appropriate UI implementation based on the mode.
+
+        Args:
+            ui_mode: UI mode ('simple' or 'rich')
+
+        Returns:
+            UIInterface: Appropriate UI implementation
+
+        Raises:
+            ValueError: If ui_mode is not recognized
+        """
+        if ui_mode == 'simple':
+            return SimpleUI()
+        elif ui_mode == 'rich':
+            return RichUI()
+        else:
+            raise ValueError(f"Unknown UI mode: {ui_mode}. Must be 'simple' or 'rich'.")
+
+    def _check_if_running_from_install_dir(self) -> Optional[str]:
+        """Check if running from an existing LLMB_INSTALL directory.
+
+        Returns:
+            Install path if running from LLMB_INSTALL, None otherwise
+        """
+        cwd = os.getcwd()
+        cluster_config_path = Path(cwd) / "cluster_config.yaml"
+
+        if cluster_config_path.exists():
+            return cwd
+        return None
+
+    def _detect_incremental_install(self, install_path: str) -> Optional[Dict[str, Any]]:
+        """Check if install_path is a valid existing installation.
+
+        Args:
+            install_path: Path to check for existing installation
+
+        Returns:
+            Cluster config dict if valid for incremental install, None otherwise
+        """
+        from llmb_install.config.cluster import load_cluster_config
+
+        cluster_config = load_cluster_config(install_path)
+        if not cluster_config:
+            return None
+
+        # Validate required fields
+        required = ['launcher', 'workloads', 'slurm']
+        if not all(k in cluster_config for k in required):
+            return None
+
+        # Check that workloads.installed is a list
+        installed = cluster_config.get('workloads', {}).get('installed', [])
+        if not isinstance(installed, list):
+            return None
+
+        return cluster_config
+
+    def _handle_repository_setup(self, install_path: str, dev_mode: bool) -> str:
+        """Handle repository copying and setup logic.
+
+        Args:
+            install_path: Installation directory path
+            dev_mode: Whether in development mode
+
+        Returns:
+            str: Path to the repository to use (either original or copied)
+        """
+        if dev_mode:
+            print(f"Development mode: Using repository at {self.root_dir}")
+            return self.root_dir
+
+        repo_copy_path = os.path.join(install_path, "llmb_repo")
+
+        # Check repository state to determine what to do
+        repo_state = check_repository_state(install_path)
+        self.logger.debug(f"Repository state for {install_path}: {repo_state}")
+
+        if repo_state == 'existing_install':
+            print(f"\nError: Existing LLMB installation found at {install_path}")
+            print("This directory contains a completed installation.")
+            print("Please choose a different installation path, or remove the existing installation.")
+            print("Future versions will support updating existing installations.")
+            raise SystemExit(1)
+        elif repo_state == 'orphaned':
+            self.logger.debug(f"Removing orphaned directory: {repo_copy_path}")
+            clean_repository_directory(repo_copy_path)
+            repo_state = 'empty'  # Now it's empty
+
+        # Determine if we need to copy
+        need_copy = repo_state == 'empty' or self.force_fresh_repo_copy
+
+        if need_copy:
+            # If forcing fresh copy, remove existing directory first
+            if self.force_fresh_repo_copy and repo_state != 'empty':
+                print("Fresh installation: Removing existing repository copy...")
+                clean_repository_directory(repo_copy_path)
+
+            self.force_fresh_repo_copy = False  # Reset flag after use
+
+            print("Copying repository to installation directory...")
+
+            try:
+                copy_repository_working_files(self.root_dir, repo_copy_path)
+                self.logger.debug(f"Repository copied from {self.root_dir} to {repo_copy_path}")
+            except Exception as e:
+                print(f"Failed to copy repository: {e}")
+                raise SystemExit(1) from e
+        else:
+            print(f"Using existing repository copy at {repo_copy_path}")
+
+        return repo_copy_path
+
+    def _complete_installation(
+        self,
+        config: InstallConfig,
+        completed_workloads: List[str],
+        workload_venvs: Dict[str, str],
+        existing_cluster_config: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """Complete installation by writing cluster config and clearing state.
+
+        Args:
+            config: Installation configuration
+            completed_workloads: List of completed workload names
+            workload_venvs: Mapping of workload names to their venv paths
+            existing_cluster_config: For incremental installs, the original cluster config to merge with
+
+        Returns:
+            True to indicate installation completed successfully
+        """
+        try:
+            # Create final config with only completed workloads
+            final_config = InstallConfig(
+                install_path=config.install_path,
+                gpu_type=config.gpu_type,
+                node_architecture=config.node_architecture,
+                venv_type=config.venv_type,
+                slurm=config.slurm,
+                environment_vars=config.environment_vars,
+                selected_workloads=completed_workloads,  # Only the completed ones
+                install_method=config.install_method,
+                ui_mode=config.ui_mode,
+                dev_mode=config.dev_mode,
+                llmb_repo=config.llmb_repo,
+                image_folder=config.image_folder,
+                cache_dirs_configured=config.cache_dirs_configured,
+            )
+
+            # Write cluster config
+
+            # Create slurm_info dict in the expected format
+            slurm_info = {}
+            if final_config.slurm:
+                slurm_info = {
+                    'slurm': {
+                        'account': final_config.slurm.account,
+                        'gpu_partition': final_config.slurm.gpu_partition,
+                        'cpu_partition': final_config.slurm.cpu_partition,
+                        'gpu_partition_gres': final_config.slurm.gpu_partition_gres,
+                        'cpu_partition_gres': final_config.slurm.cpu_partition_gres,
+                    }
+                }
+
+            create_cluster_config(
+                final_config.install_path,
+                final_config.llmb_repo,
+                completed_workloads,
+                slurm_info,
+                final_config.environment_vars,
+                final_config.gpu_type,
+                final_config.venv_type,
+                workload_venvs,
+                node_architecture=final_config.node_architecture,
+                install_method=final_config.install_method,
+                image_folder=getattr(final_config, 'image_folder', None),
+                existing_cluster_config=existing_cluster_config,  # For incremental installs
+            )
+            print(f"✓ Configuration saved to {final_config.install_path}/cluster_config.yaml")
+
+            # Clear install state
+            clear_install_state()
+
+            # Save system config for future use
+            save_system_config(final_config)
+
+            print("✓ Installation completed successfully!")
+            return True
+
+        except Exception as e:
+            print(f"Error completing installation: {e}")
+            print("Resume state preserved for retry.")
+            return True
+
+    def _check_and_handle_resume(self, args: argparse.Namespace, state_result=None) -> bool:
+        """Check for resumable installation state and handle resume if requested.
+
+        Args:
+            args: Parsed command line arguments
+            state_result: Optional pre-loaded state from load_install_state() to avoid redundant loading
+
+        Returns:
+            True if resume handled everything, False to continue normal flow
+        """
+        # Wrap entire resume logic in comprehensive error handling to prevent hangs
+        try:
+            # Skip resume entirely if disabled via environment variable
+            if os.environ.get('LLMB_DISABLE_RESUME', '').lower() in ('1', 'true', 'yes'):
+                return False
+
+            # Skip resume for headless mode (advanced users can handle failures manually)
+            if hasattr(args, 'play') and args.play:
+                return False
+
+            # Skip resume for dev mode (always start fresh)
+            dev_mode = getattr(args, 'dev_mode', False)
+            if dev_mode:
+                # Clear any existing resume state and explain why (only if state exists)
+                if state_result:
+                    try:
+                        clear_install_state()
+                        # Reset root_dir to current repository (was set to resume state's llmb_repo)
+                        self.root_dir = find_llmb_repo_root()
+                        # Reload workloads from the current repository
+                        self.workloads = build_workload_dict(self.root_dir)
+                        print("Development mode: Using current repository")
+                        print("Found resumable state - clearing (dev mode always starts fresh)")
+                        print()
+                    except Exception as e:
+                        print(f"Warning: Could not clear resume state in dev mode: {e}")
+                        raise e
+                return False
+
+            # Use provided state or return early if no state
+            if not state_result:
+                return False
+
+            # Extract state components
+            try:
+                config, completed_workloads, workload_venvs, existing_cluster_config = state_result
+            except Exception as e:
+                print(f"Warning: Could not parse resume state: {e}")
+                print("Continuing with fresh installation...")
+                return False
+
+            # Calculate remaining workloads
+            remaining_workloads = [w for w in config.selected_workloads if w not in completed_workloads]
+
+            if not remaining_workloads:
+                print("All workloads from previous installation are already completed!")
+                clear_install_state()
+                return True
+
+            # Get timestamp from state (avoiding redundant file I/O)
+            time_ago = "unknown time"
+            try:
+                # Get timestamp from already loaded state data (more efficient)
+                from llmb_install.config.system import _install_state_manager
+
+                state_path = _install_state_manager.get_path()
+                if state_path.exists():
+                    import yaml
+
+                    with open(state_path, 'r') as f:
+                        data = yaml.safe_load(f)
+                        timestamp_str = data.get('timestamp', '')
+                        if timestamp_str:
+                            timestamp = datetime.fromisoformat(timestamp_str)
+                            # Calculate time difference for human-readable display
+                            time_diff = datetime.now() - timestamp
+                            if time_diff.days > 0:
+                                time_ago = f"{time_diff.days} day{'s' if time_diff.days > 1 else ''} ago"
+                            elif time_diff.seconds > 3600:
+                                hours = time_diff.seconds // 3600
+                                time_ago = f"{hours} hour{'s' if hours > 1 else ''} ago"
+                            elif time_diff.seconds > 60:
+                                minutes = time_diff.seconds // 60
+                                time_ago = f"{minutes} min ago"
+                            else:
+                                time_ago = "just now"
+            except Exception as e:
+                print(f"Warning: Could not parse timestamp: {e}")
+                time_ago = "unknown time"
+
+            # Display resume information using consolidated summary method
+            # Detect if this is an incremental install resume
+            is_incremental = config.is_incremental_install or (existing_cluster_config is not None)
+
+            # Extract originally installed workloads for incremental installs
+            original_installed_workloads = []
+            if is_incremental and existing_cluster_config:
+                original_installed_workloads = existing_cluster_config.get('workloads', {}).get('installed', [])
+
+            if is_incremental:
+                print(f"Found interrupted incremental installation ({time_ago})")
+                if original_installed_workloads:
+                    print(f"  Original installation: {', '.join(original_installed_workloads)}")
+                print(f"  Attempted to add: {', '.join(config.selected_workloads)}")
+            else:
+                print(f"Found interrupted installation ({time_ago})")
+
+            # Use consolidated summary display with resume-specific options
+            # Disable "start fresh" for incremental installs (it breaks repository state)
+            choice = self._show_configuration_summary(
+                config,
+                is_resume=True,
+                completed_workloads=completed_workloads,
+                remaining_workloads=remaining_workloads,
+                allow_fresh_start=not is_incremental,  # No fresh start for incremental installs
+                is_incremental_resume=is_incremental,  # New flag for incremental-specific messaging
+                original_installed_workloads=original_installed_workloads,  # Show original workloads
+            )
+
+            if choice == 'yes':
+                print("Resuming installation with remaining workloads...")
+                print()
+                return self._resume_installation(
+                    config, remaining_workloads, completed_workloads, workload_venvs, existing_cluster_config
+                )
+            elif choice == 'no':
+                print("Starting fresh installation...")
+                clear_install_state()
+                print()
+                self.force_fresh_repo_copy = True  # Force repository recopy for fresh install
+                self.root_dir = find_llmb_repo_root()  # Reset to original repo location
+                self.workloads = build_workload_dict(self.root_dir)  # Reload workloads from original repo
+                return False
+            elif choice == 'clear':
+                # Clear resume state and return to incremental install flow
+                print("\nClearing resume state...")
+
+                # If this is an incremental install and some workloads completed,
+                # we need to update cluster_config before clearing state
+                if existing_cluster_config and completed_workloads:
+                    print(f"Preserving {len(completed_workloads)} completed workload(s)...")
+
+                    # Reload install_state to get the most up-to-date workload_venvs
+                    # (in case new workloads completed and venvs were updated)
+                    from llmb_install.config.system import load_install_state
+
+                    state_result = load_install_state()
+                    if state_result:
+                        _, latest_completed, latest_venvs, _ = state_result
+                        # Use the latest data
+                        completed_workloads = latest_completed
+                        workload_venvs = latest_venvs
+
+                    # Complete installation to save the completed workloads
+                    self._complete_installation(config, completed_workloads, workload_venvs, existing_cluster_config)
+                else:
+                    # No completed workloads, just clear the state
+                    clear_install_state()
+                    print("Resume state cleared.")
+
+                print()
+                # For incremental installs, let the user start fresh with incremental install
+                # This returns False to continue with normal flow, which will detect incremental install
+                return False
+            elif choice == 'edit':
+                print("Switching to interactive mode with saved configuration as defaults...")
+                print()
+                return self._edit_resume_installation(
+                    config, completed_workloads, workload_venvs, existing_cluster_config
+                )
+
+        except Exception as e:
+            print(f"Error in resume detection: {e}")
+            print("Disabling resume functionality for this session...")
+            print("(Resume state preserved - you can try again later)")
+            print("(Set LLMB_DISABLE_RESUME=1 to permanently disable)")
+            return False
+
+    def _resume_installation(
+        self,
+        config: InstallConfig,
+        remaining_workloads: List[str],
+        completed_workloads: List[str],
+        workload_venvs: Dict[str, str],
+        existing_cluster_config: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """Resume installation with remaining workloads.
+
+        Args:
+            config: Original install configuration
+            remaining_workloads: List of workloads still to be installed
+            completed_workloads: List of workloads already completed successfully
+            workload_venvs: Mapping of workload names to their venv paths
+            existing_cluster_config: For incremental installs, the original cluster config
+
+        Returns:
+            True indicating resume handled everything
+        """
+        try:
+            # Update config with remaining workloads
+            config.selected_workloads = remaining_workloads
+
+            # Note: self.root_dir already set from resume state in run() method
+            # No need to set it again here
+
+            # Setup cache directories (needed for UV and pip)
+            setup_cache_directories(config.install_path, config.venv_type)
+
+            # Re-run dependency grouping on remaining workloads for optimal installation plan
+            filtered_workloads = filter_workloads_by_gpu_type(self.workloads, config.gpu_type)
+            from llmb_install.core.workload import filter_tools_from_workload_list
+
+            tools = filter_tools_from_workload_list(self.workloads)
+            filtered_workloads.update(tools)
+            filtered_workloads = resolve_gpu_overrides(filtered_workloads, config.gpu_type)
+
+            # Extract needed parameters for _perform_installation
+            slurm_info = config.get_slurm_dict()
+
+            # Create minimal args object for _perform_installation
+            class ResumeArgs:
+                def __init__(self, config):
+                    self.image_folder = config.image_folder
+                    self.dev_mode = config.dev_mode
+
+            resume_args = ResumeArgs(config)
+
+            # Build existing_workload_venvs for venv reuse
+            # For incremental installs, combine original venvs with those from partial install
+            combined_venvs = {}
+            if existing_cluster_config:
+                # Extract venvs from original installation
+                original_venvs = existing_cluster_config.get('workloads', {}).get('config', {})
+                for wl_name, wl_config in original_venvs.items():
+                    if 'venv_path' in wl_config:
+                        combined_venvs[wl_name] = wl_config['venv_path']
+            # Add venvs from the partial incremental install (may overlap, workload_venvs takes precedence)
+            combined_venvs.update(workload_venvs)
+
+            # Perform installation with remaining workloads
+            self._perform_installation(
+                config.install_path,
+                slurm_info,
+                config.gpu_type,
+                config.node_architecture,
+                config.install_method,
+                remaining_workloads,
+                config.environment_vars,
+                config.venv_type,
+                filtered_workloads,
+                resume_args,
+                image_folder=config.image_folder,
+                is_resume=True,
+                existing_completed_workloads=completed_workloads,
+                existing_workload_venvs=combined_venvs,  # Enable venv reuse
+                existing_cluster_config=existing_cluster_config,  # Pass through for incremental installs
+            )
+
+            # Clear install state on successful completion
+            clear_install_state()
+            print("\n✓ Installation resumed and completed successfully!")
+            return True
+
+        except Exception as e:
+            print(f"\nError during resume: {e}")
+            print("You may need to start a fresh installation.")
+            return True  # Still return True to avoid double-installation attempts
+
+    def _edit_resume_installation(
+        self,
+        config: InstallConfig,
+        completed_workloads: List[str],
+        workload_venvs: Dict[str, str],
+        existing_cluster_config: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """Edit resume installation by dropping into interactive mode with defaults from resume state.
+
+        Args:
+            config: Original install configuration to use as defaults
+            completed_workloads: List of workloads already completed successfully
+            workload_venvs: Mapping of workload names to their venv paths
+            existing_cluster_config: For incremental installs, the original cluster config
+
+        Returns:
+            True indicating edit handled everything
+        """
+        try:
+            # Note: self.root_dir already set from resume state in run() method
+            # Note: Don't clear install state here - only clear it when installation actually starts
+            # This preserves resume state if user cancels out of editing
+
+            # Create args object with the necessary attributes from the original config
+            class EditArgs:
+                def __init__(self, config):
+                    self.dev_mode = config.dev_mode
+                    self.image_folder = config.image_folder
+                    self.ui_mode = config.ui_mode or 'simple'  # Default to simple if not set
+
+            edit_args = EditArgs(config)
+
+            # Collect limited configuration for resume edit mode
+            # This only allows editing specific fields while locking others
+            new_config = self._collect_limited_configuration(
+                ui_mode=edit_args.ui_mode,
+                resume_config=config,
+                completed_workloads=completed_workloads,
+                args=edit_args,
+                existing_cluster_config=existing_cluster_config,
+            )
+
+            if not new_config.selected_workloads:
+                if completed_workloads:
+                    print("\nNo additional workloads selected.")
+                    print(
+                        f"Installation complete with {len(completed_workloads)} successful workload(s): {', '.join(completed_workloads)}"
+                    )
+
+                    # Reload install_state to get the most up-to-date workload_venvs
+                    # This ensures we have venvs for all completed workloads
+                    from llmb_install.config.system import load_install_state
+
+                    state_result = load_install_state()
+                    if state_result:
+                        _, latest_completed, latest_venvs, _ = state_result
+                        # Use the latest data to ensure all completed workloads have their venvs
+                        completed_workloads = latest_completed
+                        workload_venvs = latest_venvs
+
+                    # Complete the installation
+                    return self._complete_installation(
+                        config, completed_workloads, workload_venvs, existing_cluster_config
+                    )
+                elif existing_cluster_config:
+                    # Incremental install with no new workloads selected and none completed
+                    # Just clear the install state - nothing to update
+                    from llmb_install.config.system import clear_install_state
+
+                    print("\nNo new workloads selected.")
+                    print("No changes made to existing installation.")
+                    clear_install_state()
+                    return True
+                else:
+                    print("\nNo workloads selected. Exiting.")
+                    return True
+
+            # Calculate which workloads still need to be installed (preserve completed progress)
+            workloads_to_install = [w for w in new_config.selected_workloads if w not in completed_workloads]
+
+            if not workloads_to_install:
+                print(f"\nAll selected workloads are already completed: {', '.join(new_config.selected_workloads)}")
+
+                # Reload install_state to get the most up-to-date workload_venvs
+                from llmb_install.config.system import load_install_state
+
+                state_result = load_install_state()
+                if state_result:
+                    _, latest_completed, latest_venvs, _ = state_result
+                    completed_workloads = latest_completed
+                    workload_venvs = latest_venvs
+
+                return self._complete_installation(
+                    new_config, completed_workloads, workload_venvs, existing_cluster_config
+                )
+            elif len(workloads_to_install) < len(new_config.selected_workloads):
+                already_completed = [w for w in new_config.selected_workloads if w in completed_workloads]
+                print(f"\nSkipping already completed workloads: {', '.join(already_completed)}")
+                print(f"Will install remaining workloads: {', '.join(workloads_to_install)}")
+
+            # Update config to only install remaining workloads
+            new_config.selected_workloads = workloads_to_install
+
+            # Show final configuration summary and get confirmation (with locked field indicators)
+            if not self._confirm_configuration(new_config, is_resume=True):
+                print("\nReturning to edit mode...")
+                # Recursively call edit mode again if user wants to make more changes
+                return self._edit_resume_installation(
+                    config, completed_workloads, workload_venvs, existing_cluster_config
+                )
+
+            # Prepare workloads and perform installation with new config
+            filtered_workloads = self._prepare_workloads(new_config.gpu_type, workloads_to_install)
+
+            slurm_info = {
+                'slurm': {
+                    'account': new_config.slurm.account,
+                    'gpu_partition': new_config.slurm.gpu_partition,
+                    'cpu_partition': new_config.slurm.cpu_partition,
+                    'gpu_partition_gres': new_config.slurm.gpu_partition_gres,
+                    'cpu_partition_gres': new_config.slurm.cpu_partition_gres,
+                    'node_architecture': new_config.node_architecture,
+                }
+            }
+
+            # Build existing_workload_venvs for venv reuse
+            # For incremental installs, combine original venvs with those from partial install
+            combined_venvs = {}
+            if existing_cluster_config:
+                # Extract venvs from original installation
+                original_venvs = existing_cluster_config.get('workloads', {}).get('config', {})
+                for wl_name, wl_config in original_venvs.items():
+                    if 'venv_path' in wl_config:
+                        combined_venvs[wl_name] = wl_config['venv_path']
+            # Add venvs from the partial incremental install (may overlap, workload_venvs takes precedence)
+            combined_venvs.update(workload_venvs)
+
+            # Perform installation with the newly edited configuration
+            self._perform_installation(
+                new_config.install_path,
+                slurm_info,
+                new_config.gpu_type,
+                new_config.node_architecture,
+                new_config.install_method,
+                new_config.selected_workloads,
+                new_config.environment_vars,
+                new_config.venv_type,
+                filtered_workloads,
+                edit_args,
+                image_folder=new_config.image_folder,
+                is_resume=True,  # This is a resume with edits - preserve state tracking
+                existing_completed_workloads=completed_workloads,
+                existing_workload_venvs=combined_venvs,  # Enable venv reuse
+                existing_cluster_config=existing_cluster_config,  # Pass through for incremental installs
+            )
+
+            print("\n✓ Installation completed successfully!")
+            return True
+
+        except Exception as e:
+            print(f"\nError during edit: {e}")
+            print("You may need to start a fresh installation.")
+            return True
+
+    def run(self, args: argparse.Namespace) -> None:
+        """Run the installer with the given arguments.
+
+        Args:
+            args: Parsed command line arguments
+        """
+        # Set up logging based on verbose flag
+        log_level = "DEBUG" if args.verbose else "INFO"
+        setup_logging(level=log_level)
+
+        # Check for Git LFS availability
+        if not is_git_lfs_installed():
+            print("\nError: Git LFS is not installed.")
+            print("Some recipes require Git LFS for downloading large files.")
+            print("\nPlease install Git LFS:")
+            print("  - Ubuntu/Debian: sudo apt-get install git-lfs")
+            print("  - RHEL/CentOS: sudo yum install git-lfs")
+            print("\nFor more information, visit: https://git-lfs.com/")
+            raise SystemExit(1) from None
+
+        # Ensure Git LFS is configured
+        try:
+            ensure_git_lfs_configured()
+        except Exception as e:
+            print(f"\nError: Failed to configure Git LFS: {e}")
+            print("Please run 'git lfs install' manually and try again.")
+            raise SystemExit(1) from e
+
+        # Check for resume state BEFORE loading workloads
+        # This ensures we load from the correct repository location (llmb_repo copy vs original)
+        state_result = load_install_state()
+        resume_config = None  # Track resume config for error handling
+
+        if state_result:
+            config, _, _, _ = state_result  # Unpack with new existing_cluster_config field
+            resume_config = config  # Store for later error handling
+            # Verify install path exists (state validation)
+            if os.path.exists(config.install_path):
+                # Set root_dir from resume state BEFORE loading workloads
+                if config.llmb_repo:
+                    self.root_dir = config.llmb_repo
+                    self.logger.debug(f"Resume detected: Loading workloads from {self.root_dir}")
+                else:
+                    # Fallback to original repo if llmb_repo not in state (shouldn't happen)
+                    self.root_dir = find_llmb_repo_root()
+            else:
+                # Install path gone, clear stale state and use original repo
+                clear_install_state()
+                self.root_dir = find_llmb_repo_root()
+                resume_config = None  # State cleared, no longer resuming
+        else:
+            # No resume state - check if running from existing installation directory
+            install_path_from_cwd = self._check_if_running_from_install_dir()
+            if install_path_from_cwd:
+                cluster_config = self._detect_incremental_install(install_path_from_cwd)
+                if cluster_config:
+                    # Running from LLMB_INSTALL - validate llmb_repo from cluster config
+                    llmb_repo = cluster_config.get('launcher', {}).get('llmb_repo')
+                    if not llmb_repo or not os.path.exists(llmb_repo):
+                        print(f"\nError: Existing installation at {install_path_from_cwd} cannot be used.")
+                        if llmb_repo:
+                            print(f"The llmb_repo path does not exist: {llmb_repo}")
+                        else:
+                            print("The cluster_config.yaml is missing the llmb_repo path.")
+                        print("\nThis installation cannot be extended with additional workloads.")
+                        print("Please start a fresh installation from a repository checkout.")
+                        raise SystemExit(1)
+
+                    self.root_dir = llmb_repo
+                    self.logger.debug(f"Incremental install detected: Loading workloads from {self.root_dir}")
+                else:
+                    # cluster_config.yaml exists but is invalid
+                    self.root_dir = find_llmb_repo_root()
+            else:
+                # Not in installation directory, use original repo
+                self.root_dir = find_llmb_repo_root()
+
+        # Load workloads from the correct repository location
+        self.workloads = build_workload_dict(self.root_dir)
+
+        if not self.workloads:
+            # Check if this is due to corrupted resume state
+            if resume_config and resume_config.llmb_repo and self.root_dir == resume_config.llmb_repo:
+                # Resume state exists but llmb_repo is corrupted/missing workloads
+                print("\nError: Resume state detected, but no workloads found in:")
+                print(f"  {self.root_dir}")
+                print("\nThis may indicate:")
+                print("  • The llmb_repo directory is corrupted or incomplete")
+                print("  • Files were deleted from the installation directory")
+                print("  • The installation directory is on unstable storage")
+                print()
+
+                # Offer recovery options using simple UI (we don't have config yet)
+                ui = self.create_ui('simple')
+
+                choice = ui.prompt_select(
+                    "How would you like to proceed?",
+                    choices=[
+                        {'name': 'Clear resume state and start fresh installation', 'value': 'clear'},
+                        {'name': 'Exit (investigate the issue)', 'value': 'exit'},
+                    ],
+                    default='clear',
+                )
+
+                if choice == 'clear':
+                    print("\nClearing stale resume state...")
+                    clear_install_state()
+                    print("Resume state cleared. Please run llmb-install again to start fresh.")
+                    raise SystemExit(0)
+                else:
+                    print("\nExiting. Resume state preserved at:")
+                    print("  ~/.config/llmb/install_state.yaml")
+                    print("\nTo manually clear state, run:")
+                    print("  rm ~/.config/llmb/install_state.yaml")
+                    raise SystemExit(1)
+            else:
+                # Fresh install but no workloads found in original repo
+                print(f"\nError: No workloads found in {self.root_dir}")
+                print("This repository may be missing workload metadata files.")
+                raise SystemExit(1)
+
+        # Check for resume before mode selection (single integration point)
+        # Pass the already-loaded state to avoid redundant loading
+        if self._check_and_handle_resume(args, state_result):
+            return  # Resume handled everything
+
+        # Handle different execution modes
+        if args.play:
+            self._run_headless_mode(args)
+        elif args.record:
+            self._run_record_mode(args)
+        elif args.command == 'express':
+            self._run_express_mode(args)
+        else:
+            self._run_interactive_mode(args)
+
+    def _run_headless_mode(self, args: argparse.Namespace) -> None:
+        """Run installer in headless mode using a configuration file.
+
+        Args:
+            args: Parsed command line arguments containing the config file path
+        """
+        print("=== HEADLESS INSTALLATION MODE ===")
+        config_data = load_installation_config(args.play)
+
+        # Extract configuration values
+        venv_type = config_data['venv_type']
+        install_path = config_data['install_path']
+        slurm_info = config_data['slurm_info']
+        gpu_type = config_data['gpu_type']
+        node_architecture = config_data['node_architecture']
+        install_method = config_data['install_method']
+        selected = config_data['selected_workloads']
+        env_vars = config_data['env_vars']
+        image_folder = config_data.get('image_folder')  # Use saved image folder if available
+
+        # Convert install_path to absolute path using pathlib
+        install_path = str(Path(install_path).expanduser().resolve())
+
+        print(f"Environment type: {venv_type}")
+        print(f"Install path: {install_path}")
+        print(f"GPU type: {gpu_type}")
+        print(f"Node architecture: {node_architecture}")
+        print(f"Install method: {install_method}")
+        print(f"Selected workloads: {', '.join(selected)}")
+        print()
+
+        # Handle repository copying here (before workload preparation)
+        dev_mode = getattr(args, 'dev_mode', False)
+        self.root_dir = self._handle_repository_setup(install_path, dev_mode)
+
+        # Prepare workloads and perform installation
+        filtered_workloads = self._prepare_workloads(gpu_type, selected)
+
+        # Use saved image folder
+        if image_folder is not None:
+            args.image_folder = image_folder
+
+        self._perform_installation(
+            install_path,
+            slurm_info,
+            gpu_type,
+            node_architecture,
+            install_method,
+            selected,
+            env_vars,
+            venv_type,
+            filtered_workloads,
+            args,
+            image_folder=image_folder,
+            is_resume=False,  # Fresh headless installation
+        )
+
+    def _run_record_mode(self, args: argparse.Namespace) -> None:
+        """Run installer in record mode to save configuration without installing.
+
+        Args:
+            args: Parsed command line arguments containing the config file path
+        """
+        print("=== RECORD MODE ===")
+        print("Collecting user inputs for configuration recording...")
+        print()
+
+        # Collect all configuration interactively
+        config = self._collect_configuration(ui_mode=args.ui_mode, record_mode=True, args=args)
+
+        # Save configuration and exit
+        config_data = {
+            'venv_type': config.venv_type,
+            'install_path': config.install_path,
+            'slurm_info': {
+                'slurm': {
+                    'account': config.slurm.account,
+                    'gpu_partition': config.slurm.gpu_partition,
+                    'cpu_partition': config.slurm.cpu_partition,
+                    'gpu_partition_gres': config.slurm.gpu_partition_gres,
+                    'cpu_partition_gres': config.slurm.cpu_partition_gres,
+                    'node_architecture': config.node_architecture,
+                }
+            },
+            'gpu_type': config.gpu_type,
+            'node_architecture': config.node_architecture,
+            'install_method': config.install_method,
+            'selected_workloads': config.selected_workloads,
+            'env_vars': config.environment_vars,
+        }
+
+        # Only save image_folder if it was provided
+        if args.image_folder:
+            config_data['image_folder'] = args.image_folder
+
+        save_installation_config(args.record, config_data)
+        print("\nConfiguration recorded successfully!")
+        print(f"To perform headless installation, run: llmb-install --play {args.record}")
+
+    def _run_express_mode(self, args: argparse.Namespace) -> None:
+        """Run installer in express mode using saved system configuration.
+
+        Args:
+            args: Parsed command line arguments for express command
+        """
+        # Handle --list-workloads first
+        if getattr(args, 'list_workloads', False):
+            self._list_available_workloads()
+            return
+
+        # Validate that system config exists
+        from llmb_install.config.system import (
+            get_system_config_path,
+            system_config_exists,
+        )
+
+        if not system_config_exists():
+            print("Error: Express mode requires a saved system configuration.")
+            print(f"Expected config file: {get_system_config_path()}")
+            print("\nTo create a system config, complete a successful interactive installation first:")
+            print("  llmb-install")
+            print("\nThis will save your system settings (GPU type, SLURM config, etc.) for future express installs.")
+            print("\nAlternatively, use '--play <config.yaml>' for full headless installation.")
+            raise SystemExit(1)
+
+        # Collect configuration using express mode with confirmation loop
+        while True:
+            config = self._collect_express_configuration(args)
+
+            if not config.selected_workloads:
+                print("\nNo workloads selected. Exiting.")
+                return
+
+            # Show configuration summary and get confirmation
+            if self._confirm_configuration(config):
+                break  # User confirmed, proceed with installation
+            else:
+                print("\nReturning to configuration...")
+                # Express mode doesn't support re-configuration, so this shouldn't happen
+                print("Configuration changes not supported in express mode.")
+                raise SystemExit(0)
+
+        # Update args with config values to ensure consistency
+        if config.image_folder:
+            args.image_folder = config.image_folder
+
+        # Prepare workloads and perform installation
+        filtered_workloads = self._prepare_workloads(config.gpu_type, config.selected_workloads)
+
+        slurm_info = config.get_slurm_dict() if config.slurm else {}
+
+        self._perform_installation(
+            config.install_path,
+            slurm_info,
+            config.gpu_type,
+            config.node_architecture,
+            config.install_method,
+            config.selected_workloads,
+            config.environment_vars,
+            config.venv_type,
+            filtered_workloads,
+            args,
+            image_folder=config.image_folder,
+            is_resume=False,  # Fresh express installation
+        )
+
+    def _run_interactive_mode(self, args: argparse.Namespace) -> None:
+        """Run installer in interactive mode with user prompts.
+
+        Args:
+            args: Parsed command line arguments
+        """
+        print()  # header spacing
+
+        # NEW: Check if running from existing LLMB_INSTALL (entrance point #1)
+        install_path_from_cwd = self._check_if_running_from_install_dir()
+        if install_path_from_cwd:
+            cluster_config = self._detect_incremental_install(install_path_from_cwd)
+            if cluster_config:
+                # Note: llmb_repo validation already happened in run() method,
+                # but we validate again here for consistency and defensive programming
+                llmb_repo = cluster_config.get('launcher', {}).get('llmb_repo')
+                if not llmb_repo or not os.path.exists(llmb_repo):
+                    # This should have been caught in run(), but handle it anyway
+                    print(f"\nError: Installation at {install_path_from_cwd} cannot be used.")
+                    print("Cannot proceed with incremental install.")
+                    raise SystemExit(1)
+
+                # Offer incremental install
+                ui = self.create_ui(args.ui_mode)
+                installed_workloads = cluster_config.get('workloads', {}).get('installed', [])
+                gpu_type = cluster_config.get('launcher', {}).get('gpu_type', 'unknown')
+
+                print(f"Found existing installation at {install_path_from_cwd} ({gpu_type.upper()})")
+                print(f"  Currently installed: {', '.join(installed_workloads)}")
+                print()
+
+                choice = ui.prompt_select(
+                    "What would you like to do?",
+                    choices=[
+                        {'name': 'Add workloads to this installation', 'value': 'incremental'},
+                        {'name': 'Exit', 'value': 'exit'},
+                    ],
+                    default='incremental',
+                )
+
+                # Handle cancellation (Ctrl-C returns None)
+                if choice is None:
+                    print("\n\nInstallation cancelled by user.")
+                    raise SystemExit(0)
+
+                if choice == 'exit':
+                    print("\nTo start a new installation, run llmb-install from a repository checkout.")
+                    raise SystemExit(0)
+
+                # Proceed with incremental install
+                config, existing_venvs = self._collect_incremental_configuration(
+                    args.ui_mode, install_path_from_cwd, cluster_config, args
+                )
+
+                if not config:
+                    # No workloads available or user cancelled
+                    print("\nNo workloads selected or none available. Exiting.")
+                    return
+
+                # Prepare workloads for installation
+                filtered_workloads = self._prepare_workloads(config.gpu_type, config.selected_workloads)
+                slurm_info = config.get_slurm_dict()
+
+                # Perform incremental installation
+                self._perform_installation(
+                    config.install_path,
+                    slurm_info,
+                    config.gpu_type,
+                    config.node_architecture,
+                    config.install_method,
+                    config.selected_workloads,
+                    config.environment_vars,
+                    config.venv_type,
+                    filtered_workloads,
+                    args,
+                    image_folder=config.image_folder,
+                    is_resume=False,
+                    existing_workload_venvs=existing_venvs,
+                    existing_cluster_config=cluster_config,
+                )
+                return
+
+        # Collect configuration interactively with confirmation loop
+        override_defaults = None  # Start with no overrides
+        while True:
+            config = self._collect_configuration(
+                ui_mode=args.ui_mode,
+                record_mode=False,
+                args=args,
+                override_defaults=override_defaults,  # Use previous config as defaults if editing
+            )
+
+            if not config.selected_workloads:
+                print("\nNo workloads selected. Exiting.")
+                return
+
+            # Check if this is an incremental install (from entrance point #2)
+            is_incremental = getattr(config, '_is_incremental', False)
+            if is_incremental:
+                # Incremental install - skip confirmation, proceed directly
+                existing_venvs = getattr(config, '_existing_venvs', {})
+                existing_cluster_config = getattr(config, '_existing_cluster_config', None)
+
+                filtered_workloads = self._prepare_workloads(config.gpu_type, config.selected_workloads)
+                slurm_info = config.get_slurm_dict()
+
+                self._perform_installation(
+                    config.install_path,
+                    slurm_info,
+                    config.gpu_type,
+                    config.node_architecture,
+                    config.install_method,
+                    config.selected_workloads,
+                    config.environment_vars,
+                    config.venv_type,
+                    filtered_workloads,
+                    args,
+                    image_folder=config.image_folder,
+                    is_resume=False,
+                    existing_workload_venvs=existing_venvs,
+                    existing_cluster_config=existing_cluster_config,
+                )
+                return
+
+            # Show configuration summary and get confirmation
+            if self._confirm_configuration(config):
+                break  # User confirmed, proceed with installation
+            else:
+                print("\nReturning to configuration...")
+                # Use current config as defaults for next iteration
+                override_defaults = config
+
+        # Prepare workloads and perform installation
+        filtered_workloads = self._prepare_workloads(config.gpu_type, config.selected_workloads)
+
+        slurm_info = config.get_slurm_dict()
+
+        # Add node_architecture for headless/record mode format
+
+        if slurm_info and "slurm" in slurm_info:
+
+            slurm_info["slurm"]["node_architecture"] = config.node_architecture
+
+        self._perform_installation(
+            config.install_path,
+            slurm_info,
+            config.gpu_type,
+            config.node_architecture,
+            config.install_method,
+            config.selected_workloads,
+            config.environment_vars,
+            config.venv_type,
+            filtered_workloads,
+            args,
+            image_folder=config.image_folder,
+            is_resume=False,  # Fresh interactive installation
+        )
+
+    def _collect_configuration(
+        self,
+        ui_mode: str = 'simple',
+        record_mode: bool = False,
+        args: Optional[argparse.Namespace] = None,
+        override_defaults: Optional[InstallConfig] = None,
+    ) -> InstallConfig:
+        """Collect installation configuration from user prompts.
+
+        Args:
+            ui_mode: UI mode to use ('simple', 'rich', 'express')
+            record_mode: Whether running in record mode
+            args: Command line arguments
+            override_defaults: Optional config to use as defaults instead of system config
+
+        Returns:
+            InstallConfig: Complete installation configuration
+        """
+        # Create UI instance for all prompts
+        ui = self.create_ui(ui_mode)
+
+        # Load actual system config first for stable defaults
+        system_config = load_system_config()
+        if system_config:
+            ui.log("Found saved system configuration - using as defaults where applicable")
+
+        # Create merged defaults dict - system config first, then resume overrides
+        defaults = {}
+        if system_config:
+            defaults.update(system_config.to_dict())
+        if override_defaults:
+            defaults.update(override_defaults.to_dict())
+            ui.log("Using saved installation configuration as additional defaults")  # Not wild about this language.
+
+        # Collect basic configuration using merged defaults
+        venv_type = prompt_environment_type(ui, defaults.get('venv_type'), express_mode=False)
+        print()
+
+        # Loop until we get a valid install path (not an existing installation, or user accepts incremental)
+        while True:
+            install_path = prompt_install_location(ui, default=defaults.get('install_path'))
+            if not install_path:
+                print("\nInstallation cancelled.")
+                raise SystemExit(0)
+
+            # NEW: Check for existing installation (entrance point #2)
+            cluster_config = self._detect_incremental_install(install_path)
+            if cluster_config:
+                # Validate llmb_repo path before offering incremental install
+                llmb_repo = cluster_config.get('launcher', {}).get('llmb_repo')
+                if not llmb_repo or not os.path.exists(llmb_repo):
+                    print(f"\nError: Existing installation at {install_path} cannot be used.")
+                    if llmb_repo:
+                        print(f"The llmb_repo path does not exist: {llmb_repo}")
+                    else:
+                        print("The cluster_config.yaml is missing the llmb_repo path.")
+                    print("\nThis installation cannot be extended with additional workloads.")
+                    print("Please choose a different installation path.")
+                    continue  # Re-prompt for path
+
+                installed_workloads = cluster_config.get('workloads', {}).get('installed', [])
+                gpu_type = cluster_config.get('launcher', {}).get('gpu_type', 'unknown')
+
+                print(f"\nExisting installation detected at {install_path} ({gpu_type.upper()})")
+                print(f"  Currently installed: {', '.join(installed_workloads)}")
+                print()
+
+                choice = ui.prompt_select(
+                    "What would you like to do?",
+                    choices=[
+                        {'name': 'Add workloads to existing installation', 'value': 'incremental'},
+                        {'name': 'Choose different installation path', 'value': 'different'},
+                    ],
+                    default='incremental',
+                )
+
+                # Handle cancellation (Ctrl-C returns None)
+                if choice is None:
+                    print("\n\nInstallation cancelled by user.")
+                    raise SystemExit(0)
+
+                if choice == 'incremental':
+                    # Reload workloads from the correct llmb_repo for this installation
+                    # (Important for entrance point #2 - interactive path prompt)
+                    llmb_repo = cluster_config.get('launcher', {}).get('llmb_repo')
+                    if llmb_repo and llmb_repo != self.root_dir:
+                        self.logger.debug(f"Reloading workloads from installation's llmb_repo: {llmb_repo}")
+                        self.root_dir = llmb_repo
+                        self.workloads = build_workload_dict(self.root_dir)
+                        if not self.workloads:
+                            print(f"\nError: Could not load workloads from {self.root_dir}")
+                            print("The installation's repository may be corrupted.")
+                            continue  # Re-prompt for path
+
+                    # Return a special marker that indicates incremental install
+                    # The caller (_run_interactive_mode) will handle the incremental flow
+                    # For now, we need to refactor this slightly differently
+                    # Since _collect_configuration is called from a loop in _run_interactive_mode,
+                    # we'll handle incremental install directly here and raise a custom exception
+                    # to break out of the config loop
+
+                    config, existing_venvs = self._collect_incremental_configuration(
+                        ui_mode, install_path, cluster_config, args
+                    )
+
+                    if not config:
+                        # No workloads available or user cancelled - reprompt for path
+                        continue
+
+                    # Store incremental install info in the config for the caller to use
+                    config._is_incremental = True
+                    config._existing_venvs = existing_venvs
+                    config._existing_cluster_config = cluster_config
+                    return config
+                else:
+                    # Loop back to prompt for new path
+                    continue
+            else:
+                # No existing installation, proceed with normal flow
+                break
+
+        # Handle repository copying here (before other prompts)
+        dev_mode = getattr(args, 'dev_mode', False) if args else False
+
+        # Skip repository setup if editing configuration with same install path
+        if override_defaults and override_defaults.llmb_repo and override_defaults.install_path == install_path:
+            # Reuse existing repository location from previous configuration
+            self.root_dir = override_defaults.llmb_repo
+            self.logger.debug(f"Edit mode: Reusing existing repository at {self.root_dir}")
+        else:
+            # First time configuration or install path changed - perform repository setup
+            self.root_dir = self._handle_repository_setup(install_path, dev_mode)
+
+        # Setup cache directories now that we know the install path
+        setup_cache_directories(install_path, venv_type)
+
+        # Import prompt functions for SLURM and GPU configuration
+        from llmb_install.ui.prompts.gpu import prompt_gpu_type as new_prompt_gpu_type
+        from llmb_install.ui.prompts.gpu import (
+            prompt_node_architecture as new_prompt_node_architecture,
+        )
+        from llmb_install.ui.prompts.slurm import (
+            prompt_slurm_info as new_prompt_slurm_info,
+        )
+
+        # Prepare SLURM defaults
+        slurm_defaults = None
+        slurm_config_data = defaults.get('slurm')
+        if slurm_config_data:
+            slurm_defaults = {
+                'account': slurm_config_data['account'],
+                'gpu_partition': slurm_config_data['gpu_partition'],
+                'cpu_partition': slurm_config_data['cpu_partition'],
+            }
+
+        slurm_config = new_prompt_slurm_info(ui, slurm_defaults, express_mode=False)
+        if not slurm_config:
+            print("\nInstallation cancelled.")
+            raise SystemExit(0)
+
+        gpu_type = new_prompt_gpu_type(ui, self.workloads, defaults.get('gpu_type'), express_mode=False)
+
+        node_architecture = new_prompt_node_architecture(
+            ui, gpu_type, defaults.get('node_architecture'), express_mode=False
+        )
+        print()
+
+        # Filter workloads by GPU type
+        filtered_workloads = filter_workloads_by_gpu_type(self.workloads, gpu_type)
+        if not filtered_workloads:
+            print(f"No workloads found that support {gpu_type} GPU type.")
+            raise SystemExit(1)
+
+        # Add tools to workload list
+        tools = filter_tools_from_workload_list(self.workloads)
+        filtered_workloads.update(tools)
+
+        # Resolve GPU-specific images/repos
+        filtered_workloads = resolve_gpu_overrides(filtered_workloads, gpu_type)
+
+        install_method = prompt_install_method(ui, defaults.get('install_method'), express_mode=False)
+        print()
+
+        selected = prompt_workload_selection(ui, filtered_workloads)
+        if not selected:
+            print("\nInstallation cancelled.")
+            raise SystemExit(0)
+
+        env_vars = prompt_environment_variables(ui, defaults.get('environment_vars'), express_mode=False)
+        if env_vars is None:
+            print("\nInstallation cancelled.")
+            raise SystemExit(0)
+        print()
+
+        # Create configuration object
+        slurm_obj = SlurmConfig(
+            account=slurm_config['slurm']['account'],
+            gpu_partition=slurm_config['slurm']['gpu_partition'],
+            cpu_partition=slurm_config['slurm']['cpu_partition'],
+            gpu_partition_gres=slurm_config['slurm'].get('gpu_partition_gres'),
+            cpu_partition_gres=slurm_config['slurm'].get('cpu_partition_gres'),
+        )
+
+        config = InstallConfig(
+            install_path=install_path,
+            gpu_type=gpu_type,
+            node_architecture=node_architecture,
+            venv_type=venv_type,
+            slurm=slurm_obj,
+            environment_vars=env_vars,
+            selected_workloads=selected,
+            install_method=install_method,
+            ui_mode=ui_mode,
+            dev_mode=dev_mode,
+            llmb_repo=self.root_dir,
+        )
+
+        return config
+
+    def _collect_limited_configuration(
+        self,
+        ui_mode: str,
+        resume_config: InstallConfig,
+        completed_workloads: List[str],
+        args: Optional[argparse.Namespace] = None,
+        existing_cluster_config: Optional[Dict[str, Any]] = None,
+    ) -> InstallConfig:
+        """Collect limited configuration for resume edit mode.
+
+        Only allows editing specific fields while locking others to prevent edge cases.
+        This is a restricted version of _collect_configuration for resume scenarios.
+
+        Args:
+            ui_mode: UI mode to use ('simple', 'rich')
+            resume_config: Original install configuration (locked fields come from here)
+            completed_workloads: List of workloads already completed successfully
+            args: Command line arguments
+            existing_cluster_config: For incremental installs, the original cluster config
+
+        Returns:
+            InstallConfig: Updated configuration with only allowed changes
+        """
+        # Import SlurmConfig for early return case
+        from llmb_install.config.models import SlurmConfig
+
+        # Create UI instance for all prompts
+        ui = self.create_ui(ui_mode)
+
+        # 1. Virtual Environment Type - LOCKED, use from resume config
+        venv_type = resume_config.venv_type
+        print()
+
+        # 2. SLURM configuration - allow changes
+        from llmb_install.ui.prompts.slurm import (
+            prompt_slurm_info as new_prompt_slurm_info,
+        )
+
+        # Prepare SLURM defaults from resume config
+        slurm_defaults = None
+        if resume_config.slurm:
+            slurm_defaults = {
+                'account': resume_config.slurm.account,
+                'gpu_partition': resume_config.slurm.gpu_partition,
+                'cpu_partition': resume_config.slurm.cpu_partition,
+            }
+
+        slurm_config = new_prompt_slurm_info(ui, slurm_defaults, express_mode=False)
+        if not slurm_config:
+            print("\nConfiguration cancelled.")
+            raise SystemExit(0)
+
+        # 3. Install method - allow changes if system supports both
+        install_method = prompt_install_method(ui, resume_config.install_method, express_mode=False)
+        print()
+
+        # 4. Workload selection - restricted to original selection minus completed
+        # Calculate remaining workloads that can be selected
+        remaining_workloads = [w for w in resume_config.selected_workloads if w not in completed_workloads]
+
+        if not remaining_workloads:
+            ui.log("All originally selected workloads have been completed!")
+            selected = []
+        else:
+            # Prepare workloads dict for selection (filtering by original GPU type)
+            filtered_workloads = filter_workloads_by_gpu_type(self.workloads, resume_config.gpu_type)
+            tools = filter_tools_from_workload_list(self.workloads)
+            filtered_workloads.update(tools)
+            filtered_workloads = resolve_gpu_overrides(filtered_workloads, resume_config.gpu_type)
+
+            # Filter to only show workloads from original selection that aren't completed
+            available_workloads = {k: v for k, v in filtered_workloads.items() if k in remaining_workloads}
+
+            print("Workload Status:")
+            print(f"  Original selection: {', '.join(resume_config.selected_workloads)}")
+            if completed_workloads:
+                # Show completed as a nice list
+                print(f"  Completed: {', '.join(completed_workloads)}")
+            print()
+            print("Remaining workloads (pre-selected for installation):")
+            print("Uncheck any workloads you want to skip:")
+
+            # Prompt for workload selection from remaining workloads
+            # Remove "Install All" option and pre-select remaining workloads
+            # Allow empty selection if some workloads already completed OR if this is an incremental install
+            # (incremental installs have original workloads, so it's okay to select no new ones)
+            is_incremental = existing_cluster_config is not None
+            selected = prompt_workload_selection(
+                ui,
+                available_workloads,
+                default_selected=remaining_workloads,  # Pre-select all remaining
+                show_install_all=False,  # Remove "Install All" option for resume mode
+                allow_empty=bool(completed_workloads) or is_incremental,  # Allow empty if completed or incremental
+            )
+
+            if selected is None:  # User cancelled
+                print("\nConfiguration cancelled.")
+                raise SystemExit(0)
+
+            # Check if user selected no workloads for incremental install (no new workloads to add)
+            # In this case, skip remaining prompts and return early with empty selection
+            if is_incremental and not selected and not completed_workloads:
+                # Return early with empty workload selection - caller will handle cleanup
+                return InstallConfig(
+                    install_path=resume_config.install_path,
+                    gpu_type=resume_config.gpu_type,
+                    node_architecture=resume_config.node_architecture,
+                    llmb_repo=resume_config.llmb_repo,
+                    dev_mode=resume_config.dev_mode,
+                    image_folder=resume_config.image_folder,
+                    venv_type=venv_type,
+                    slurm=SlurmConfig(
+                        account=slurm_config['slurm']['account'],
+                        gpu_partition=slurm_config['slurm']['gpu_partition'],
+                        cpu_partition=slurm_config['slurm']['cpu_partition'],
+                        gpu_partition_gres=slurm_config['slurm'].get('gpu_partition_gres'),
+                        cpu_partition_gres=slurm_config['slurm'].get('cpu_partition_gres'),
+                    ),
+                    install_method=install_method,
+                    selected_workloads=[],
+                    environment_vars=resume_config.environment_vars,  # Keep existing
+                    ui_mode=ui_mode,
+                    cache_dirs_configured=resume_config.cache_dirs_configured,
+                    is_incremental_install=resume_config.is_incremental_install,
+                )
+
+        # 5. Environment variables - allow updating
+        from llmb_install.ui.prompts.environment import prompt_environment_variables
+
+        # Re-prompt for environment variables, passing existing as defaults
+        # This allows users to update HF_TOKEN or other variables
+        existing_env_vars = resume_config.environment_vars.copy()
+        new_env_vars = prompt_environment_variables(ui, defaults=existing_env_vars, express_mode=False)
+
+        if new_env_vars is None:  # User cancelled
+            print("\nConfiguration cancelled.")
+            raise SystemExit(0)
+
+        # Merge new env vars
+        env_vars = new_env_vars
+
+        # Create SLURM config object
+        slurm_obj = SlurmConfig(
+            account=slurm_config['slurm']['account'],
+            gpu_partition=slurm_config['slurm']['gpu_partition'],
+            cpu_partition=slurm_config['slurm']['cpu_partition'],
+            gpu_partition_gres=slurm_config['slurm'].get('gpu_partition_gres'),
+            cpu_partition_gres=slurm_config['slurm'].get('cpu_partition_gres'),
+        )
+
+        # Create updated configuration with locked and modified fields
+        config = InstallConfig(
+            # LOCKED FIELDS - use original values
+            install_path=resume_config.install_path,
+            gpu_type=resume_config.gpu_type,
+            node_architecture=resume_config.node_architecture,
+            llmb_repo=resume_config.llmb_repo,
+            dev_mode=resume_config.dev_mode,
+            image_folder=resume_config.image_folder,
+            # EDITABLE FIELDS - use new values
+            venv_type=venv_type,
+            slurm=slurm_obj,
+            install_method=install_method,
+            selected_workloads=selected,
+            # PRESERVED FIELDS - keep original
+            environment_vars=env_vars,
+            ui_mode=ui_mode,
+            cache_dirs_configured=resume_config.cache_dirs_configured,
+        )
+
+        return config
+
+    def _show_configuration_summary(
+        self,
+        config: InstallConfig,
+        is_resume: bool = False,
+        completed_workloads: Optional[List[str]] = None,
+        remaining_workloads: Optional[List[str]] = None,
+        allow_fresh_start: bool = False,
+        is_incremental_resume: bool = False,
+        original_installed_workloads: Optional[List[str]] = None,
+    ) -> str:
+        """Display installation configuration summary.
+
+        Args:
+            config: Installation configuration to summarize
+            is_resume: Whether this is a resume scenario (shows locked fields)
+            completed_workloads: List of completed workloads (for resume flow)
+            remaining_workloads: List of remaining workloads (for resume flow)
+            allow_fresh_start: Whether to show "start fresh" option (for resume flow)
+            is_incremental_resume: Whether this is resuming an incremental install
+            original_installed_workloads: Original workloads before incremental install (if incremental)
+
+        Returns:
+            User choice: 'yes' to continue, 'edit' to modify configuration, 'no' for fresh start, 'clear' to clear resume state
+        """
+        print("\nInstallation Summary")
+        print("=" * 50)
+
+        # Show locked fields with indicator if in resume mode (🔒 at start for visibility)
+        locked_prefix = "🔒 " if is_resume else ""
+        print(f"{locked_prefix}Install Path: {config.install_path}")
+        print(f"{locked_prefix}GPU Type: {config.gpu_type}")
+        print(f"{locked_prefix}Node Architecture: {config.node_architecture}")
+        print(f"{locked_prefix}Virtual Environment: {config.venv_type}")
+        print(f"Install Mode: {config.install_method}")
+
+        if config.slurm:
+            print(f"SLURM Account: {config.slurm.account}")
+            print(f"GPU Partition: {config.slurm.gpu_partition}")
+            print(f"CPU Partition: {config.slurm.cpu_partition}")
+
+        if config.llmb_repo and is_resume:
+            print(f"🔒 Repository: {config.llmb_repo}")
+
+        # Show workload information (differs between resume, incremental resume, and normal flow)
+        if is_incremental_resume and original_installed_workloads:
+            # Incremental resume: show original, attempted to add, completed, and remaining
+            print(f"🔒 Original Installation: {', '.join(original_installed_workloads)}")
+            print(f"Attempted to Add: {', '.join(config.selected_workloads)}")
+            if completed_workloads:
+                print(f"✓ Successfully Added: {', '.join(completed_workloads)}")
+            if remaining_workloads:
+                print(f"Remaining to Install: {', '.join(remaining_workloads)}")
+        elif completed_workloads is not None or remaining_workloads is not None:
+            # Regular resume flow: show original, completed, and remaining
+            print(f"Selected Workloads: {', '.join(config.selected_workloads)}")
+            if completed_workloads:
+                print(f"Completed Workloads: {', '.join(completed_workloads)}")
+            else:
+                print("Completed Workloads: None")
+            if remaining_workloads:
+                print(f"Remaining Workloads: {', '.join(remaining_workloads)}")
+        else:
+            # Normal flow: just show selected
+            if config.selected_workloads:
+                print(f"Selected Workloads: {', '.join(config.selected_workloads)}")
+            else:
+                print("Selected Workloads: None")
+
+        if config.environment_vars:
+            print(f"Environment Variables: {len(config.environment_vars)} configured")
+
+        if config.image_folder:
+            print(f"Container Image Folder: {config.image_folder}")
+
+        if config.dev_mode:
+            print(f"Development Mode: Enabled (using {config.llmb_repo})")
+
+        print()
+
+        # Add note about locked fields if in resume mode
+        if is_resume:
+            if is_incremental_resume:
+                print("Note: This is resuming an incremental installation.")
+                print("      Original workloads will be preserved upon completion.")
+            print("      Fields marked with 🔒 cannot be changed during resume.")
+            print()
+
+        # Create UI instance for prompting
+        ui = self.create_ui(config.ui_mode)
+
+        # Build prompt choices based on context
+        if is_incremental_resume:
+            # Special options for incremental resume
+            prompt_message = "Continue adding workloads to existing installation?"
+            choices = [
+                {'name': 'Yes, resume incremental installation', 'value': 'yes'},
+                {'name': 'Clear resume state and return to incremental install menu', 'value': 'clear'},
+                {'name': 'Edit configuration', 'value': 'edit'},
+            ]
+        elif allow_fresh_start:
+            prompt_message = "Continue with remaining workloads?"
+            choices = [
+                {'name': 'Yes, resume installation', 'value': 'yes'},
+                {'name': 'No, start fresh installation', 'value': 'no'},
+                {'name': 'Edit configuration', 'value': 'edit'},
+            ]
+        else:
+            prompt_message = "Continue with installation?"
+            choices = [
+                {'name': 'Yes, start installation', 'value': 'yes'},
+                {'name': 'Edit configuration', 'value': 'edit'},
+            ]
+
+        while True:
+            choice = ui.prompt_select(prompt_message, choices=choices, default='yes')
+
+            if choice in ['yes', 'edit', 'no', 'clear']:
+                return choice
+            elif choice is None:
+                # User cancelled (Ctrl+C), exit installer
+                print("\nInstallation cancelled by user.")
+                raise SystemExit(0)
+            else:
+                print("Please select a valid option.")
+
+    def _confirm_configuration(self, config: InstallConfig, is_resume: bool = False) -> bool:
+        """Show configuration summary and get user confirmation.
+
+        Args:
+            config: Installation configuration to confirm
+            is_resume: Whether this is a resume scenario (shows locked fields)
+
+        Returns:
+            True if user wants to continue, False if they want to edit
+        """
+        choice = self._show_configuration_summary(config, is_resume=is_resume)
+        return choice == 'yes'
+
+    def _collect_incremental_configuration(
+        self,
+        ui_mode: str,
+        install_path: str,
+        cluster_config: Dict[str, Any],
+        args: Optional[argparse.Namespace] = None,
+    ) -> tuple[Optional[InstallConfig], Dict[str, str]]:
+        """Collect configuration for incremental install - workload selection only.
+
+        All settings are locked from the existing cluster_config. Only prompts for
+        workload selection, filtering out already installed workloads.
+
+        Args:
+            ui_mode: UI mode to use ('simple', 'rich')
+            install_path: Path to the existing installation
+            cluster_config: Loaded cluster configuration dict
+            args: Optional command line arguments (for image_folder override)
+
+        Returns:
+            Tuple of (InstallConfig, existing_workload_venvs) or (None, {}) if cancelled
+        """
+        # Extract existing configuration (ALL LOCKED)
+        installed_workloads = cluster_config['workloads']['installed']
+        existing_venvs = cluster_config['workloads'].get('config', {})
+
+        # Build workload_venvs map
+        existing_workload_venvs = {}
+        for wl_name, wl_config in existing_venvs.items():
+            if 'venv_path' in wl_config:
+                existing_workload_venvs[wl_name] = wl_config['venv_path']
+
+        # Extract locked configuration from cluster_config
+        launcher = cluster_config['launcher']
+        gpu_type = launcher['gpu_type']
+        llmb_repo = launcher.get('llmb_repo')
+
+        # Extract install-specific metadata (new in Phase 1)
+        install_metadata = cluster_config.get('install', {})
+        install_method = install_metadata.get('method', 'local')
+
+        # Extract venv_type with backward compatibility fallback
+        from llmb_install.environment.venv_utils import extract_venv_type_from_config
+
+        venv_type = extract_venv_type_from_config(cluster_config)
+        if venv_type:
+            self.logger.debug(f"Extracted venv_type '{venv_type}' from cluster config")
+
+        # If not found, error out - we need to know the venv type
+        if not venv_type:
+            print(f"\nError: Cannot determine virtual environment type for installation at {install_path}")
+            print("The cluster_config.yaml is missing venv_type information.")
+            print("\nThis installation appears to be corrupted or from an incompatible version.")
+            print("Please start a fresh installation from a repository checkout.")
+            return (None, {})
+
+        # Get node_architecture - prefer install section, fall back to launcher for backward compat
+        node_architecture_from_install = install_metadata.get('node_architecture')
+        node_architecture_from_launcher = launcher.get('node_architecture', 'x86_64')
+        node_architecture = node_architecture_from_install or node_architecture_from_launcher
+
+        # Get image_folder - from install section or -i flag override
+        image_folder_from_config = install_metadata.get('image_folder')
+        image_folder_from_flag = getattr(args, 'image_folder', None) if args else None
+        image_folder = image_folder_from_flag or image_folder_from_config  # Flag takes precedence
+
+        # Extract SLURM, env_vars, etc. - ALL LOCKED, just reuse
+        slurm_config_dict = cluster_config.get('slurm', {})
+        env_vars = cluster_config.get('environment', {})
+
+        ui = self.create_ui(ui_mode)
+
+        # Display configuration summary (all fields locked except workloads)
+        print("\n" + "=" * 70)
+        print("INCREMENTAL INSTALL - Configuration Summary")
+        print("=" * 70)
+        print(f"🔒 Install Path: {install_path}")
+        print(f"🔒 GPU Type: {gpu_type}")
+        print(f"🔒 Node Architecture: {node_architecture}")
+        print(f"🔒 Virtual Environment: {venv_type}")
+        if slurm_config_dict:
+            print(f"🔒 SLURM Account: {slurm_config_dict.get('account', 'N/A')}")
+            print(f"🔒 GPU Partition: {slurm_config_dict.get('gpu_partition', 'N/A')}")
+            print(f"🔒 CPU Partition: {slurm_config_dict.get('cpu_partition', 'N/A')}")
+        if image_folder:
+            flag_indicator = " (from -i flag)" if image_folder_from_flag else ""
+            print(f"🔒 Image Folder: {image_folder}{flag_indicator}")
+        print(f"🔒 Already Installed: {', '.join(installed_workloads)}")
+        print()
+        print("Note: All settings locked. Only workload selection available.")
+        print("=" * 70)
+        print()
+
+        # Filter workloads to exclude already installed
+        filtered_workloads = filter_workloads_by_gpu_type(self.workloads, gpu_type)
+        tools = filter_tools_from_workload_list(self.workloads)
+        filtered_workloads.update(tools)
+        filtered_workloads = resolve_gpu_overrides(filtered_workloads, gpu_type)
+
+        # Remove already installed workloads
+        available_workloads = {k: v for k, v in filtered_workloads.items() if k not in installed_workloads}
+
+        if not available_workloads:
+            print("No additional workloads available for this GPU type.")
+            print("All supported workloads are already installed.")
+            return (None, {})
+
+        print(f"Available workloads to add ({len(available_workloads)}):")
+
+        try:
+            selected = prompt_workload_selection(
+                ui,
+                available_workloads,
+                show_install_all=True,  # Allow "Install All Available"
+                allow_empty=False,
+            )
+        except KeyboardInterrupt:
+            # User cancelled - treat same as no selection
+            # This allows clean return rather than propagating the exception
+            return (None, {})
+
+        if not selected:
+            return (None, {})
+
+        # Build InstallConfig using existing settings
+        slurm_obj = SlurmConfig(
+            account=slurm_config_dict.get('account', ''),
+            gpu_partition=slurm_config_dict.get('gpu_partition', ''),
+            cpu_partition=slurm_config_dict.get('cpu_partition', ''),
+            gpu_partition_gres=slurm_config_dict.get('gpu_gres'),
+            cpu_partition_gres=slurm_config_dict.get('cpu_gres'),
+        )
+
+        config = InstallConfig(
+            install_path=install_path,
+            gpu_type=gpu_type,
+            node_architecture=node_architecture,
+            venv_type=venv_type,
+            slurm=slurm_obj,
+            environment_vars=env_vars,
+            selected_workloads=selected,
+            install_method=install_method,
+            ui_mode=ui_mode,
+            dev_mode=False,  # Incremental never uses dev mode
+            llmb_repo=llmb_repo,
+        )
+
+        # Add image_folder if present
+        if image_folder:
+            config.image_folder = image_folder
+
+        return (config, existing_workload_venvs)
+
+    def _collect_express_configuration(self, args: argparse.Namespace) -> InstallConfig:
+        """Collect configuration for express mode using saved system config.
+
+        Express mode only prompts for install_path and workloads. All other values
+        are taken from the saved system configuration.
+
+        Args:
+            args: Parsed command line arguments
+
+        Returns:
+            InstallConfig: Complete installation configuration
+        """
+        # Load system config (guaranteed to exist due to create_ui check)
+        system_config = load_system_config()
+        if not system_config:
+            print("Error: System config disappeared between checks")
+            raise SystemExit(1)
+
+        ui = SimpleUI()  # Use simple UI for minimal prompts
+
+        # Display summary of saved configuration first
+        ui.print_section("Express Mode Configuration Summary")
+        ui.log(f"GPU Type: {system_config.gpu_type.upper()}")
+        ui.log(f"Architecture: {system_config.node_architecture}")
+        ui.log(f"Environment: {system_config.venv_type}")
+        ui.log(f"Install Method: {system_config.install_method}")
+        if system_config.slurm:
+            ui.log(f"SLURM Account: {system_config.slurm.account}")
+            ui.log(f"GPU Partition: {system_config.slurm.gpu_partition}")
+            ui.log(f"CPU Partition: {system_config.slurm.cpu_partition}")
+            if system_config.slurm.gpu_partition_gres:
+                ui.log(f"GPUs per Node: {system_config.slurm.gpu_partition_gres}")
+        if system_config.image_folder:
+            ui.log(f"Image Folder: {system_config.image_folder}")
+        if system_config.environment_vars:
+            ui.log(f"Environment Variables: {len(system_config.environment_vars)} saved")
+        print()
+
+        # Get install path from arguments or prompt
+        # Install path can come from positional argument or --install-path flag
+        install_path_pos = getattr(args, 'install_path_pos', None)
+        install_path_flag = getattr(args, 'install_path_flag', None)
+
+        # Warn if both are provided to avoid confusion
+        if install_path_pos and install_path_flag:
+            ui.log(
+                f"Warning: Both positional path '{install_path_pos}' and --install-path '{install_path_flag}' provided. Using positional argument."
+            )
+
+        install_path = install_path_pos or install_path_flag
+        if install_path:
+            # Convert to absolute path using pathlib
+            install_path = str(Path(install_path).expanduser().resolve())
+            ui.log(f"Using install path: {install_path}")
+        else:
+            install_path = prompt_install_location(ui)
+            if not install_path:
+                print("\nInstallation cancelled.")
+                raise SystemExit(0)
+
+        # NEW: Check for existing installation
+        cluster_config = self._detect_incremental_install(install_path)
+        if cluster_config:
+            print("\nExisting installation detected at this path.")
+            print("Express mode does not support incremental installation.")
+            print("\nTo add workloads to an existing installation:")
+            print("  1. cd to the installation directory")
+            print("  2. Run: llmb-install")
+            print("  3. Select workloads to add")
+            raise SystemExit(0)
+
+        # Handle repository copying here (before other prompts)
+        dev_mode = getattr(args, 'dev_mode', False)
+        self.root_dir = self._handle_repository_setup(install_path, dev_mode)
+
+        # Setup cache directories
+        setup_cache_directories(install_path, system_config.venv_type)
+
+        # Get workloads from CLI or prompt
+        if args.workloads:
+            if args.workloads.lower() == 'all':
+                # Filter available workloads by saved GPU type
+                filtered_workloads = filter_workloads_by_gpu_type(self.workloads, system_config.gpu_type)
+                if not filtered_workloads:
+                    print(f"Error: No workloads available for GPU type: {system_config.gpu_type}")
+                    raise SystemExit(1)
+
+                # Add tools
+                tools = filter_tools_from_workload_list(self.workloads)
+                filtered_workloads.update(tools)
+
+                # Resolve GPU overrides
+                filtered_workloads = resolve_gpu_overrides(filtered_workloads, system_config.gpu_type)
+
+                selected = list(filtered_workloads.keys())
+                ui.log(f"Installing all workloads for {system_config.gpu_type}: {', '.join(selected)}")
+            else:
+                # Parse comma-separated workload list
+                selected = [w.strip() for w in args.workloads.split(',') if w.strip()]
+                ui.log(f"Installing specified workloads: {', '.join(selected)}")
+        else:
+            # Prompt for workload selection
+            filtered_workloads = filter_workloads_by_gpu_type(self.workloads, system_config.gpu_type)
+            if not filtered_workloads:
+                print(f"Error: No workloads available for GPU type: {system_config.gpu_type}")
+                raise SystemExit(1)
+
+            # Add tools
+            tools = filter_tools_from_workload_list(self.workloads)
+            filtered_workloads.update(tools)
+
+            # Resolve GPU overrides
+            filtered_workloads = resolve_gpu_overrides(filtered_workloads, system_config.gpu_type)
+
+            selected = prompt_workload_selection(ui, filtered_workloads)
+            if not selected:
+                print("\nInstallation cancelled.")
+                raise SystemExit(0)
+
+        # Use saved environment variables (express mode doesn't prompt for these)
+        env_vars = system_config.environment_vars.copy() if system_config.environment_vars else {}
+
+        # Handle image folder - use saved config if not provided via CLI
+        image_folder = getattr(args, 'image_folder', None)
+        if not image_folder and system_config.image_folder:
+            image_folder = system_config.image_folder
+            ui.log(f"Using saved image folder: {image_folder}")
+
+        # Create SLURM config object
+        slurm_obj = None
+        if system_config.slurm:
+            slurm_obj = SlurmConfig(
+                account=system_config.slurm.account,
+                gpu_partition=system_config.slurm.gpu_partition,
+                cpu_partition=system_config.slurm.cpu_partition,
+                gpu_partition_gres=system_config.slurm.gpu_partition_gres,
+                cpu_partition_gres=system_config.slurm.cpu_partition_gres,
+            )
+
+        # Use all saved values from system config
+        config = InstallConfig(
+            install_path=install_path,
+            gpu_type=system_config.gpu_type,
+            node_architecture=system_config.node_architecture,
+            venv_type=system_config.venv_type,
+            slurm=slurm_obj,
+            environment_vars=env_vars,
+            selected_workloads=selected,
+            install_method=system_config.install_method,
+            ui_mode='simple',  # Express mode uses simple UI
+            image_folder=image_folder,
+            dev_mode=dev_mode,
+            llmb_repo=self.root_dir,
+        )
+
+        print("Starting installation...")
+        return config
+
+    def _list_available_workloads(self) -> None:
+        """List all available workloads, optionally filtered by saved GPU type."""
+        from llmb_install.config.system import load_system_config, system_config_exists
+
+        # Use already loaded workloads (avoid duplicate repo root messages)
+        if not hasattr(self, 'workloads') or not self.workloads:
+            print("Error: No workloads found in repository")
+            raise SystemExit(1)
+
+        # Try to load system config for GPU filtering
+        system_config = None
+        if system_config_exists():
+            system_config = load_system_config()
+
+        if system_config:
+            gpu_type_display = system_config.gpu_type.upper()
+            print(f"Available workloads for {gpu_type_display}:")
+
+            # Filter workloads by saved GPU type
+            filtered_workloads = filter_workloads_by_gpu_type(self.workloads, system_config.gpu_type)
+            if not filtered_workloads:
+                print(f"No workloads available for {gpu_type_display}")
+                return
+
+            # Add tools
+            tools = filter_tools_from_workload_list(self.workloads)
+            filtered_workloads.update(tools)
+
+            # Resolve GPU overrides
+            filtered_workloads = resolve_gpu_overrides(filtered_workloads, system_config.gpu_type)
+
+            # List all workloads
+            print()
+            for name in sorted(filtered_workloads.keys()):
+                print(f"  {name}")
+
+            print("\nUsage:")
+            print("  llmb-install express -w all")
+            print("  llmb-install express -w workload1,workload2")
+        else:
+            print("Available workloads by GPU type:")
+            print("\nRun an installation first to save your GPU type, then use:")
+            print("  llmb-install express --list-workloads")
+
+            # Group by GPU type
+            gpu_workloads = {}
+            for name, workload in self.workloads.items():
+                if 'run' in workload and 'gpu_configs' in workload['run']:
+                    gpu_types = list(workload['run']['gpu_configs'].keys())
+                    for gpu_type in gpu_types:
+                        if gpu_type not in gpu_workloads:
+                            gpu_workloads[gpu_type] = []
+                        gpu_workloads[gpu_type].append(name)
+                else:
+                    # Tools or workloads without GPU configs
+                    if 'Tools' not in gpu_workloads:
+                        gpu_workloads['Tools'] = []
+                    gpu_workloads['Tools'].append(name)
+
+            for gpu_type in sorted(gpu_workloads.keys()):
+                if gpu_type == 'Tools':
+                    print(f"\n{gpu_type}:")
+                else:
+                    print(f"\n{gpu_type.upper()}:")
+                for name in sorted(gpu_workloads[gpu_type]):
+                    print(f"  {name}")
+
+    def _prepare_workloads(self, gpu_type: str, selected: List[str]) -> Dict[str, Dict[str, Any]]:
+        """Prepare workloads for installation by filtering and resolving GPU overrides.
+
+        Args:
+            gpu_type: Selected GPU type
+            selected: List of selected workload keys
+
+        Returns:
+            Dictionary of prepared workloads
+        """
+        # Filter workloads by GPU type
+        filtered_workloads = filter_workloads_by_gpu_type(self.workloads, gpu_type)
+        if not filtered_workloads:
+            print(f"No workloads found that support {gpu_type} GPU type.")
+            raise SystemExit(1)
+
+        # Add tools to workload list
+        tools = filter_tools_from_workload_list(self.workloads)
+        filtered_workloads.update(tools)
+
+        # Resolve GPU-specific images/repos
+        filtered_workloads = resolve_gpu_overrides(filtered_workloads, gpu_type)
+
+        # Validate that all selected workloads exist
+        missing_workloads = [w for w in selected if w not in filtered_workloads]
+        if missing_workloads:
+            print(f"Error: Selected workloads not found: {missing_workloads}")
+            raise SystemExit(1)
+
+        return filtered_workloads
+
+    def _perform_installation(
+        self,
+        install_path: str,
+        slurm_info: Dict[str, Any],
+        gpu_type: str,
+        node_architecture: str,
+        install_method: str,
+        selected: List[str],
+        env_vars: Dict[str, str],
+        venv_type: str,
+        filtered_workloads: Dict[str, Dict[str, Any]],
+        args,
+        image_folder: Optional[str] = None,
+        is_resume: bool = False,
+        existing_completed_workloads: Optional[List[str]] = None,
+        existing_workload_venvs: Optional[Dict[str, str]] = None,
+        existing_cluster_config: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Perform the actual installation process.
+
+        This function contains all the installation logic that was previously in main().
+        It can be called from both interactive and headless modes.
+
+        Args:
+            install_path: Base installation directory
+            slurm_info: SLURM configuration dictionary
+            gpu_type: Selected GPU type
+            node_architecture: Selected node architecture
+            install_method: Installation method ('local' or 'slurm')
+            selected: List of selected workload keys
+            env_vars: Environment variables dictionary
+            venv_type: Type of virtual environment ('venv' or 'conda')
+            filtered_workloads: Dictionary of available workloads filtered by GPU type
+            args: Command line arguments
+            image_folder: Optional image folder path (overrides args.image_folder for incremental installs)
+            is_resume: Whether this is a resume operation (don't clear existing state)
+            existing_completed_workloads: List of workloads already completed (for resume/edit)
+            existing_workload_venvs: Mapping of workload names to venv paths (for incremental installs)
+            existing_cluster_config: Existing cluster config (for incremental installs)
+        """
+        # Clear any existing install state only if this is NOT a resume operation
+        if not is_resume:
+            try:
+                if install_state_exists():
+                    clear_install_state()
+                    print("Cleared previous installation state - starting fresh installation")
+            except Exception as e:
+                print(f"Warning: Could not clear previous installation state: {e}")
+
+        # Initialize state tracking for resume functionality
+        completed_workloads = existing_completed_workloads[:] if existing_completed_workloads else []
+
+        # Create InstallConfig for state tracking (unless this is a resume call)
+        dev_mode = getattr(args, 'dev_mode', False)
+        install_config = None
+        if not dev_mode:
+            try:
+                # Extract SLURM config if present
+                slurm_config = None
+                if slurm_info and 'slurm' in slurm_info:
+                    slurm_data = slurm_info['slurm']
+                    slurm_config = SlurmConfig(
+                        account=slurm_data.get('account', ''),
+                        gpu_partition=slurm_data.get('gpu_partition', ''),
+                        cpu_partition=slurm_data.get('cpu_partition', ''),
+                        gpu_partition_gres=slurm_data.get('gpu_partition_gres'),
+                        cpu_partition_gres=slurm_data.get('cpu_partition_gres'),
+                    )
+
+                # Mark as incremental if this is adding workloads to existing installation
+                is_incremental = existing_cluster_config is not None
+
+                install_config = InstallConfig(
+                    install_path=install_path,
+                    venv_type=venv_type,
+                    gpu_type=gpu_type,
+                    node_architecture=node_architecture,
+                    slurm=slurm_config,
+                    environment_vars=env_vars,
+                    selected_workloads=selected,
+                    install_method=install_method,
+                    image_folder=getattr(args, 'image_folder', None),
+                    dev_mode=dev_mode,
+                    llmb_repo=self.root_dir,  # Store the actual repo path being used
+                    is_incremental_install=is_incremental,
+                )
+
+                # Save initial state (no completed workloads yet, no venvs yet)
+                # Save BEFORE directory creation so if makedirs fails, we still have state for resume
+                # For incremental installs, also save the existing cluster config
+                save_install_state(install_config, completed_workloads, {}, existing_cluster_config)
+
+            except Exception as e:
+                print(f"Warning: Could not initialize state tracking: {e}")
+                # Continue with installation even if state tracking fails
+        # Setup install directory structure
+        os.makedirs(install_path, exist_ok=True)
+        os.makedirs(os.path.join(install_path, "images"), exist_ok=True)
+        os.makedirs(os.path.join(install_path, "datasets"), exist_ok=True)
+        os.makedirs(os.path.join(install_path, "workloads"), exist_ok=True)
+        os.makedirs(os.path.join(install_path, "venvs"), exist_ok=True)
+        os.makedirs(os.path.join(install_path, "tools"), exist_ok=True)
+
+        create_llmb_run_symlink(install_path)
+
+        print("\nDownloading required container images.")
+        print("--------------------------------")
+        required_images = get_required_images(filtered_workloads, selected)
+        print("\nRequired container images:")
+        for image, filename in sorted(required_images.items()):
+            print(f"  - {image} -> {filename}")
+        print("\n")
+
+        # Use provided image_folder parameter if available, otherwise fall back to args
+        effective_image_folder = image_folder if image_folder is not None else getattr(args, 'image_folder', None)
+        fetch_container_images(
+            required_images, install_path, node_architecture, install_method, slurm_info, effective_image_folder
+        )
+
+        # Download and install required tools
+        required_tools = get_required_tools(filtered_workloads, selected)
+        if required_tools:
+            print("\nDownloading required tools.")
+            print("--------------------------------")
+            print("\nRequired tools:")
+            for tool_name, version in sorted(required_tools):
+                print(f"  - {tool_name}: {version}")
+            print("\n")
+            fetch_and_install_tools(required_tools, install_path, node_architecture)
+
+        workload_venvs = {}  # To store venv path for each workload
+        dep_groups = group_workloads_by_dependencies(filtered_workloads, selected)
+
+        # Build reverse mapping: dep_hash -> venv_path for incremental installs
+        # This allows us to reuse existing venvs when dependencies match
+        from llmb_install.environment.venv_utils import build_venv_hash_mapping
+
+        venv_to_hash = {}
+        if existing_workload_venvs:
+            venv_to_hash = build_venv_hash_mapping(existing_workload_venvs)
+            for dep_hash, venv_path in venv_to_hash.items():
+                self.logger.debug(f"Mapped existing venv hash {dep_hash} -> {venv_path}")
+
+        # Show the user how workloads will be grouped
+        print_dependency_group_summary(dep_groups)
+
+        print("Installing Workloads")
+        print("===================")
+
+        for dep_hash, workload_keys in dep_groups.items():
+            if dep_hash is None:  # Scripted workloads
+                print("\n[Individual Installations - Legacy Setup Scripts]")
+                print("-" * 60)
+                for workload_key in workload_keys:
+                    venv_path = install_scripted_workload(
+                        workload_key,
+                        filtered_workloads[workload_key],
+                        install_path,
+                        venv_type,
+                        env_vars,
+                        gpu_type,
+                    )
+                    workload_venvs[workload_key] = venv_path
+                    # Execute any additional setup tasks defined for the workload
+                    run_setup_tasks(
+                        workload_key,
+                        filtered_workloads[workload_key],
+                        venv_path,
+                        venv_type,
+                        install_path,
+                        slurm_info,
+                        env_vars,
+                        gpu_type,
+                    )
+
+                # Track completion for scripted workloads (after all workloads in this group complete)
+                if install_config is not None:
+                    try:
+                        for workload_key in workload_keys:
+                            completed_workloads.append(workload_key)
+                        save_install_state(install_config, completed_workloads, workload_venvs, existing_cluster_config)
+                    except Exception as e:
+                        print(f"Warning: Could not update installation state: {e}")
+
+            else:  # New dependency management
+                venvs_dir = os.path.join(install_path, "venvs")
+
+                # Use unified naming scheme for all dependency-based workloads
+                venv_name = f"venv_{dep_hash[:12]}"
+
+                # Check for existing venv with matching hash (incremental install)
+                from llmb_install.environment.venv_utils import should_reuse_venv
+
+                existing_venv_path = should_reuse_venv(dep_hash, venv_to_hash, validate_exists=True)
+
+                if existing_venv_path:
+                    # REUSE EXISTING VENV
+                    if len(workload_keys) == 1:
+                        workload_key = workload_keys[0]
+                        print("\n[Reusing Existing Virtual Environment]")
+                        print(f"Installing: {workload_key}")
+                        print(f"Matching venv: {existing_venv_path}")
+                        print("-" * 70)
+                    else:
+                        print("\n[Reusing Existing Shared Virtual Environment]")
+                        print(f"Installing workloads: {', '.join(sorted(workload_keys))}")
+                        print(f"Matching venv: {existing_venv_path}")
+                        print("-" * 70)
+
+                    # Validate venv actually exists before reusing
+                    if not os.path.exists(existing_venv_path):
+                        print(f"\nError: Venv path in cluster config does not exist: {existing_venv_path}")
+                        print("Installation appears incomplete or corrupted.")
+                        print("Please verify the installation directory or reinstall.")
+                        raise SystemExit(1)
+
+                    venv_path = existing_venv_path
+
+                    # Get dependencies for repo cloning (no installation needed)
+                    first_workload_key = workload_keys[0]
+                    dependencies = _resolve_dependencies(filtered_workloads[first_workload_key])
+
+                    if dependencies is None:
+                        print(f"Warning: No dependencies found for workload group containing {first_workload_key}")
+                        continue
+
+                    # Clone repos and set up workload directories (dependencies already installed)
+                    git_deps_to_clone = dependencies.get('git', {})
+
+                    for workload_key in workload_keys:
+                        workload_dir = os.path.join(install_path, "workloads", workload_key)
+                        os.makedirs(workload_dir, exist_ok=True)
+
+                        # Clone all necessary git repos into the workload dir
+                        if git_deps_to_clone:
+                            clone_git_repos(git_deps_to_clone, workload_dir, install_path)
+
+                        workload_venvs[workload_key] = venv_path
+
+                    # Run post-install scripts and setup tasks
+                    env = get_venv_environment(venv_path, venv_type)
+                    env['LLMB_INSTALL'] = install_path
+                    env['MANUAL_INSTALL'] = 'false'
+                    env['GPU_TYPE'] = gpu_type
+                    if env_vars:
+                        env_vars_str = {k: str(v) for k, v in env_vars.items()}
+                        env.update(env_vars_str)
+
+                    for workload_key in workload_keys:
+                        workload_data = filtered_workloads[workload_key]
+                        setup_config = workload_data.get('setup', {})
+                        setup_script = setup_config.get('setup_script')
+                        if setup_script:
+                            # Set workload-specific env var
+                            env['LLMB_WORKLOAD'] = os.path.join(install_path, "workloads", workload_key)
+                            source_dir = workload_data['path']
+                            run_post_install_script(setup_script, source_dir, env)
+                        # Execute new-style setup tasks (if any)
+                        run_setup_tasks(
+                            workload_key,
+                            workload_data,
+                            venv_path,
+                            venv_type,
+                            install_path,
+                            slurm_info,
+                            env_vars,
+                            gpu_type,
+                        )
+
+                    print("✓ Workloads installed successfully (reused venv)")
+
+                else:
+                    # CREATE NEW VENV (normal flow)
+                    if len(workload_keys) == 1:
+                        # If group has only one workload, it's still an individual installation
+                        workload_key = workload_keys[0]
+                        print("\n[Individual Installation - Unique Dependencies]")
+                        print(f"Installing: {workload_key}")
+                        print("-" * 60)
+                    else:
+                        # Otherwise, use a shared name for the group
+                        print("\n[Shared Virtual Environment Group]")
+                        print(f"Installing workloads: {', '.join(sorted(workload_keys))}")
+                        print("-" * 70)
+
+                    # 1. Create one venv for this group
+                    venv_path = os.path.join(venvs_dir, venv_name)
+                    create_virtual_environment(venv_path, venv_type)
+
+                    # Get resolved dependencies from the first workload in the group
+                    first_workload_key = workload_keys[0]
+                    dependencies = _resolve_dependencies(filtered_workloads[first_workload_key])
+
+                    if dependencies is None:
+                        print(f"Warning: No dependencies found for workload group containing {first_workload_key}")
+                        continue
+
+                    # 2. For each workload, create its folder and clone any repos that need to be local
+                    git_deps_to_clone = dependencies.get('git', {})
+
+                    for workload_key in workload_keys:
+                        workload_dir = os.path.join(install_path, "workloads", workload_key)
+                        os.makedirs(workload_dir, exist_ok=True)
+
+                        # Clone all necessary git repos into the workload dir
+                        clone_git_repos(git_deps_to_clone, workload_dir, install_path)
+                        workload_venvs[workload_key] = venv_path
+
+                    # 3. Install dependencies into the shared venv using the first workload's clones
+                    env = get_venv_environment(venv_path, venv_type)
+                    env['LLMB_INSTALL'] = install_path
+                    env['MANUAL_INSTALL'] = 'false'
+                    env['GPU_TYPE'] = gpu_type
+                    if env_vars:
+                        env_vars_str = {k: str(v) for k, v in env_vars.items()}
+                        env.update(env_vars_str)  # Ensure things like HF_TOKEN are set in the setup env.
+
+                    first_workload_dir = os.path.join(install_path, "workloads", first_workload_key)
+                    install_dependencies(venv_path, venv_type, dependencies, first_workload_dir, env)
+
+                    # 4. For each workload, run post-install script (if any)
+                    for workload_key in workload_keys:
+                        workload_data = filtered_workloads[workload_key]
+                        setup_config = workload_data.get('setup', {})
+                        setup_script = setup_config.get('setup_script')
+                        if setup_script:
+                            # Set workload-specific env var
+                            env['LLMB_WORKLOAD'] = os.path.join(install_path, "workloads", workload_key)
+                            source_dir = workload_data['path']
+                            run_post_install_script(setup_script, source_dir, env)
+                        # Execute new-style setup tasks (if any)
+                        run_setup_tasks(
+                            workload_key,
+                            workload_data,
+                            venv_path,
+                            venv_type,
+                            install_path,
+                            slurm_info,
+                            env_vars,
+                            gpu_type,
+                        )
+
+                # Track completion for dependency-based workloads (after all workloads in this group complete)
+                if install_config is not None:
+                    try:
+                        for workload_key in workload_keys:
+                            completed_workloads.append(workload_key)
+                        save_install_state(install_config, completed_workloads, workload_venvs, existing_cluster_config)
+                    except Exception as e:
+                        print(f"Warning: Could not update installation state: {e}")
+
+        # Get image_folder from args if available
+        image_folder = getattr(args, 'image_folder', None) if args else None
+
+        create_cluster_config(
+            install_path,
+            self.root_dir,
+            selected,
+            slurm_info,
+            env_vars,
+            gpu_type,
+            venv_type,
+            workload_venvs,
+            node_architecture=node_architecture,
+            install_method=install_method,
+            image_folder=image_folder,
+            existing_cluster_config=existing_cluster_config,  # For incremental installs
+        )
+
+        print(f"\nInstallation complete! Workloads have been installed to: {install_path}")
+
+        # Save system config for future defaults (excluding per-install variables)
+        try:
+            slurm_config = None
+            if slurm_info and 'slurm' in slurm_info:
+                slurm_data = slurm_info['slurm']
+                slurm_config = SlurmConfig(
+                    account=slurm_data.get('account', ''),
+                    gpu_partition=slurm_data.get('gpu_partition', ''),
+                    cpu_partition=slurm_data.get('cpu_partition', ''),
+                    gpu_partition_gres=slurm_data.get('gpu_partition_gres'),
+                    cpu_partition_gres=slurm_data.get('cpu_partition_gres'),
+                )
+
+            install_config = InstallConfig(
+                install_path=install_path,
+                venv_type=venv_type,
+                gpu_type=gpu_type,
+                node_architecture=node_architecture,
+                slurm=slurm_config,
+                selected_workloads=selected,
+                install_method=install_method,
+                environment_vars=env_vars,
+                image_folder=getattr(args, 'image_folder', None),
+                dev_mode=getattr(args, 'dev_mode', False),
+                llmb_repo=self.root_dir,
+            )
+
+            save_system_config(install_config)
+        except Exception as e:
+            print(f"Warning: Failed to save system config for future defaults: {e}")
+
+        # Flag to track if any async jobs were submitted
+        async_jobs_submitted = False
+
+        # Pre-check for async tasks across all selected workloads (sbatch, nemo2)
+        for workload_key in selected:
+            workload_data = filtered_workloads[workload_key]
+            for task in workload_data.get('setup', {}).get('tasks', []):
+                job_type = task.get('job_type', 'local').lower()
+                if job_type in ('sbatch', 'nemo2'):
+                    async_jobs_submitted = True
+                    break  # No need to check other tasks for this workload
+            if async_jobs_submitted:  # If found in this workload, no need to check other workloads
+                break
+
+        # Add the notice here if async jobs were submitted
+        if async_jobs_submitted:
+            message_lines = [
+                "IMPORTANT: Some installation tasks were submitted as SLURM sbatch jobs.",
+                "These jobs may still be queued or running in the background.",
+                "To verify their status, please run: 'squeue -u $USER'",
+            ]
+            max_len = max(len(line) for line in message_lines)
+            border = "=" * (max_len + 4)  # +4 for padding
+
+            print(f"\n{border}")
+            for line in message_lines:
+                print(f"  {line.ljust(max_len)}  ")
+            print(f"{border}\n")
+
+        print("To run llmb-run from any directory, set the LLMB_INSTALL environment variable:")
+        print(f"  export LLMB_INSTALL={install_path}")
+        print("Consider adding this to your shell profile (e.g., ~/.bashrc or ~/.bash_aliases) for permanent access.")
+
+        # Clear install state on successful completion
+        if not dev_mode:
+            try:
+                clear_install_state()
+            except Exception as e:
+                print(f"Warning: Could not clear installation state: {e}")

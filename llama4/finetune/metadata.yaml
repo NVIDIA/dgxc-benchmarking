@@ -49,6 +49,7 @@ setup:
       - 'scipy<1.13.0'
       - 'bitsandbytes==0.46.0'
       - 'transformers==4.55.4'
+      - 'nvidia-modelopt==0.35.1'
       - package: megatron-core
         repo_key: megatron_core
       - package: nemo_run

@@ -1,3 +1,12 @@
+## [v25.08.01] - 2025-11-07
+
+### Changed
+- Enforce 'nvidia-modelopt==0.35.1' during install to workaround bug caused by latest torch version.
+- Switched inference downloads to use 'hf download' instead of 'git clone'.
+- Updated llmb-run and llmb-install packages
+- Updated 'install.sh' script.
+- Updated inf_nim/deepseek-r1 launch script.
+
 ## [v25.08] - 2025-09-08
 
 ### Added
