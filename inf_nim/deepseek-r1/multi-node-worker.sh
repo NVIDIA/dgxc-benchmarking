@@ -33,9 +33,9 @@ export NIM_NODE_RANK=${SLURM_NODEID}
 export NVIDIA_VISIBLE_DEVICES=all
 export NIM_NODE_RANK=${SLURM_NODEID}
 if [ "$NIM_NODE_RANK" -eq 0 ]; then
-  export NIM_LEADER_ROLE=1
+    export NIM_LEADER_ROLE=1
 else
-  export NIM_LEADER_ROLE=0
+    export NIM_LEADER_ROLE=0
 fi
 
 # start server

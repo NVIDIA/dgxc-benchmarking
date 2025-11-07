@@ -145,7 +145,7 @@ MODE="min_latency" MAX_NUM_TOKENS=512 USE_CASES=generation:512/8000 llmb-run sin
 STREAMING=false USE_CASES=reasoning:1000/1000 llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
 ```
 
-For more details on llmb-run usage, see the [llmb-run documentation](../../llmb-run/README.md).
+For more details on llmb-run usage, see the [llmb-run documentation](../../cli/llmb-run/README.md).
 
 ## Direct Method
 

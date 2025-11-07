@@ -160,7 +160,7 @@ MODE="min_latency" USE_CASES=generation:512/8000 llmb-run single -w inference_ll
 STREAMING=false USE_CASES=reasoning:1000/1000 llmb-run single -w inference_llama4 -s 17b --dtype fp8 --scale 8
 ```
 
-For more details on llmb-run usage, see the [llmb-run documentation](../../llmb-run/README.md).
+For more details on llmb-run usage, see the [llmb-run documentation](../../cli/llmb-run/README.md).
 
 # Direct Method
 

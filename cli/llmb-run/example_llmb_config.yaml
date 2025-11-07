@@ -1,0 +1,31 @@
+# This file is automatically created in the experiment's folder upon job launch
+# It contains metadata about the job, workload, model, cluster, and container
+job_info:
+  job_id: '3913022'
+  launch_time: '2025-07-01T21:05:18.298517'
+workload_info:
+  framework: nemo2
+  gsw_version: '25.07'
+  fw_version: 25.04.01
+  workload_type: pretrain
+  synthetic_dataset: true
+model_info:
+  model_name: nemotron4
+  model_size: 15b
+  dtype: fp8
+  scale: 8
+  gpu_type: h100
+cluster_info:
+  cluster_name: cluster-1
+  gpus_per_node: 8
+  llmb_install: /lustre/fsw/portfolios/general/llmb-25.07-dev
+  llmb_repo: /lustre/fsw/portfolios/general/dev-repo
+  slurm_account: account_name
+  slurm_gpu_partition: slurm_partition
+container_info:
+  images:
+  - nvcr.io#nvidia/nemo:25.04.01
+job_config:
+  profile_enabled: false
+  env_overrides: {}
+  model_overrides: {}
