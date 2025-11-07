@@ -1,4 +1,4 @@
-## [v25.08.01] - 2025-11-06
+## [v25.08.01] - 2025-11-07
 
 ### Changed
 - Enforce 'nvidia-modelopt==0.35.1' during install to workaround bug caused by latest torch version.
