@@ -1,4 +1,4 @@
-## [v25.10] - 2025-12-02
+## [v25.10] - 2025-12-03
 
 ### Added
   - GB300 support
@@ -18,7 +18,7 @@
   - RAG Blueprint inference recipe
   - Llama4 pretrain, fine tuning, inference recipes
 
-## [v25.08.01] - 2025-11-06
+## [v25.08.01] - 2025-11-07
 
 ### Changed
   - Enforce 'nvidia-modelopt==0.35.1' during install to workaround bug caused by latest torch version.
@@ -32,16 +32,7 @@
 ### Changed
   - Llama3.1 Documentation - GA parameter fix
 
-## [v25.05.04] - 2025-09-05
-
-### Added
-  - H100 512 GPU support for DeepSeek V3 Pretrain
-
-### Changed
-  - Bug fix for broken launch sequence due to transformers package update
-  - Include latest LLMB tooling with improved capabilities for mass recipe submission and other updates
-
-## [v25.08] - 2025-08-25
+## [v25.08] - 2025-09-08
 
 ### Added
   - GB200 support
@@ -57,23 +48,7 @@
 ### Changed 
   - Pretrain and finetune NeMo based recipes have been updated to 25.07.01 image
 
-## [v25.05.03] - 2025-08-21
-
-### Changed
-  - Fixed nvcr.io links in DeepSeek V3 and Nemotron-H metadata files.
-
-## [v25.04.02] - 2025-07-23
-
-### Changed
-  - Fixed launch errors for nemotron and llama 3.1 recipes
-
-## [v25.05.02] - 2025-07-22
-
-### Changed
-  - H100 baseline performance numbers based on most recent runs
-    - Grok1 314B
-
-## [v25.07] - 2025-07-18
+## [v25.07] - 2025-09-05
 
 ### Added
   - B200 Support
@@ -93,6 +68,31 @@
 
 ### Removed
   - Llama3 70b inference NIM recipe
+
+## [v25.05.04] - 2025-09-05
+
+### Added
+  - H100 512 GPU support for DeepSeek V3 Pretrain
+
+### Changed
+  - Bug fix for broken launch sequence due to transformers package update
+  - Include latest LLMB tooling with improved capabilities for mass recipe submission and other updates
+
+## [v25.05.03] - 2025-08-21
+
+### Changed
+  - Fixed nvcr.io links in DeepSeek V3 and Nemotron-H metadata files.
+
+## [v25.04.02] - 2025-07-23
+
+### Changed
+  - Fixed launch errors for nemotron and llama 3.1 recipes
+
+## [v25.05.02] - 2025-07-22
+
+### Changed
+  - H100 baseline performance numbers based on most recent runs
+    - Grok1 314B
 
 ## [v25.05.01] - 2025-06-18
 
