@@ -1,0 +1,445 @@
+Starting the benchmark!
+Concurrency: 1
+DEBUG: TOTAL_REQUESTS=200, MIN_REQUESTS=200, REQUEST_MULTIPLIER=5
+Use Case: chat
+Input Sequence Length: 128
+Output Sequence Length: 128
+----------------
+Generated 200 prompts
+ Successfully read data for 1 stream/streams with 200 step/steps.
+*** Measurement Settings ***
+  Service Kind: OPENAI
+  Sending 200 benchmark requests
+  Using asynchronous calls for inference
+
+Request concurrency: 1
+Updated progress to 1%
+environment: line 15: : No such file or directory
+Updated progress to 1%
+environment: line 15: : No such file or directory
+Updated progress to 1%
+environment: line 15: : No such file or directory
+  Pass [1] throughput: 2.94101 infer/sec. Avg latency: 336431 usec (std 175150 usec). 
+  Client: 
+    Request count: 200
+    Throughput: 2.94101 infer/sec
+    Avg client overhead: 0.00%
+    Avg latency: 336431 usec (standard deviation 175150 usec)
+    p50 latency: 331384 usec
+    p90 latency: 376370 usec
+    p95 latency: 387187 usec
+    p99 latency: 389978 usec
+    Avg HTTP time: 336626 usec (send 71 usec + response wait 28466 usec + receive 308089 usec)
+Inferences/Second vs. Client Average Batch Latency
+Concurrency: 1, throughput: 2.94101 infer/sec, latency 336431 usec
+None of PyTorch, TensorFlow >= 2.0, or Flax have been found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Loading tokenizer: meta-llama/Llama-3.2-1B-Instruct
+
+============================================================
+TOKEN-LEVEL METRICS
+============================================================
+Input Tokens/sec:         805.69
+Output Tokens/sec:        386.31
+Avg Input Seq Length:        271 tokens
+Avg Output Seq Length:       130 tokens
+
+Time to First Token (TTFT):
+  Avg:     28.47 ms
+  P50:     16.42 ms
+  P90:     17.91 ms
+  P99:     19.91 ms
+
+Inter-Token Latency (ITL):
+  Avg:      2.39 ms
+  P50:      2.46 ms
+  P90:      2.81 ms
+  P99:      2.97 ms
+============================================================
+
+Concurrency: 1
+DEBUG: TOTAL_REQUESTS=200, MIN_REQUESTS=200, REQUEST_MULTIPLIER=5
+Use Case: chat
+Input Sequence Length: 4096
+Output Sequence Length: 512
+----------------
+Generated 200 prompts
+ Successfully read data for 1 stream/streams with 200 step/steps.
+*** Measurement Settings ***
+  Service Kind: OPENAI
+  Sending 200 benchmark requests
+  Using asynchronous calls for inference
+
+Request concurrency: 1
+Updated progress to 1%
+environment: line 15: : No such file or directory
+Updated progress to 1%
+environment: line 15: : No such file or directory
+Updated progress to 1%
+environment: line 15: : No such file or directory
+Updated progress to 1%
+environment: line 15: : No such file or directory
+Updated progress to 1%
+environment: line 15: : No such file or directory
+Updated progress to 1%
+environment: line 15: : No such file or directory
+Updated progress to 1%
+environment: line 15: : No such file or directory
+Updated progress to 1%
+environment: line 15: : No such file or directory
+  Pass [1] throughput: 0.79047 infer/sec. Avg latency: 1263402 usec (std 105784 usec). 
+  Client: 
+    Request count: 200
+    Throughput: 0.79047 infer/sec
+    Avg client overhead: 0.00%
+    Avg latency: 1263402 usec (standard deviation 105784 usec)
+    p50 latency: 1251015 usec
+    p90 latency: 1428600 usec
+    p95 latency: 1539266 usec
+    p99 latency: 1573337 usec
+    Avg HTTP time: 1263527 usec (send 91 usec + response wait 55798 usec + receive 1207638 usec)
+Inferences/Second vs. Client Average Batch Latency
+Concurrency: 1, throughput: 0.79047 infer/sec, latency 1263402 usec
+None of PyTorch, TensorFlow >= 2.0, or Flax have been found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Loading tokenizer: meta-llama/Llama-3.2-1B-Instruct
+
+============================================================
+TOKEN-LEVEL METRICS
+============================================================
+Input Tokens/sec:        6830.15
+Output Tokens/sec:        406.75
+Avg Input Seq Length:       8631 tokens
+Avg Output Seq Length:       514 tokens
+
+Time to First Token (TTFT):
+  Avg:     55.92 ms
+  P50:     54.86 ms
+  P90:     59.31 ms
+  P99:     68.23 ms
+
+Inter-Token Latency (ITL):
+  Avg:      2.35 ms
+  P50:      2.33 ms
+  P90:      2.69 ms
+  P99:      3.00 ms
+============================================================
+
+Concurrency: 25
+DEBUG: TOTAL_REQUESTS=200, MIN_REQUESTS=200, REQUEST_MULTIPLIER=5
+Use Case: chat
+Input Sequence Length: 128
+Output Sequence Length: 128
+----------------
+Generated 200 prompts
+ Successfully read data for 1 stream/streams with 200 step/steps.
+*** Measurement Settings ***
+  Service Kind: OPENAI
+  Sending 200 benchmark requests
+  Using asynchronous calls for inference
+
+Request concurrency: 25
+Updated progress to 1%
+environment: line 15: : No such file or directory
+  Pass [1] throughput: 33.3313 infer/sec. Avg latency: 498290 usec (std 75924 usec). 
+  Client: 
+    Request count: 200
+    Throughput: 33.3313 infer/sec
+    Avg client overhead: 0.00%
+    Avg latency: 498290 usec (standard deviation 75924 usec)
+    p50 latency: 533562 usec
+    p90 latency: 563862 usec
+    p95 latency: 618248 usec
+    p99 latency: 618574 usec
+    Avg HTTP time: 505856 usec (send 1843 usec + response wait 129505 usec + receive 374508 usec)
+Inferences/Second vs. Client Average Batch Latency
+Concurrency: 25, throughput: 33.3313 infer/sec, latency 498290 usec
+None of PyTorch, TensorFlow >= 2.0, or Flax have been found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Loading tokenizer: meta-llama/Llama-3.2-1B-Instruct
+
+============================================================
+TOKEN-LEVEL METRICS
+============================================================
+Input Tokens/sec:        9698.42
+Output Tokens/sec:       4319.09
+Avg Input Seq Length:        270 tokens
+Avg Output Seq Length:       120 tokens
+
+Time to First Token (TTFT):
+  Avg:    128.06 ms
+  P50:    146.76 ms
+  P90:    179.01 ms
+  P99:    226.08 ms
+
+Inter-Token Latency (ITL):
+  Avg:      3.10 ms
+  P50:      2.75 ms
+  P90:      2.92 ms
+  P99:     20.30 ms
+============================================================
+
+Concurrency: 25
+DEBUG: TOTAL_REQUESTS=200, MIN_REQUESTS=200, REQUEST_MULTIPLIER=5
+Use Case: chat
+Input Sequence Length: 4096
+Output Sequence Length: 512
+----------------
+Generated 200 prompts
+ Successfully read data for 1 stream/streams with 200 step/steps.
+*** Measurement Settings ***
+  Service Kind: OPENAI
+  Sending 200 benchmark requests
+  Using asynchronous calls for inference
+
+Request concurrency: 25
+Updated progress to 1%
+environment: line 15: : No such file or directory
+  Pass [1] throughput: 6.66627 infer/sec. Avg latency: 2721959 usec (std 248546 usec). 
+  Client: 
+    Request count: 200
+    Throughput: 6.66627 infer/sec
+    Avg client overhead: 0.00%
+    Avg latency: 2721959 usec (standard deviation 248546 usec)
+    p50 latency: 2893514 usec
+    p90 latency: 3183897 usec
+    p95 latency: 3366494 usec
+    p99 latency: 3420950 usec
+    Avg HTTP time: 2776886 usec (send 1697 usec + response wait 320584 usec + receive 2454605 usec)
+Inferences/Second vs. Client Average Batch Latency
+Concurrency: 25, throughput: 6.66627 infer/sec, latency 2721959 usec
+None of PyTorch, TensorFlow >= 2.0, or Flax have been found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Loading tokenizer: meta-llama/Llama-3.2-1B-Instruct
+
+============================================================
+TOKEN-LEVEL METRICS
+============================================================
+Input Tokens/sec:       59195.45
+Output Tokens/sec:       3502.73
+Avg Input Seq Length:       8633 tokens
+Avg Output Seq Length:       511 tokens
+
+Time to First Token (TTFT):
+  Avg:    313.07 ms
+  P50:    261.65 ms
+  P90:    554.12 ms
+  P99:    902.55 ms
+
+Inter-Token Latency (ITL):
+  Avg:      4.72 ms
+  P50:      3.86 ms
+  P90:      4.54 ms
+  P99:     33.32 ms
+============================================================
+
+Concurrency: 50
+DEBUG: TOTAL_REQUESTS=250, MIN_REQUESTS=200, REQUEST_MULTIPLIER=5
+Use Case: chat
+Input Sequence Length: 128
+Output Sequence Length: 128
+----------------
+Generated 250 prompts
+ Successfully read data for 1 stream/streams with 250 step/steps.
+*** Measurement Settings ***
+  Service Kind: OPENAI
+  Sending 250 benchmark requests
+  Using asynchronous calls for inference
+
+Request concurrency: 50
+  Pass [1] throughput: 49.9972 infer/sec. Avg latency: 754992 usec (std 129459 usec). 
+  Client: 
+    Request count: 250
+    Throughput: 49.9972 infer/sec
+    Avg client overhead: 0.00%
+    Avg latency: 754992 usec (standard deviation 129459 usec)
+    p50 latency: 768679 usec
+    p90 latency: 920263 usec
+    p95 latency: 920930 usec
+    p99 latency: 927401 usec
+    Avg HTTP time: 769972 usec (send 6138 usec + response wait 273990 usec + receive 489844 usec)
+Inferences/Second vs. Client Average Batch Latency
+Concurrency: 50, throughput: 49.9972 infer/sec, latency 754992 usec
+None of PyTorch, TensorFlow >= 2.0, or Flax have been found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Loading tokenizer: meta-llama/Llama-3.2-1B-Instruct
+
+============================================================
+TOKEN-LEVEL METRICS
+============================================================
+Input Tokens/sec:       15893.07
+Output Tokens/sec:       6746.41
+Avg Input Seq Length:        271 tokens
+Avg Output Seq Length:       115 tokens
+
+Time to First Token (TTFT):
+  Avg:    273.90 ms
+  P50:    285.88 ms
+  P90:    402.89 ms
+  P99:    412.68 ms
+
+Inter-Token Latency (ITL):
+  Avg:      4.22 ms
+  P50:      3.35 ms
+  P90:      3.72 ms
+  P99:     21.94 ms
+============================================================
+
+Concurrency: 50
+DEBUG: TOTAL_REQUESTS=250, MIN_REQUESTS=200, REQUEST_MULTIPLIER=5
+Use Case: chat
+Input Sequence Length: 4096
+Output Sequence Length: 512
+----------------
+Generated 250 prompts
+ Successfully read data for 1 stream/streams with 250 step/steps.
+*** Measurement Settings ***
+  Service Kind: OPENAI
+  Sending 250 benchmark requests
+  Using asynchronous calls for inference
+
+Request concurrency: 50
+Updated progress to 1%
+environment: line 15: : No such file or directory
+  Pass [1] throughput: 10.4161 infer/sec. Avg latency: 4249531 usec (std 219952 usec). 
+  Client: 
+    Request count: 250
+    Throughput: 10.4161 infer/sec
+    Avg client overhead: 0.00%
+    Avg latency: 4249531 usec (standard deviation 219952 usec)
+    p50 latency: 4274445 usec
+    p90 latency: 4749335 usec
+    p95 latency: 5075953 usec
+    p99 latency: 5435527 usec
+    Avg HTTP time: 4352722 usec (send 4913 usec + response wait 481290 usec + receive 3866519 usec)
+Inferences/Second vs. Client Average Batch Latency
+Concurrency: 50, throughput: 10.4161 infer/sec, latency 4249531 usec
+None of PyTorch, TensorFlow >= 2.0, or Flax have been found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Loading tokenizer: meta-llama/Llama-3.2-1B-Instruct
+
+============================================================
+TOKEN-LEVEL METRICS
+============================================================
+Input Tokens/sec:       93474.31
+Output Tokens/sec:       5540.90
+Avg Input Seq Length:       8632 tokens
+Avg Output Seq Length:       512 tokens
+
+Time to First Token (TTFT):
+  Avg:    467.87 ms
+  P50:    379.07 ms
+  P90:    995.93 ms
+  P99:   1750.29 ms
+
+Inter-Token Latency (ITL):
+  Avg:      7.41 ms
+  P50:      5.08 ms
+  P90:      5.91 ms
+  P99:     36.52 ms
+============================================================
+
+Concurrency: 100
+DEBUG: TOTAL_REQUESTS=500, MIN_REQUESTS=200, REQUEST_MULTIPLIER=5
+Use Case: chat
+Input Sequence Length: 128
+Output Sequence Length: 128
+----------------
+Generated 500 prompts
+ Successfully read data for 1 stream/streams with 500 step/steps.
+*** Measurement Settings ***
+  Service Kind: OPENAI
+  Sending 500 benchmark requests
+  Using asynchronous calls for inference
+
+Request concurrency: 100
+  Pass [1] throughput: 71.4244 infer/sec. Avg latency: 1183733 usec (std 93899 usec). 
+  Client: 
+    Request count: 500
+    Throughput: 71.4244 infer/sec
+    Avg client overhead: 0.00%
+    Avg latency: 1183733 usec (standard deviation 93899 usec)
+    p50 latency: 1225109 usec
+    p90 latency: 1424691 usec
+    p95 latency: 1427761 usec
+    p99 latency: 1428437 usec
+    Avg HTTP time: 1198502 usec (send 5654 usec + response wait 491967 usec + receive 700881 usec)
+Inferences/Second vs. Client Average Batch Latency
+Concurrency: 100, throughput: 71.4244 infer/sec, latency 1183733 usec
+None of PyTorch, TensorFlow >= 2.0, or Flax have been found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Loading tokenizer: meta-llama/Llama-3.2-1B-Instruct
+
+============================================================
+TOKEN-LEVEL METRICS
+============================================================
+Input Tokens/sec:       20447.98
+Output Tokens/sec:       8312.22
+Avg Input Seq Length:        271 tokens
+Avg Output Seq Length:       110 tokens
+
+Time to First Token (TTFT):
+  Avg:    488.88 ms
+  P50:    546.01 ms
+  P90:    638.68 ms
+  P99:    805.40 ms
+
+Inter-Token Latency (ITL):
+  Avg:      6.37 ms
+  P50:      4.47 ms
+  P90:      5.59 ms
+  P99:     42.13 ms
+============================================================
+
+Concurrency: 100
+DEBUG: TOTAL_REQUESTS=500, MIN_REQUESTS=200, REQUEST_MULTIPLIER=5
+Use Case: chat
+Input Sequence Length: 4096
+Output Sequence Length: 512
+----------------
+Generated 500 prompts
+ Successfully read data for 1 stream/streams with 500 step/steps.
+*** Measurement Settings ***
+  Service Kind: OPENAI
+  Sending 500 benchmark requests
+  Using asynchronous calls for inference
+
+Request concurrency: 100
+environment: line 15: : No such file or directory
+Updated progress to 1%
+  Pass [1] throughput: 12.4993 infer/sec. Avg latency: 7434037 usec (std 119161 usec). 
+  Client: 
+    Request count: 500
+    Throughput: 12.4993 infer/sec
+    Avg client overhead: 0.00%
+    Avg latency: 7434037 usec (standard deviation 119161 usec)
+    p50 latency: 7571828 usec
+    p90 latency: 9146735 usec
+    p95 latency: 10190777 usec
+    p99 latency: 11005092 usec
+    Avg HTTP time: 7581342 usec (send 5409 usec + response wait 664915 usec + receive 6911018 usec)
+Inferences/Second vs. Client Average Batch Latency
+Concurrency: 100, throughput: 12.4993 infer/sec, latency 7434037 usec
+None of PyTorch, TensorFlow >= 2.0, or Flax have been found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Updated progress to 1%
+environment: line 15: : No such file or directory
+Loading tokenizer: meta-llama/Llama-3.2-1B-Instruct
+
+============================================================
+TOKEN-LEVEL METRICS
+============================================================
+Input Tokens/sec:      108882.75
+Output Tokens/sec:       6473.77
+Avg Input Seq Length:       8630 tokens
+Avg Output Seq Length:       513 tokens
+
+Time to First Token (TTFT):
+  Avg:    653.54 ms
+  P50:    348.94 ms
+  P90:   2055.07 ms
+  P99:   3793.83 ms
+
+Inter-Token Latency (ITL):
+  Avg:     13.24 ms
+  P50:      8.21 ms
+  P90:     38.22 ms
+  P99:     40.66 ms
+============================================================
+
+Created progress file at /vllm-llm-results/progress
+environment: line 15: : No such file or directory
+Updated progress to 100%
+Finished Benchmarking

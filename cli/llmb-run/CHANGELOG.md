@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.6] - 2025-11-07
+
+### Added
+- `LLMB_SKIP_PP` environment variable to disable post-processing.
+
+## [1.3.5] - 2025-11-05
+
+### Changed
+- Use `release.yaml` for version information, fall back to `metadata.yaml` if it does not exist.
+
 ## [1.3.4] - 2025-10-24
 
 ### Added

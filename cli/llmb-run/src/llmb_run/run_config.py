@@ -45,6 +45,29 @@ except ModuleNotFoundError:
     pass
 
 
+def load_llmb_version(repo_root: str) -> Optional[str]:
+    """Load llmb_version from release.yaml at repo root.
+
+    Args:
+        repo_root: Path to repository root directory.
+
+    Returns:
+        Version string, or None if not found
+    """
+    release_yaml_path = os.path.join(repo_root, 'release.yaml')
+    if os.path.exists(release_yaml_path):
+        try:
+            with open(release_yaml_path, 'r') as f:
+                release_data = yaml.safe_load(f)
+                if version := release_data.get('llmb_version'):
+                    logger.debug(f"Loaded llmb_version '{version}' from {release_yaml_path}")
+                    return version
+        except Exception as e:
+            logger.warning(f"Failed to load release.yaml from {release_yaml_path}: {e}")
+
+    return None
+
+
 def find_experiment_config_file(experiment_dir: str) -> Optional[str]:
     """Find the experiment config file in the configs directory.
 
@@ -311,6 +334,10 @@ def create_llmb_config(task, job_id, workdir, config, workloads):
         logger.debug(f"Skipping experiment_id generation for {framework} workload")
         experiment_id = None
 
+    # Get llmb_version from release.yaml (new format) with fallback to metadata.yaml (legacy)
+    repo_root = config.get('launcher', {}).get('llmb_repo')
+    llmb_version = load_llmb_version(repo_root) or metadata.get('general', {}).get('gsw_version') or 'unknown'
+
     # Build configuration dictionary
     llmb_config = {
         'job_info': {
@@ -320,7 +347,7 @@ def create_llmb_config(task, job_id, workdir, config, workloads):
         },
         'workload_info': {
             'framework': framework,
-            'gsw_version': metadata.get('general', {}).get('gsw_version', 'unknown'),
+            'gsw_version': llmb_version,  # Keep field name for backward compatibility
             'fw_version': fw_version,
             'workload_type': workload_info.get('workload_type', ''),
             'synthetic_dataset': workload_info.get('synthetic_dataset', True),

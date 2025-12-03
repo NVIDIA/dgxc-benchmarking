@@ -1,0 +1,178 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: MIT
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-metrics-calculator
+  labels:
+    app: {{ .Release.Name }}-metrics
+data:
+  calculate_token_metrics.py: |
+    #!/usr/bin/env python3
+    import json
+    import os
+    import sys
+    
+    def calculate_token_metrics(output_dir, model_tokenizer):
+        """Calculate token-level metrics from perf_analyzer output"""
+        try:
+            from transformers import AutoTokenizer
+            
+            # Load tokenizer
+            print(f"Loading tokenizer: {model_tokenizer}")
+            tokenizer = AutoTokenizer.from_pretrained(model_tokenizer)
+            
+            # Load perf_analyzer results
+            with open(f"{output_dir}/profile_export.json") as f:
+                data = json.load(f)
+            
+            # Load input data
+            with open(f"{output_dir}/inputs.json") as f:
+                inputs = json.load(f)["data"]
+            
+            # Extract experiment data
+            exp = data.get("experiments", [{}])[0]
+            requests = exp.get("requests", [])
+            
+            if not requests:
+                print("Warning: No requests found in profile_export.json")
+                return {}
+            
+            # Calculate input tokens
+            inp_tokens = sum(
+                len(tokenizer.encode(inp["payload"][0]["messages"][0]["content"])) 
+                for inp in inputs[:len(requests)]
+            )
+            
+            # Calculate output tokens and timing metrics
+            out_tokens = 0
+            ttft_list = []  # Time to First Token
+            itl_list = []   # Inter-Token Latency
+            
+            for req in requests:
+                resp_outputs = req.get("response_outputs", [])
+                out_tokens += len(resp_outputs)
+                
+                timestamps = req.get("response_timestamps", [])
+                req_timestamp = req.get("timestamp", 0)
+                
+                # Calculate TTFT (time from request to first token)
+                if len(timestamps) >= 1:
+                    ttft_ms = (timestamps[0] - req_timestamp) / 1000000  # Convert to ms
+                    ttft_list.append(ttft_ms)
+                
+                # Calculate ITL (time between subsequent tokens)
+                if len(timestamps) > 1:
+                    for i in range(1, len(timestamps)):
+                        itl_ms = (timestamps[i] - timestamps[i-1]) / 1000000
+                        itl_list.append(itl_ms)
+            
+            # Calculate total time (timestamps are absolute nanoseconds, not offsets)
+            if requests:
+                start_time = min(r.get("timestamp", 0) for r in requests if r.get("timestamp"))
+                # response_timestamps are already absolute, don't add request timestamp!
+                end_times = [
+                    r["response_timestamps"][-1] 
+                    for r in requests if r.get("response_timestamps") and len(r["response_timestamps"]) > 0
+                ]
+                end_time = max(end_times) if end_times else start_time
+                total_time_sec = (end_time - start_time) / 1000000000  # Convert nanoseconds to seconds
+            else:
+                total_time_sec = 0
+            
+            # Helper function for percentiles
+            def percentile(data, p):
+                if not data:
+                    return 0
+                sorted_data = sorted(data)
+                idx = int(len(sorted_data) * p)
+                return sorted_data[min(idx, len(sorted_data)-1)]
+            
+            # Compile metrics
+            metrics = {
+                "request_throughput": len(requests) / total_time_sec if total_time_sec > 0 else 0,
+                "request_latency_avg": exp.get("latency_avg", 0) / 1000,
+                "request_latency_p50": exp.get("latency_p50", 0) / 1000,
+                "request_latency_p90": exp.get("latency_p90", 0) / 1000,
+                "request_latency_p95": exp.get("latency_p95", 0) / 1000,
+                "request_latency_p99": exp.get("latency_p99", 0) / 1000,
+                "input_sequence_length_avg": inp_tokens / len(requests) if requests else 0,
+                "output_sequence_length_avg": out_tokens / len(requests) if requests else 0,
+                "time_to_first_token_avg": sum(ttft_list) / len(ttft_list) if ttft_list else 0,
+                "time_to_first_token_p50": percentile(ttft_list, 0.50),
+                "time_to_first_token_p90": percentile(ttft_list, 0.90),
+                "time_to_first_token_p95": percentile(ttft_list, 0.95),
+                "time_to_first_token_p99": percentile(ttft_list, 0.99),
+                "inter_token_latency_avg": sum(itl_list) / len(itl_list) if itl_list else 0,
+                "inter_token_latency_p50": percentile(itl_list, 0.50),
+                "inter_token_latency_p90": percentile(itl_list, 0.90),
+                "inter_token_latency_p95": percentile(itl_list, 0.95),
+                "inter_token_latency_p99": percentile(itl_list, 0.99),
+                "output_token_throughput": out_tokens / total_time_sec if total_time_sec > 0 else 0,
+                "input_token_throughput": inp_tokens / total_time_sec if total_time_sec > 0 else 0
+            }
+            
+            # Save metrics
+            with open(f"{output_dir}/profile_export_genai_perf.json", "w") as f:
+                json.dump(metrics, f, indent=2)
+            
+            # Print summary
+            print("\n" + "="*60)
+            print("TOKEN-LEVEL METRICS")
+            print("="*60)
+            print(f"Input Tokens/sec:     {metrics['input_token_throughput']:>10.2f}")
+            print(f"Output Tokens/sec:    {metrics['output_token_throughput']:>10.2f}")
+            print(f"Avg Input Seq Length: {metrics['input_sequence_length_avg']:>10.0f} tokens")
+            print(f"Avg Output Seq Length:{metrics['output_sequence_length_avg']:>10.0f} tokens")
+            print(f"\nTime to First Token (TTFT):")
+            print(f"  Avg:  {metrics['time_to_first_token_avg']:>8.2f} ms")
+            print(f"  P50:  {metrics['time_to_first_token_p50']:>8.2f} ms")
+            print(f"  P90:  {metrics['time_to_first_token_p90']:>8.2f} ms")
+            print(f"  P99:  {metrics['time_to_first_token_p99']:>8.2f} ms")
+            print(f"\nInter-Token Latency (ITL):")
+            print(f"  Avg:  {metrics['inter_token_latency_avg']:>8.2f} ms")
+            print(f"  P50:  {metrics['inter_token_latency_p50']:>8.2f} ms")
+            print(f"  P90:  {metrics['inter_token_latency_p90']:>8.2f} ms")
+            print(f"  P99:  {metrics['inter_token_latency_p99']:>8.2f} ms")
+            print("="*60 + "\n")
+            
+            return metrics
+            
+        except Exception as e:
+            print(f"Warning: Could not calculate token metrics: {e}")
+            import traceback
+            traceback.print_exc()
+            # Create empty metrics file
+            with open(f"{output_dir}/profile_export_genai_perf.json", "w") as f:
+                json.dump({}, f)
+            return {}
+    
+    if __name__ == "__main__":
+        output_dir = os.environ.get("OUTPUT_DIR")
+        model_tokenizer = os.environ.get("MODEL_TOKENIZER")
+        
+        if not output_dir or not model_tokenizer:
+            print("Error: OUTPUT_DIR and MODEL_TOKENIZER environment variables must be set")
+            sys.exit(1)
+        
+        calculate_token_metrics(output_dir, model_tokenizer)
+

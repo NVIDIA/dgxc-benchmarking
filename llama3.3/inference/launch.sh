@@ -26,8 +26,6 @@
 # Parameters
 #SBATCH --exclusive
 #SBATCH --job-name="llama3.3-70b_fp4:trtllm-benchmark"
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
 #SBATCH --time=00:30:00
 
 set -eu -o pipefail
@@ -38,15 +36,10 @@ if [ ${BASH_VERSION:0:1} -lt 4 ] || [ ${BASH_VERSION:0:1} -eq 4 ] && [ ${BASH_VE
     exit 1
 fi
 
-if [[ $SLURM_JOB_NUM_NODES -ne 1 ]]; then
-    echo "This benchmark only supports a single node -- ${SLURM_JOB_NUM_NODE} nodes requested."
-    exit 1
-fi
-
 export WORKLOAD_TYPE=inference
 export MODEL_NAME=llama3.3
-export FW_VERSION=1.0.0rc4
-export GSW_VERSION=25.08
+export FW_VERSION=1.1.0rc5
+export GSW_VERSION=25.10
 
 export LLMB_INSTALL=${LLMB_INSTALL:?Please set LLMB_INSTALL to the path of the installation directory for all workloads}
 export LLMB_WORKLOAD=$LLMB_INSTALL/workloads/${WORKLOAD_TYPE}_${MODEL_NAME}
@@ -60,36 +53,49 @@ if [[ $MODE != "min_latency" && $MODE != "max_throughput" ]]; then
     exit 1
 fi
 
-if [[ $MODE == "max_throughput" ]]; then
-    export CONFIG_FILE=$LLMB_WORKLOAD/config_max_throughput.yml
-elif [[ $MODE == "min_latency" ]]; then
-    export CONFIG_FILE=$LLMB_WORKLOAD/config_min_latency.yml
-fi
-
 export MODEL_CARD="Llama3.3-70B"
-export MODEL_PATH=$LLMB_WORKLOAD/Llama3.3_70B
 export MOUNT_DIR=$LLMB_WORKLOAD
+export GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
+export GPU_TYPE=${GPU_TYPE,,}
 
 # User defined variables
 export EP=1 # No expert parallel support in this model, so override to 1
-
 export NUM_REQUESTS=${NUM_REQUESTS:-4096}
 export USE_CASES=${USE_CASES:-"reasoning:1000/1000 chat:128/128 summarization:8000/512 generation:512/8000"}
-export CONCURRENCY=${CONCURRENCY:--1}
 export MAX_NUM_TOKENS=${MAX_NUM_TOKENS:-2048}
 
 if [[ $MODE == "max_throughput" ]]; then
-    export TP=${TP:-1}
-    export PP=${PP:-1}
-    export MAX_BATCH_SIZE=${MAX_BATCH_SIZE:-256}
-    export KV_CACHE_FRACTION=${KV_CACHE_FRACTION:-0.95}
+    if [[ $GPU_TYPE == "h100" ]]; then
+        export MODEL_PATH=$LLMB_WORKLOAD/Llama-3.3-70B-Instruct-FP8
+        export TP=${TP:-2}
+        export PP=${PP:-1}
+        export MAX_BATCH_SIZE=${MAX_BATCH_SIZE:-256}
+        export NUM_REQUESTS=${NUM_REQUESTS:-2000}
+        export KV_CACHE_FRACTION=${KV_CACHE_FRACTION:-0.95}
+        export CONCURRENCY=${CONCURRENCY:-128}
+    elif [[ $GPU_TYPE == "gb200" ]] || [[ $GPU_TYPE == "b200" ]]; then
+        export MODEL_PATH=$LLMB_WORKLOAD/Llama-3.3-70B-Instruct-FP4
+        export TP=${TP:-1}
+        export PP=${PP:-1}
+        export MAX_BATCH_SIZE=${MAX_BATCH_SIZE:-640}
+        export NUM_REQUESTS=${NUM_REQUESTS:-4000}
+        export KV_CACHE_FRACTION=${KV_CACHE_FRACTION:-0.95}
+        export CONCURRENCY=${CONCURRENCY:-640}
+    fi
 elif [[ $MODE == "min_latency" ]]; then
-    export TP=${TP:-4}
-    export PP=${PP:-1}
-    export MAX_BATCH_SIZE=1
-    export CONCURRENCY=1
-    export KV_CACHE_FRACTION=${KV_CACHE_FRACTION:-0.75}
-    export NUM_REQUESTS=20
+    if [[ $GPU_TYPE == "gb200" ]]; then
+        export MODEL_PATH=$LLMB_WORKLOAD/Llama-3.3-70B-Instruct-FP4
+        export TP=${TP:-4}
+        export PP=${PP:-1}
+        export MAX_BATCH_SIZE=1
+        export CONCURRENCY=1
+        export KV_CACHE_FRACTION=${KV_CACHE_FRACTION:-0.75}
+        export NUM_REQUESTS=20
+    else
+        echo "❌ Error: Min latency mode only supports gb200 GPU type, got '$GPU_TYPE'"
+        exit 1
+
+    fi
 fi
 
 export STREAMING=${STREAMING:-true}
@@ -101,9 +107,62 @@ if [ "$STREAMING" = true ]; then
     streaming_log='_streaming-on'
 fi
 
+# Using MAX_BATCH_SIZE generate cuda graph batch sizes
+generate_powers_of_2() {
+    local number=$1
+    local power=1
+    local powers_of_2=()
+
+    while [ $power -le $number ]; do
+        powers_of_2+=("$power")
+        power=$((power * 2))
+    done
+    # Add last number to the list
+    if [ ${powers_of_2[-1]} -ne $number ]; then
+        powers_of_2+=("$number")
+    fi
+
+    local joined_list=$(
+        IFS=,
+        echo "[${powers_of_2[*]}]"
+    )
+    echo "$joined_list"
+}
+
+export cuda_batch_sizes=$(generate_powers_of_2 $MAX_BATCH_SIZE)
+
+# Generate config file for max_throughput:
+pushd $LLMB_WORKLOAD
+
+EPOCH_MS=$(date +%s%3N)
+
+if [[ $MODE == "max_throughput" ]]; then
+    cat << EOF > config_${EPOCH_MS}.yml
+enable_attention_dp: false
+cuda_graph_config:
+  enable_padding: true
+  batch_sizes: $cuda_batch_sizes
+print_iter_log: true
+kv_cache_config:
+  free_gpu_memory_fraction: $KV_CACHE_FRACTION
+stream_interval: 4
+EOF
+elif [[ $MODE == "min_latency" ]]; then
+    cat << EOF > config_${EPOCH_MS}.yml
+enable_attention_dp: false
+cuda_graph_config:
+  max_batch_size: 4
+kv_cache_config:
+  enable_block_reuse: false
+print_iter_log: false
+enable_autotuner: false
+enable_min_latency: true
+EOF
+fi
+
 # Loop over each use case
 for value in $USE_CASES; do
-
+    export CONFIG_FILE=$LLMB_WORKLOAD/config_${EPOCH_MS}.yml
     use_case=$(echo "$value" | cut -d':' -f1)
     ISL=$(echo "$value" | cut -d':' -f2 | cut -d'/' -f1)
     OSL=$(echo "$value" | cut -d':' -f2 | cut -d'/' -f2)

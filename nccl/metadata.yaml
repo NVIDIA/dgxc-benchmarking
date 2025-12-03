@@ -1,0 +1,52 @@
+# Setup
+general:
+  workload: nccl
+  workload_type: microbenchmark
+  gsw_version: '25.10'
+  framework: nccl
+
+container:
+  images: 
+    - 'nvcr.io#nvidia/nemo:25.09.00'
+
+repositories:
+  comms-perf:
+    url: "https://github.com/NVIDIA/Nvidia-Comms-Perf-Suite.git"
+    commit: "07b1b55f606af57e3f276bf182e04f626c923b4c"
+
+setup:
+  venv_req: true
+  dependencies:
+    git:
+      comms-perf:
+        repo_key: comms-perf
+        install_method:
+          type: clone
+  tasks:
+    - name: Generate NCCL launch script
+      cmd: './setup_nccl_launcher.sh'
+      job_type: local
+      requires_gpus: false
+
+# Run
+run:
+  launcher_type: 'sbatch'
+  launch_script: 'launch.sh'
+
+  gpu_configs:
+    gb200:
+      model_configs:
+        - model_size: 'nccl'
+          dtypes: ['fp8']
+          scales: [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
+    b200:
+      model_configs:
+        - model_size: 'nccl'
+          dtypes: ['fp8']
+          scales: [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
+    h100:
+      model_configs:
+        - model_size: 'nccl'
+          dtypes: ['fp8']
+          scales: [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
+  

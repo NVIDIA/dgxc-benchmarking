@@ -68,7 +68,6 @@ tools:
 general:
   workload: my_workload
   workload_type: pretrain
-  gsw_version: '25.10.dev'
   framework: nemo2
 
 container:
@@ -104,7 +103,6 @@ run:
 general:
   workload: my_workload
   workload_type: pretrain
-  gsw_version: '25.10.dev'
   framework: nemo2
 
 container:
@@ -141,7 +139,6 @@ run:
 general:
   workload: my_workload
   workload_type: pretrain
-  gsw_version: '25.10.dev'
   framework: nemo2
 
 container:

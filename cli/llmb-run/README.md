@@ -398,4 +398,14 @@ llmb-run --help
 For most users, we recommend using the automated installer script described in Quick Start.
 
 
+## Environment Variables Reference
+
+The following environment variables are recognized to control behavior:
+
+| Variable | Purpose | Input |
+|---|---|---|
+| `LLMB_SKIP_PP` | Disable post-processing job submission | `1`, `true`, or `yes` to disable |
+
+
+
 

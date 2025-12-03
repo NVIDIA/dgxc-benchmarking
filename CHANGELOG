@@ -1,13 +1,47 @@
-## [v25.08.01] - 2025-11-07
+## [v25.10] - 2025-12-02
+
+### Added
+  - GB300 support
+    - Pretrain recipes: Nemotron4, Llama3.1, DS V3, Grok1 and Nemotron-H
+  - Micro-benchmark for measuring CPU overhead
+  - NCCL benchmark
+  - Inference recipes deployable via Helm Charts for K8s platform
+  - GPT OSS inference recipes for Dynamo K8s platform
+  - Llama3 LoRa finetuning recipe
 
 ### Changed
-- Enforce 'nvidia-modelopt==0.35.1' during install to workaround bug caused by latest torch version.
-- Switched inference downloads to use 'hf download' instead of 'git clone'.
-- Updated llmb-run and llmb-install packages
-- Updated 'install.sh' script.
-- Updated inf_nim/deepseek-r1 launch script.
+  - Updated DS V3, Grok1, Llama 3.1, Nemotron4 and Nemotron-H pretrain and finetune recipes to reduce install footprint
+  - Updated to NeMo 25.09.00 where applicable
 
-## [v25.08] - 2025-09-08
+### Removed
+  - DeepSeek R1 NIM inference recipe
+  - RAG Blueprint inference recipe
+  - Llama4 pretrain, fine tuning, inference recipes
+
+## [v25.08.01] - 2025-11-06
+
+### Changed
+  - Enforce 'nvidia-modelopt==0.35.1' during install to workaround bug caused by latest torch version.
+  - Switched inference downloads to use 'hf download' instead of 'git clone'.
+  - Updated llmb-run and llmb-install packages
+  - Updated 'install.sh' script.
+  - Updated inf_nim/deepseek-r1 launch script.
+
+## [v25.05.05] - 2025-10-22
+
+### Changed
+  - Llama3.1 Documentation - GA parameter fix
+
+## [v25.05.04] - 2025-09-05
+
+### Added
+  - H100 512 GPU support for DeepSeek V3 Pretrain
+
+### Changed
+  - Bug fix for broken launch sequence due to transformers package update
+  - Include latest LLMB tooling with improved capabilities for mass recipe submission and other updates
+
+## [v25.08] - 2025-08-25
 
 ### Added
   - GB200 support
@@ -20,10 +54,26 @@
     - Inference recipes: DeepSeek R1, Llama 3.3, Llama 4
     - Expanded scales support for pretrain recipes: Llama 3.1 405B, Llama 4 Maverick, Grok1 314B, Nemotron4 15B/340B
 
-### Changed
+### Changed 
   - Pretrain and finetune NeMo based recipes have been updated to 25.07.01 image
 
-## [v25.07] - 2025-09-05
+## [v25.05.03] - 2025-08-21
+
+### Changed
+  - Fixed nvcr.io links in DeepSeek V3 and Nemotron-H metadata files.
+
+## [v25.04.02] - 2025-07-23
+
+### Changed
+  - Fixed launch errors for nemotron and llama 3.1 recipes
+
+## [v25.05.02] - 2025-07-22
+
+### Changed
+  - H100 baseline performance numbers based on most recent runs
+    - Grok1 314B
+
+## [v25.07] - 2025-07-18
 
 ### Added
   - B200 Support
@@ -43,26 +93,6 @@
 
 ### Removed
   - Llama3 70b inference NIM recipe
-
-## [v25.05.04] - 2025-09-05
-
-### Added
-  - H100 512 GPU support for DeepSeek V3 Pretrain
-
-### Changed
-  - Bug fix for broken launch sequence due to transformers package update
-  - Include latest LLMB tooling with improved capabilities for mass recipe submission and other updates
-
-## [v25.05.03] - 2025-08-21
-
-### Changed
-  - Fixed nvcr.io links in DeepSeek V3 and Nemotron-H metadata files.
-
-## [v25.05.02] - 2025-07-22
-
-### Updated
-  - H100 baseline performance numbers based on most recent runs
-    - Grok1 314B
 
 ## [v25.05.01] - 2025-06-18
 

@@ -1,0 +1,69 @@
+# Setup
+general:
+  workload: llama3
+  workload_type: finetune
+  gsw_version: '25.10'
+  framework: nemo2
+
+container:
+  images: 
+    - 'nvcr.io#nvidia/nemo:25.09.00'
+
+repositories:
+  nemo:
+    url: "https://github.com/NVIDIA-NeMo/NeMo.git"
+    commit: "9957a50be311d2279d240e890b93d88a659f772d"
+  megatron_core:
+    url: "https://github.com/NVIDIA/Megatron-LM.git"
+    commit: "20d73fe76eb03672c02f637e9b47e562b9010d4c"
+  nemo_run:
+    url: "https://github.com/NVIDIA/NeMo-Run.git"
+    commit: "04f900a9c1cde79ce6beca6a175b4c62b99d7982"
+
+setup:
+  venv_req: true
+  dependencies:
+    pip:
+      - package: nemo
+        repo_key: nemo
+        install_target: '.[nlp]'
+      - 'scipy<1.13.0'
+      - 'bitsandbytes==0.46.0'
+      - 'nvidia-modelopt==0.35.1'
+      - package: megatron-core
+        repo_key: megatron_core
+      - package: nemo_run
+        repo_key: nemo_run
+  tasks:
+    - name: checkpoint_dataset_download
+      cmd: './download_ckpt_dataset.sh'
+      job_type: nemo2
+      requires_gpus: true
+
+tools:
+  cuda_cupti_lib:
+    by_gpu:
+      gb200: "13.0.85"
+# Run
+run:
+  launcher_type: 'nemo'
+  launch_script: 'launch.sh'
+
+  gpu_configs:
+    gb200:
+      model_configs:
+        - model_size: '70b'
+          dtypes: ['fp8', 'bf16']
+          scales: [8, 16, 32]
+    b200:
+      model_configs:
+        - model_size: '70b'
+          dtypes: ['fp8', 'bf16']
+          scales: [8, 16, 32]
+
+    h100:
+      model_configs:
+        - model_size: '70b'
+          dtypes: ['fp8', 'bf16']
+          scales: [8, 16, 32]
+

@@ -26,8 +26,6 @@
 # Parameters
 #SBATCH --exclusive
 #SBATCH --job-name="llama3.3-70b:trtllm-setup"
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
 #SBATCH --time=1:00:00
 
 set -eu -o pipefail
@@ -40,53 +38,30 @@ fi
 
 export WORKLOAD_TYPE=inference
 export MODEL_NAME=llama3.3
-export FW_VERSION=1.0.0rc4
+export FW_VERSION=1.1.0rc5
 
-MODEL_WEIGHTS_DIR="Llama3.3_70B"
-# LLMB_INSTALL and LLMB_WORKLOAD are set by installer.
-export MODEL_PATH=$LLMB_WORKLOAD/$MODEL_WEIGHTS_DIR
+# LLMB_INSTALL and LLMB_WORKLOAD are provided by installer.
 
 # Create Hugging Face cache directory
 HF_CACHE_DIR=$LLMB_INSTALL/.cache/huggingface
 mkdir -p $HF_CACHE_DIR
 
+# Download weights
 pushd $LLMB_WORKLOAD
-hf download nvidia/Llama-3.3-70B-Instruct-FP4 --cache-dir $HF_CACHE_DIR --local-dir $MODEL_WEIGHTS_DIR
+if [[ $GPU_TYPE == "h100" ]]; then
+    MODEL_WEIGHTS_DIR="Llama-3.3-70B-Instruct-FP8"
+    hf download nvidia/Llama-3.3-70B-Instruct-FP8 --cache-dir $HF_CACHE_DIR --local-dir $MODEL_WEIGHTS_DIR
+elif [[ $GPU_TYPE == "gb200" ]] || [[ $GPU_TYPE == "b200" ]]; then
+    MODEL_WEIGHTS_DIR="Llama-3.3-70B-Instruct-FP4"
+    hf download nvidia/Llama-3.3-70B-Instruct-FP4 --cache-dir $HF_CACHE_DIR --local-dir $MODEL_WEIGHTS_DIR
+else
+    echo "Error: Unsupported GPU_TYPE '$GPU_TYPE'. Supported values: h100, b200 and gb200." >&2
+    exit 1
+fi
 
+export MODEL_PATH=$LLMB_WORKLOAD/$MODEL_WEIGHTS_DIR
 ISL_OSL_COMBINATIONS=("reasoning:1000/1000" "chat:128/128" "summarization:8000/512" "generation:512/8000")
 PROMPT_REQUESTS=${PROMPT_REQUESTS:-50000}
-
-cat << EOF > config_max_throughput.yml
-enable_attention_dp: false
-cuda_graph_config:
-  enable_padding: true
-  batch_sizes:
-    - 1
-    - 2
-    - 4
-    - 8
-    - 16
-    - 32
-    - 64
-    - 128
-    - 256
-    - 320
-    - 448
-    - 512
-print_iter_log: true
-stream_interval: 4
-EOF
-
-cat << EOF > config_min_latency.yml
-enable_attention_dp: false
-cuda_graph_config:
-  max_batch_size: 1
-kv_cache_config:
-  enable_block_reuse: false
-print_iter_log: false
-enable_autotuner: false
-enable_min_latency: true
-EOF
 
 for value in "${ISL_OSL_COMBINATIONS[@]}"; do
 

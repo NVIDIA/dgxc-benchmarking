@@ -2,59 +2,86 @@
 general:
   workload: llama3.1
   workload_type: pretrain
-  gsw_version: '25.08'
-  framework: nemo2
+  gsw_version: '25.10'
+  framework: megatron_bridge
 
 container:
   images: 
-    - 'nvcr.io#nvidia/nemo:25.07.01'
+    - 'nvcr.io#nvidia/nemo:25.09.00'
 
 repositories:
-  nemo:
-    url: "https://github.com/NVIDIA/NeMo.git"
-    commit: "830b06a720002d63d5bada53bd3f7e6c49777ab8"
+  megatron_bridge:
+    url: "https://github.com/NVIDIA-NeMo/Megatron-Bridge.git"
+    commit: "f23d790cf6ff26f7731c637925656ed7f94473ba" 
   megatron_core:
     url: "https://github.com/NVIDIA/Megatron-LM.git"
-    commit: "ac198fc0d60a8c748597e01ca4c6887d3a7bcf3d"
+    commit: "20d73fe76eb03672c02f637e9b47e562b9010d4c"
   nemo_run:
-    url: "https://github.com/NVIDIA/NeMo-Run.git"
-    commit: "2ca3b41a2276f1f24bd462e8baeb28c2536aa7b1"
+    url: "https://github.com/NVIDIA-NeMo/Run.git"
+    commit: "04f900a9c1cde79ce6beca6a175b4c62b99d7982"
 
 setup:
   venv_req: true
   dependencies:
     pip:
-      - package: nemo
-        repo_key: nemo
-        install_target: '.[all]'
-      - 'scipy<1.13.0'
-      - 'bitsandbytes==0.46.0'
-      - 'transformers==4.55.4'
-      - 'nvidia-modelopt==0.35.1'
+      - package: megatron_bridge
+        repo_key: megatron_bridge
+        install_target: '.'
       - package: megatron-core
         repo_key: megatron_core
       - package: nemo_run
         repo_key: nemo_run
 
+tools:
+  cuda_cupti_lib: "13.0.85"
+
 # Run
 run:
-  launcher_type: 'nemo'
+  launcher_type: 'megatron_bridge'
   launch_script: 'launch.sh'
 
   gpu_configs:
+    gb300:
+      model_configs:
+        - model_size: '405b'
+          dtypes:
+            'fp8': [128, 256, 512, 1024]
+        - model_size: '70b'
+          dtypes:
+            'fp8': [64,128,256,512,1024]
+        - model_size: '8b'
+          dtypes:
+            'fp8': [8,16,32,64,128]
     gb200:
       model_configs:
         - model_size: '405b'
-          dtypes: ['fp8', 'bf16']
-          scales: [128, 256, 512]
+          dtypes: 
+            'fp8': [128, 256, 512]
+        - model_size: '70b'
+          dtypes:
+            'fp8': [64,128,256,512]
+        - model_size: '8b'
+          dtypes:
+            'fp8': [8,16,32,64,128]
     b200:
       model_configs:
         - model_size: '405b'
-          dtypes: ['fp8', 'bf16']
-          scales: [128, 256, 512, 1024]
+          dtypes:
+            'fp8': [128, 256, 512, 1024]
+        - model_size: '70b'
+          dtypes:
+            'fp8': [64,128,256,512,1024]
+        - model_size: '8b'
+          dtypes:
+            'fp8': [8,16,32,64,128]
     h100:
       model_configs:
         - model_size: '405b'
-          dtypes: ['fp8', 'bf16']
-          scales: [512, 1024, 2048]
-  
+          dtypes: 
+            'fp8': [1024]
+        - model_size: '70b'
+          dtypes:
+            'fp8': [64,128,256,512,1024]
+        - model_size: '8b'
+          dtypes:
+            'fp8': [8,16,32,64,128]

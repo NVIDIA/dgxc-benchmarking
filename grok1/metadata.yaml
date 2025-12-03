@@ -2,42 +2,41 @@
 general:
   workload: grok1
   workload_type: pretrain
-  gsw_version: '25.08'
+  gsw_version: '25.10'
   framework: nemo2
 
 container:
   images: 
-    - 'nvcr.io#nvidia/nemo:25.04.00'
+    - 'nvcr.io#nvidia/nemo:25.09.00'
 
 repositories:
   nemo:
-    url: "https://github.com/NVIDIA/NeMo.git"
-    commit: "6f2c6fdaffcc0af97a9e2219fcc104e2399627e4"
+    url: "https://github.com/NVIDIA-NeMo/NeMo.git"
+    commit: "9957a50be311d2279d240e890b93d88a659f772d"
   megatron_core:
     url: "https://github.com/NVIDIA/Megatron-LM.git"
-    commit: "64cb6bd7a155c4e742514ed1024407fb97d0a367"
+    commit: "20d73fe76eb03672c02f637e9b47e562b9010d4c"
   nemo_run:
-    url: "https://github.com/NVIDIA/NeMo-Run.git"
-    commit: "f3e69eebb2bf66e46f6a2aa64465f714f9ea751d"
+    url: "https://github.com/NVIDIA-NeMo/Run.git"
+    commit: "04f900a9c1cde79ce6beca6a175b4c62b99d7982"
 
 setup:
   venv_req: true
   dependencies:
-    git:
-      nemo:
-        repo_key: nemo
-        install_method:
-          type: script
-          path: "reinstall.sh"
     pip:
+      - package: nemo
+        repo_key: nemo
+        install_target: '.[nlp]'
       - 'scipy<1.13.0'
       - 'bitsandbytes==0.46.0'
-      - 'transformers==4.55.4'
       - 'nvidia-modelopt==0.35.1'
       - package: megatron-core
         repo_key: megatron_core
       - package: nemo_run
         repo_key: nemo_run
+
+tools:
+  cuda_cupti_lib: "13.0.85"
 
 # Run
 run:
@@ -45,6 +44,11 @@ run:
   launch_script: 'launch.sh'
 
   gpu_configs:
+    gb300:
+      model_configs:
+        - model_size: '314b'
+          dtypes: ['fp8', 'bf16']
+          scales: [128, 256, 512]
     gb200:
       model_configs:
         - model_size: '314b'
@@ -60,4 +64,3 @@ run:
         - model_size: '314b'
           dtypes: ['fp8', 'bf16']
           scales: [512, 1024, 2048]
-

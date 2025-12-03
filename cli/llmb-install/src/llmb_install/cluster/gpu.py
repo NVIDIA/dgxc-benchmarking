@@ -200,7 +200,7 @@ def get_available_gpu_choices(workloads: Dict[str, Dict[str, Any]]) -> List[Dict
         List[Dict[str, str]]: List of choice dictionaries with 'name' and 'value' keys
 
     Raises:
-        SystemExit: If no supported GPU types found
+        ValueError: If no supported GPU types found
     """
     from llmb_install.constants import SUPPORTED_GPU_TYPES
 

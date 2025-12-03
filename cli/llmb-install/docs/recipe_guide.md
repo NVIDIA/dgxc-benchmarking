@@ -44,7 +44,6 @@ Identifies the workload at a high level:
 general:
   workload: nemotron4              # workload model name
   workload_type: pretrain          # Type of workload
-  gsw_version: '25.10.dev'         # Version string (YY.MM or YY.MM.PP)
   framework: nemo2                 # Framework used
   model: nemotron4                 # Optional: Override model name in llmb-config
 ```
@@ -56,9 +55,10 @@ general:
   - `pretrain` - Pre-training workloads
   - `inference` - Inference workloads
   - `finetune` - Fine-tuning workloads
-- **`gsw_version`** (string, required): Version in `YY.MM` or `YY.MM.PP` format
 - **`framework`** (string, required): Framework name (e.g., `nemo2`, `maxtext`, `megatron`)
 - **`model`** (string, optional): Model name to use in `llmb-config_jobid.yaml` for `model_info.model_name`. If not specified, defaults to the `workload` value. Useful when multiple workload directories share the same base model (e.g., `llama3.1` and `llama3.3` both use `model: llama3`)
+
+**Note**: Version information is managed centrally in `release.yaml` at the repository root and does not need to be specified in individual recipe metadata files.
 
 ## Container Section (Required)
 
@@ -397,7 +397,6 @@ Here's a complete `metadata.yaml` example:
 general:
   workload: nemotron4
   workload_type: pretrain
-  gsw_version: '25.10.dev'
   framework: nemo2
 
 container:
@@ -641,7 +640,6 @@ The complete schema is defined in `.gitlab/ci/metadata_schema.yaml`. Key enums a
 - **Job Types**: `local`, `nemo2`, `srun`, `sbatch`
 
 ### Format Patterns
-- **gsw_version**: `YY.MM.PP` or `YY.MM` (e.g., `25.10.dev`, `25.10.01`)
 - **commit**: Full 40-character SHA hash
 - **image URLs**: Use `#` instead of `/` (e.g., `nvcr.io#nvidia/nemo:25.07.01`)
 

@@ -50,3 +50,4 @@ build/
 __pycache__/
 llm-benchmarking-collection-internal.cursor-workspace.code-workspace
 .vscode/settings.json
+.vscode/launch.json

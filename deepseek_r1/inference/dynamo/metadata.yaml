@@ -1,0 +1,52 @@
+# Setup
+general:
+  workload: deepseek-r1-dynamo
+  workload_type: inference
+  gsw_version: '25.10'
+  framework: dynamo
+
+container:
+  images:
+    by_gpu:
+      gb200:
+        - 'nvcr.io#nvidia/ai-dynamo/tensorrtllm-runtime:0.6.1'
+      b200:
+        - 'nvcr.io#nvidia/ai-dynamo/tensorrtllm-runtime:0.6.1'
+      h100:
+        - 'nvcr.io#nvidia/ai-dynamo/tensorrtllm-runtime:0.6.1'
+
+setup:
+  venv_req: true
+  dependencies:
+    pip:
+      - 'huggingface_hub[cli]'
+  tasks:
+    - name: weights_download
+      cmd: './download_weights.sh'
+      job_type: local
+      requires_gpus: false
+
+# Run
+run:
+  launcher_type: 'sbatch'
+  launch_script: 'launch.sh'
+
+  gpu_configs:
+    gb200:
+      model_configs:
+        - model_size: '671b'
+          dtypes: ['nvfp4']
+          scales: [32]
+          exact_scales: true
+    b200:
+      model_configs:
+        - model_size: '671b'
+          dtypes: ['nvfp4']
+          scales: [32]
+          exact_scales: true
+    h100:
+      model_configs:
+        - model_size: '671b'
+          dtypes: ['fp8']
+          scales: [48]
+          exact_scales: true
