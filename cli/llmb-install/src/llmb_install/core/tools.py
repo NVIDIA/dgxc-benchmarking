@@ -331,7 +331,7 @@ def _install_cuda_cupti_lib(
             for member in tar.getmembers():
                 # Remove first path component (e.g., 'cuda_cupti-linux-x86_64-13.0.85-archive/')
                 parts = member.name.split('/', 1)
-                if len(parts) > 1:
+                if len(parts) > 1 and parts[1]:
                     member.name = parts[1]
                     tar.extract(member, path=install_dir)
 

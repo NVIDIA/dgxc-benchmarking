@@ -1,0 +1,61 @@
+# Setup
+general:
+  workload: cpu_overhead
+  workload_type: microbenchmark
+  gsw_version: '25.10'
+  framework: trt-llm
+
+container:
+  images:
+    - 'nvcr.io#nvidia/tensorrt-llm/release:1.1.0rc5'
+
+repositories:
+  trt-llm:
+    url: "https://github.com/NVIDIA/TensorRT-LLM.git"
+    commit: "0c9430e5a530ba958fc9dca561a3ad865ad9f492"
+
+setup:
+  venv_req: true
+  dependencies:
+    git:
+      trt-llm:
+        repo_key: trt-llm
+        install_method:
+          type: clone
+    pip:
+      - 'huggingface_hub[cli]'
+      - 'click==8.2.1'
+      - 'transformers==4.52.4'
+      - 'pillow==11.2.1'
+      - 'datasets==3.6.0'
+      - 'pydantic==2.11.7'
+  tasks:
+    - name: dataset_download
+      cmd: './download_dataset.sh'
+      job_type: local
+      requires_gpus: false
+
+# Run
+run:
+  launcher_type: 'sbatch'
+  launch_script: 'launch.sh'
+
+  gpu_configs:
+    gb200:
+      model_configs:
+        - model_size: '120b'
+          dtypes: ['mxfp4']
+          scales: [1, 4]
+          exact_scales: true
+    b200:
+      model_configs:
+        - model_size: '120b'
+          dtypes: ['mxfp4']
+          scales: [1, 4]
+          exact_scales: true
+    h100:
+      model_configs:
+        - model_size: '120b'
+          dtypes: ['mxfp4']
+          scales: [1, 4]
+          exact_scales: true

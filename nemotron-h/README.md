@@ -4,34 +4,41 @@ This recipe contains information and scripts to produce performance results for 
 
 The recipes listed below progressively increase GPU count, with configurations weak-scaled to match.
 
-## H100
+## GB300
 
-| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
-|------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
-| 56B  | FP8       | 64   | 8192   | 118    | 8   | 1   | 1   | NA  | 8   | NA  | 1   | 192  | 24  |
-| 56B  | FP8       | 128  | 8192   | 118    | 8   | 1   | 1   | NA  | 16  | NA  | 1   | 384  | 24  |
-| 56B  | FP8       | 256  | 8192   | 118    | 8   | 1   | 1   | NA  | 32  | NA  | 1   | 768  | 24  |
-| 56B  | FP8       | 512  | 8192   | 118    | 8   | 1   | 1   | NA  | 64  | NA  | 1   | 1536 | 24  |
-| 56B  | FP8       | 1024 | 8192   | 118    | 8   | 1   | 1   | NA  | 128 | NA  | 1   | 3072 | 24  |
-| 56B  | FP8       | 2048 | 8192   | 118    | 8   | 1   | 1   | NA  | 256 | NA  | 1   | 6144 | 24  |
+| Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
+|------|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
+| FP8 | 32 | 8192 | 118 | 2 | 1 | 1 | 1 | 16 | 1 | 1 | 96 | 6 |
+| FP8 | 64 | 8192 | 118 | 2 | 1 | 1 | 1 | 32 | 1 | 1 | 192 | 6 |
+| FP8 | 128 | 8192 | 118 | 2 | 1 | 1 | 1 | 64 | 1 | 1 | 384 | 6 |
+| FP8 | 256 | 8192 | 118 | 2 | 1 | 1 | 1 | 128 | 1 | 1 | 768 | 6 |
+| FP8 | 512 | 8192 | 118 | 2 | 1 | 1 | 1 | 256 | 1 | 1 | 1536 | 6 |
 
 ## B200 and GB200
 
-| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
-|------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
-| 56B  | FP8       | 32   | 8192   | 118    | 4   | 1   | 1   | NA  | 8   | NA  | 2   | 96   | 6  |
-| 56B  | FP8       | 64   | 8192   | 118    | 4   | 1   | 1   | NA  | 16  | NA  | 2   | 192  | 6  |
-| 56B  | FP8       | 128  | 8192   | 118    | 4   | 1   | 1   | NA  | 32  | NA  | 2   | 384  | 6  |
-| 56B  | FP8       | 256  | 8192   | 118    | 4   | 1   | 1   | NA  | 64  | NA  | 2   | 768  | 6  |
-| 56B  | FP8       | 512  | 8192   | 118    | 4   | 1   | 1   | NA  | 128 | NA  | 2   | 1536 | 6  |
+| Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
+|------|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
+| FP8 | 32 | 8192 | 118 | 4 | 1 | 1 | 1 | 8 | 1 | 2 | 96 | 6 |
+| FP8 | 64 | 8192 | 118 | 4 | 1 | 1 | 1 | 16 | 1 | 2 | 192 | 6 |
+| FP8 | 128 | 8192 | 118 | 4 | 1 | 1 | 1 | 32 | 1 | 2 | 384 | 6 |
+| FP8 | 256 | 8192 | 118 | 4 | 1 | 1 | 1 | 64 | 1 | 2 | 768 | 6 |
+| FP8 | 512 | 8192 | 118 | 4 | 1 | 1 | 1 | 128 | 1 | 2 | 1536 | 6 |
+
+## H100
+
+| Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
+|------|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
+| FP8 | 64 | 8192 | 118 | 8 | 1 | 1 | 1 | 8 | 1 | 1 | 192 | 24 |
+| FP8 | 128 | 8192 | 118 | 8 | 1 | 1 | 1 | 16 | 1 | 1 | 384 | 24 |
+| FP8 | 256 | 8192 | 118 | 8 | 1 | 1 | 1 | 32 | 1 | 1 | 768 | 24 |
+| FP8 | 512 | 8192 | 118 | 8 | 1 | 1 | 1 | 64 | 1 | 1 | 1536 | 24 |
+| FP8 | 1024 | 8192 | 118 | 8 | 1 | 1 | 1 | 128 | 1 | 1 | 3072 | 24 |
 
 # Performance Measurement and Analysis
 
 Performance for Nemotron-H training is measured by seconds per iteration, or in other words seconds per training step. This metric is logged for every training step in the main training log file [see Output Locations](#output-locations).
 
 Since the early training steps typically take much longer time (with input prefetch, activation memory allocation, and JIT compilation), we use the `parse_train_timing.sh` script to analyze iterations 35-44 and calculate mean and standard deviation for reliable performance metrics.
-
-**Note:** TFLOPS_per_GPU not currently supported for this model, values returned by the results parser are **invalid**.
 
 ### Running the parse_train_timing.sh script
 
@@ -79,24 +86,24 @@ $LLMB_REPO/common/parse_train_timing.sh --full-names
 
 Example output:
 ```shell
-Train Step Timing Analysis (iterations 35-44)
+Train Step Timing and TFLOPS Analysis (iterations 35-44)
 ================================================================================
-Experiment                                                                         Status Time Mean (s) Time Std (s) TFLOPS_per_GPU Mean TFLOPS_per_GPU Std
--------------------------------------------------------------------------------- -------- ------------- ------------ ------------------- ------------------
-pretrain_nemotronh_56b_fp8_gpus128_tp8_pp1_cp1_vpNone_mbs1_gbs384_3281967         Success        11.874        0.027              877.20               2.03
+Experiment                                                                                   Status Time Mean (s) Time Std (s) TFLOPS_per_GPU Mean TFLOPS_per_GPU Std
+------------------------------------------------------------------------------------------ -------- ------------- ------------ ------------------- ------------------
+pretrain_nemotronh_56b_fp8_gpus128_tp4_pp1_cp1_vpNone_mbs2_gbs384_1063626                   Success         5.310        0.007             1961.50               2.80
 ```
 
 To obtain throughput as a tokens per second measurement, follow this formula: 
 ```shell
-throughput in tokens per second = (sequence length * global batch size) / training_step_timing
+(throughput in tokens per second) = (sequence length) * (global batch size) / training_step_timing
 ```
-E.g. 8192 * 384 / 11.874 = 264926
+E.g. 8192 * 384 / 5.310 = 592415
 
 To calculate time to train estimate:
 ```shell
-time to train in days = (total tokens) / (throughput in tokens per second) / (number of seconds in a day)
+(time to train in days) = (total tokens) / (throughput in tokens per second) / (number of seconds in a day)
 ```
-E.g. 1e12 / 264926 / 86400 = 43.688 days
+E.g. 1e12 / 592415 / 86400 = 19.54 days
 
 
 To calculate the model flops utilization (MFU):
@@ -104,15 +111,21 @@ To calculate the model flops utilization (MFU):
 MFU = (achieved TFLOPS_per_GPU) / (peak GPU FLOPS)
 ```
 
-The peak theoretical throughput for H100 FP8 is **1979** TFLOPS.
+The peak theoretical throughput for GB200 FP8 is **4.9** PFLOPS.
 
-E.g. Nemotron-H 56b FP8 on 256x H100 GPUs (GBS=768)
+E.g. Nemotron-H 56B FP8 on 128x GB200 GPUs
 ```shell
-peak FLOPS for H100 FP8 = 1979 TFLOPS
-achieved TFLOPS_per_GPU = 877.200 TFLOPS
+peak FLOPS for H100 FP8 = 4.9 PFLOPS
+achieved TFLOPS_per_GPU = 1961.50 TFLOPS
 
-MFU =  877.200 / 1979 = 44.33%
+MFU =  1961.50e+12 / 4.9e+15 = 40.03%
 ```
+
+**Peak theoretical throughput across GPUs and Data Types (in TFLOPS)**
+
+| Data Type | GB300 | GB200 | B200 | H100 |
+| --------  | :---: | :---: | :---:| :---:|
+| FP8       | 4900  | 4900  | 4500 | 1979 |  
 
 
 # Prerequisites
@@ -146,8 +159,6 @@ The following directory layout and key variables are used in the recipe:
 - Results, logs, and checkpoints are stored under subfolders of `LLMB_WORKLOAD` (see below).
 
 
-**Migration Note:**
-If you previously used `STAGE_PATH`, replace it with `LLMB_INSTALL` (top-level). All output, logs, and checkpoints will be created under the workload's appropriate `LLMB_WORKLOAD` folder.
 
 # Prepare Dataset
 Since Nemotron-H training only uses synthetic datasets, this step is omitted.
@@ -184,7 +195,7 @@ Alternatively, you can run training directly using the launch script. This metho
 ### Command Template
 
 ```shell
-JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] ./launch.sh
+JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] [ADDITIONAL_SLURM_PARAMS=<params>] ./launch.sh
 ```
 
 ### Environment Variables
@@ -192,6 +203,7 @@ JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] 
 **Required:**
 - `JOB_TOTAL_GPUS`: Number of GPUs to use
 - `GPU_TYPE`: Type of GPU hardware
+  - `gb300` - NVIDIA GB300 GPUs
   - `gb200` - NVIDIA GB200 GPUs
   - `b200` - NVIDIA B200 GPUs
   - `h100` - NVIDIA H100 GPUs
@@ -202,11 +214,20 @@ JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] 
 - `MODEL_SIZE`: Model variant (fixed: `56b`)
   - `56b` - 56 billion parameter model (only supported size)
 
+- `ADDITIONAL_SLURM_PARAMS`: Additional SLURM parameters (optional)
+  - Format: Semicolon-separated key=value pairs (use semicolons when values contain commas)
+  - Example: `"nodelist=node001,node002;constraint=gpu"`
+
 **Note:** This workload only supports:
 - FP8 precision
 - 56B model size
 
 ### Example Commands
+
+Train Nemotron-H 56B with FP8 precision on 128 GB300 GPUs:
+```shell
+JOB_TOTAL_GPUS=128 GPU_TYPE=GB300 ./launch.sh
+```
 
 Train Nemotron-H 56B with FP8 precision on 128 GB200 GPUs:
 ```shell
@@ -221,6 +242,23 @@ JOB_TOTAL_GPUS=128 GPU_TYPE=B200 ./launch.sh
 Train Nemotron-H 56B with FP8 precision on 128 H100 GPUs:
 ```shell
 JOB_TOTAL_GPUS=128 GPU_TYPE=H100 ./launch.sh
+```
+
+### SLURM Node Specification Examples
+
+Train on specific nodes:
+```shell
+ADDITIONAL_SLURM_PARAMS="nodelist=node001,node002" JOB_TOTAL_GPUS=128 GPU_TYPE=gb200 ./launch.sh
+```
+
+Train with node constraints:
+```shell
+ADDITIONAL_SLURM_PARAMS="constraint=gpu&memory;exclusive" JOB_TOTAL_GPUS=256 GPU_TYPE=gb200 ./launch.sh
+```
+
+Train using a SLURM reservation:
+```shell
+ADDITIONAL_SLURM_PARAMS="reservation=my_reservation" JOB_TOTAL_GPUS=512 GPU_TYPE=h100 ./launch.sh
 ```
 
 # Output Locations
@@ -289,20 +327,3 @@ In order to view the profile traces (*.nsys-rep files) interactively:
 Since most of the benchmarking jobs run on multiple GPUs, there will be multiple .nsys-rep files generated for each run. [Multi-Report Analysis Guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#multi-report-analysis) will be very helpful to automate the analysis and get to results quicker by using Nsight recipes.
 
 **See** these [tutorials](https://developer.nvidia.com/nsight-systems/get-started#tutorials) to get a quick start if you are new to Nsight profiling.
-
-<!-- NCCL trace support removed. Documentation section deleted intentionally. -->
-
-# FAQ
-
-For GB200 you may see the following error message
-```shell
-[rank368]:[E808 04:21:41.160918398 ProcessGroupNCCL.cpp:655] [Rank 368] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=5, OpType=ALLREDUCE, NumelIn=1, NumelOut=1, Timeout(ms)=600000) ran for 600001 milliseconds before timing out.
-[rank368]:[E808 04:21:41.161005534 ProcessGroupNCCL.cpp:2299] [PG ID 0 PG GUID 0(default_pg) Rank 368]  failure detected by watchdog at work sequence id: 5 PG status: last enqueued work: 5, last completed work: 4
-[rank368]:[E808 04:21:41.161011710 ProcessGroupNCCL.cpp:693] Stack trace of the failed collective not found, potentially because FlightRecorder is disabled. You can enable it by setting TORCH_NCCL_TRACE_BUFFER_SIZE to a non-zero value.
-[rank368]:[E808 04:21:41.161045406 ProcessGroupNCCL.cpp:2147] [PG ID 0 PG GUID 0(default_pg) Rank 368] First PG on this rank to signal dumping.
-```
-
-To fix, try running with TP_COMM_OVERLAP disabled like so:
-```bash
-TP_COMM_OVERLAP=False llmb-run single -w pretrain_nemotron-h -s 56b --dtype fp8 --scale 512
-```

@@ -33,9 +33,9 @@ from typing import Any, Dict, List, Optional
 
 from llmb_install.environment.detector import (
     detect_virtual_environment,
+    get_clean_environment_for_subprocess,
     has_active_conda_environment,
 )
-from llmb_install.environment.venv_manager import get_clean_environment_for_subprocess
 
 
 def is_enroot_installed() -> bool:

@@ -30,27 +30,24 @@ set -eu -o pipefail
 
 export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=llama3.1
-export FW_VERSION=25.07.01
-export GSW_VERSION=25.08
+export FW_VERSION=25.09.00
+export GSW_VERSION=25.10.1
+
+export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh}
 
 export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
-export HF_TOKEN=${HF_TOKEN?"Required variable HF_TOKEN"}
-
-# Ensure STAGE_PATH is not set as it's been replaced by LLMB_INSTALL
-if [ -n "${STAGE_PATH+x}" ]; then
-    echo "Error: STAGE_PATH is deprecated and should not be set. Please use LLMB_INSTALL instead."
-    exit 1
-fi
 
 export LLMB_WORKLOAD=$LLMB_INSTALL/workloads/${WORKLOAD_TYPE}_${MODEL_NAME}
 export NEMORUN_HOME=$LLMB_WORKLOAD
 export LLMB_REPO=$PWD
 
-export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh}
-
 CLUSTER_TYPE=${CLUSTER_TYPE:-slurm}
 DTYPE=${DTYPE:-fp8}
 DTYPE=${DTYPE,,}
+FP8_RECIPE=${FP8_RECIPE:-cs}
+FP8_RECIPE=${FP8_RECIPE,,}
+MODEL_SIZE=${MODEL_SIZE:-405b}
+MODEL_SIZE=${MODEL_SIZE,,}
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 PROFILE_ENABLED=${PROFILE_ENABLED,,}
 GPU_METRICS_ENABLED=${ENABLE_GPU_METRICS:-false}
@@ -62,6 +59,15 @@ GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
 GPU_TYPE=${GPU_TYPE,,}
 JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
 
+# Handle additional SLURM parameters from environment variable
+ADDITIONAL_SLURM_PARAMS=${ADDITIONAL_SLURM_PARAMS:-""}
+
+# Add additional SLURM parameters if provided
+SLURM_ARGS=""
+if [ -n "$ADDITIONAL_SLURM_PARAMS" ]; then
+    SLURM_ARGS="--additional_slurm_params ${ADDITIONAL_SLURM_PARAMS}"
+fi
+
 CONTAINER_MOUNTS=""
 if [[ -n ${RUN_CONF_MOUNTS:-""} ]]; then
     if [[ -n ${CONTAINER_MOUNTS} ]]; then
@@ -72,58 +78,30 @@ fi
 
 CONFIG_OVERRIDES=""
 
-if [ $GPU_TYPE = "gb200" ]; then
-    DEF_GPUS_PER_NODE=4
-    if [ $DTYPE = "bf16" ]; then
-        DEF_TP=4
-        DEF_PP=8
-        DEF_CP=2
-        DEF_VP=8
-        DEF_MBS=1
-        DEF_GBS=$((JOB_TOTAL_GPUS / 2))
-        DEF_FSDP=0
-    else
-        DEF_TP=4
-        DEF_PP=8
-        DEF_CP=2
-        DEF_VP=8
-        DEF_MBS=1
-        DEF_GBS=$((JOB_TOTAL_GPUS / 2))
-        DEF_FSDP=0
-        CONFIG_OVERRIDES+="
-      -ol 0 \
-    "
-    fi
-elif [ $GPU_TYPE = "b200" ]; then
-    DEF_GPUS_PER_NODE=8
-    DEF_TP=4
-    DEF_PP=8
-    DEF_CP=2
-    DEF_VP=8
-    DEF_MBS=1
-    DEF_GBS=$((JOB_TOTAL_GPUS / 2))
-    DEF_FSDP=0
-elif [ $GPU_TYPE = "h100" ]; then
-    DEF_GPUS_PER_NODE=8
-    DEF_TP=8
-    DEF_PP=8
-    DEF_CP=2
-    DEF_VP=8
-    DEF_MBS=1
-    DEF_GBS=$((JOB_TOTAL_GPUS / 2))
-    DEF_FSDP=0
-else
-    echo "$GPU_TYPE not supported"
-    exit 1
-fi
-
-GPUS_PER_NODE=${GPUS_PER_NODE:-$DEF_GPUS_PER_NODE}
-
 TIME_LIMIT=${TIME_LIMIT:-"00:30:00"}
 MAX_STEPS=${MAX_STEPS:-50}
 CPU_PER_TASK_PINNING=${CPU_PER_TASK_PINNING:-0}
 ENABLE_CHECKPOINT=${ENABLE_CHECKPOINT:-false}
 ENABLE_CHECKPOINT=${ENABLE_CHECKPOINT,,}
+
+if [[ -n ${TP-} ]]; then
+    CONFIG_OVERRIDES+="-tp $TP "
+fi
+if [[ -n ${PP-} ]]; then
+    CONFIG_OVERRIDES+="-pp $PP "
+fi
+if [[ -n ${CP-} ]]; then
+    CONFIG_OVERRIDES+="-cp $CP "
+fi
+if [[ -n ${VP-} ]]; then
+    CONFIG_OVERRIDES+="-vp $VP "
+fi
+if [[ -n ${MBS-} ]]; then
+    CONFIG_OVERRIDES+="-mb $MBS "
+fi
+if [[ -n ${GBS-} ]]; then
+    CONFIG_OVERRIDES+="-gb $GBS "
+fi
 
 if [[ $CLUSTER_TYPE != "slurm" ]]; then
     echo "Only SLURM is supported for this workload"
@@ -135,38 +113,12 @@ if [[ $ENABLE_CHECKPOINT == true ]] || [[ -n ${LOAD_CHECKPOINT_PATH-} ]]; then
     exit 1
 fi
 
-export PROFILE_START_STEP=${PROFILE_START_STEP:-45}
-export PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
-
-NUM_LAYERS=${NUM_LAYERS:-126}
-HIDDEN_SIZE=${HIDDEN_SIZE:-8192}
-
-TP=${TP:-$DEF_TP}
-PP=${PP:-$DEF_PP}
-CP=${CP:-$DEF_CP}
-VP=${VP:-$DEF_VP}
-MBS=${MBS:-$DEF_MBS}
-GBS=${GBS:-$DEF_GBS}
-FSDP=${FSDP:-$DEF_FSDP}
-
-CONFIG_OVERRIDES+="-tp $TP \
-  -pp $PP \
-  -cp $CP \
-  -vp $VP \
-  -mb $MBS \
-  -gb $GBS \
-  -fsdp $FSDP \
-  -ep 1 \
-"
-
-if [[ $PROFILE_ENABLED == true ]]; then
-    CONFIG_OVERRIDES+=" -en "
-    CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
-    CONFIG_OVERRIDES+=" --profiling_stop_step=$PROFILE_STOP_STEP "
-    if [[ $GPU_METRICS_ENABLED == true ]]; then
-        CONFIG_OVERRIDES+=" -pgm "
-    fi
-    MAX_STEPS=$PROFILE_STOP_STEP
+if [[ $MODEL_SIZE == 405b ]]; then
+    LLAMA_MODEL="llama31"
+elif [[ $MODEL_SIZE == 70b ]]; then
+    LLAMA_MODEL="llama3"
+else
+    LLAMA_MODEL="llama3"
 fi
 
 if [[ $ENABLE_CHECKPOINT == true ]]; then
@@ -184,43 +136,43 @@ if [[ -n ${CONTAINER_MOUNTS} ]]; then
     CONFIG_OVERRIDES+=" --custom_mounts $CONTAINER_MOUNTS"
 fi
 
+if [[ $PROFILE_ENABLED == "true" ]]; then
+    CONFIG_OVERRIDES+=" --enable_nsys "
+    if [[ $GPU_METRICS_ENABLED == true ]]; then
+        CONFIG_OVERRIDES+=" --profiling_gpu_metrics "
+    fi
+fi
+
+if [[ $DTYPE == "fp8" ]]; then
+    CONFIG_OVERRIDES+=" --fp8_recipe $FP8_RECIPE "
+fi
+
 if [[ $ENABLE_VBOOST == true ]]; then
     CONFIG_OVERRIDES+=" --enable_vboost true "
 fi
 
-#run command
-pushd $LLMB_WORKLOAD/NeMo
-
-if [ $CLUSTER_TYPE = slurm ]; then
-    python3 -m scripts.performance.llm.pretrain_llama31_405b \
-        --gpu $GPU_TYPE \
-        --container_image $IMAGE \
-        --compute_dtype $DTYPE \
-        --num_gpus $JOB_TOTAL_GPUS \
-        --gpus_per_node $GPUS_PER_NODE \
-        --max_steps $MAX_STEPS \
-        $CONFIG_OVERRIDES \
-        slurm \
-        --account $SBATCH_ACCOUNT \
-        --partition $SBATCH_PARTITION \
-        --log_dir $NEMORUN_HOME \
-        --time_limit $TIME_LIMIT
+if [[ $GPU_TYPE == "gb200" ]] || [[ $GPU_TYPE == "gb300" ]]; then
+    GPUS_PER_NODE=4
 else
-    python3 -m scripts.performance.llm.pretrain_llama31_405b \
-        --gpu $GPU_TYPE \
-        --container_image nvcr.io/nvidia/nemo:$FW_VERSION \
-        --compute_dtype $DTYPE \
-        --num_gpus $JOB_TOTAL_GPUS \
-        --gpus_per_node $GPUS_PER_NODE \
-        --max_steps $MAX_STEPS \
-        $CONFIG_OVERRIDES \
-        runai \
-        --base_url $BASE_URL \
-        --app_id $APP_ID \
-        --app_secret $APP_SECRET \
-        --project_name $PROJECT_NAME \
-        --pvc_nemo_run_dir $PVC_DIR \
-        --time_limit $TIME_LIMIT
+    GPUS_PER_NODE=8
 fi
+
+#run command
+pushd $LLMB_WORKLOAD/Megatron-Bridge
+
+python -m scripts.performance.setup_experiment \
+    --gpu $GPU_TYPE \
+    --container_image $IMAGE \
+    --compute_dtype $DTYPE \
+    --num_gpus $JOB_TOTAL_GPUS \
+    --gpus_per_node $GPUS_PER_NODE \
+    --model_name $LLAMA_MODEL \
+    --model_size $MODEL_SIZE \
+    $CONFIG_OVERRIDES \
+    --account $SBATCH_ACCOUNT \
+    --partition $SBATCH_PARTITION \
+    --log_dir $NEMORUN_HOME \
+    --time_limit $TIME_LIMIT \
+    $SLURM_ARGS
 
 popd

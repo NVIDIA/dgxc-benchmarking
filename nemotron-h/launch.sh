@@ -30,16 +30,10 @@ set -eu -o pipefail
 
 export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=nemotron-h
-export FW_VERSION=25.07.01
-export GSW_VERSION=25.08
+export FW_VERSION=25.09.00
+export GSW_VERSION=25.10
 
 export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
-
-# Ensure STAGE_PATH is not set as it's been replaced by LLMB_INSTALL
-if [ -n "${STAGE_PATH+x}" ]; then
-    echo "Error: STAGE_PATH is deprecated and should not be set. Please use LLMB_INSTALL instead."
-    exit 1
-fi
 
 export LLMB_WORKLOAD=$LLMB_INSTALL/workloads/${WORKLOAD_TYPE}_${MODEL_NAME}
 export NEMORUN_HOME=$LLMB_WORKLOAD
@@ -49,6 +43,8 @@ export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh
 
 DTYPE=${DTYPE:-fp8}
 DTYPE=${DTYPE,,}
+FP8_RECIPE=${FP8_RECIPE:-cs}
+FP8_RECIPE=${FP8_RECIPE,,}
 GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
 GPU_TYPE=${GPU_TYPE,,}
 JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
@@ -61,8 +57,11 @@ GPU_METRICS_ENABLED=${GPU_METRICS_ENABLED,,}
 ENABLE_VBOOST=${ENABLE_VBOOST:-false}
 ENABLE_VBOOST=${ENABLE_VBOOST,,}
 
+# Handle additional SLURM parameters from environment variable
+ADDITIONAL_SLURM_PARAMS=${ADDITIONAL_SLURM_PARAMS:-""}
+
 MAX_STEPS=${MAX_STEPS:-50}
-TIME_LIMIT=${TIME_LIMIT:-"00:25:00"}
+TIME_LIMIT=${TIME_LIMIT:-"00:30:00"}
 CPU_PER_TASK_PINNING=${CPU_PER_TASK_PINNING:-0}
 
 export PROFILE_START_STEP=${PROFILE_START_STEP:-45}
@@ -77,7 +76,11 @@ if [[ -n ${RUN_CONF_MOUNTS:-""} ]]; then
 fi
 
 if [ $MODEL_SIZE = 56b ]; then
-    if [ $GPU_TYPE = gb200 ]; then
+    if [ $GPU_TYPE = gb300 ]; then
+        DEF_GPUS_PER_NODE=4
+        TP=2
+        MBS=1
+    elif [ $GPU_TYPE = gb200 ]; then
         DEF_GPUS_PER_NODE=4
         TP=4
         MBS=2
@@ -113,6 +116,7 @@ CONFIG_OVERRIDES=" -tp $TP \
   --num_layers $NUM_LAYERS \
   --hidden_size $HIDDEN_SIZE \
   -ep 1 \
+  -fr $FP8_RECIPE \
 "
 
 if [[ $PROFILE_ENABLED == "true" ]]; then
@@ -133,9 +137,15 @@ if [[ $ENABLE_VBOOST == true ]]; then
     CONFIG_OVERRIDES+=" --enable_vboost true "
 fi
 
+# Add additional SLURM parameters if provided
+SLURM_ARGS=""
+if [ -n "$ADDITIONAL_SLURM_PARAMS" ]; then
+    SLURM_ARGS="--additional_slurm_params ${ADDITIONAL_SLURM_PARAMS}"
+fi
+
 pushd $LLMB_WORKLOAD/NeMo
 
-python -m scripts.performance.llm.pretrain_nemotronh_${MODEL_SIZE} \
+python3 -m scripts.performance.llm.pretrain_nemotronh_${MODEL_SIZE} \
     --gpu $GPU_TYPE \
     --container_image $IMAGE \
     --compute_dtype $DTYPE \
@@ -147,6 +157,7 @@ python -m scripts.performance.llm.pretrain_nemotronh_${MODEL_SIZE} \
     --account $SBATCH_ACCOUNT \
     --partition $SBATCH_PARTITION \
     --log_dir ${NEMORUN_HOME} \
-    --time_limit $TIME_LIMIT
+    --time_limit $TIME_LIMIT \
+    $SLURM_ARGS
 
 popd

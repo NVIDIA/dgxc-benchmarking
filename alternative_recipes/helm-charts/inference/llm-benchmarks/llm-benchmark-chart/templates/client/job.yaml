@@ -1,0 +1,273 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: MIT
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "{{ .Release.Name }}-client"
+spec:
+  template:
+    spec:
+      serviceAccountName: {{ include "benchmark_chart.serviceAccountName" . }}
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: {{ .Values.ngcImagePullSecretName }}
+      {{- if .Values.tolerations }}
+      tolerations:
+{{ toYaml .Values.tolerations | indent 8 }}
+      {{- end }}
+      volumes:
+      {{- if .Values.environment.RESULTS_PATH }}
+      - name: results-volume
+        hostPath:
+          path: {{ .Values.environment.RESULTS_PATH }}
+          type: DirectoryOrCreate
+      {{- end }}
+      - name: metrics-script
+        configMap:
+          name: {{ .Release.Name }}-metrics-calculator
+          defaultMode: 0755
+      containers:
+      - name: benchmarking-client
+        image: {{ .Values.environment.BENCHMARK_SERVER_IMAGE }}
+        volumeMounts:
+        {{- if .Values.environment.RESULTS_PATH }}
+        - name: results-volume
+          mountPath: {{ .Values.environment.RESULTS_PATH }}
+        {{- end }}
+        - name: metrics-script
+          mountPath: /scripts
+        command: ["sh", "-c"]
+        args:
+          - |
+            BASE_URL="http://{{ .Release.Name }}-server:{{ .Values.environment.SERVER_PORT }}"
+            HEALTH_CHECK_URL="${BASE_URL}/${SERVER_HEALTH_CHECK_ENDPOINT}"
+            echo '{
+                "model": "'$MODEL_NAME'",
+                "num_gpus": '$NUM_GPUS',
+                "concurrency_range": "'$CONCURRENCY_RANGE'",
+                "use_cases": "'$USE_CASES'"
+            }' > metadata.json
+
+            PERCENT_COMPLETE=1
+
+            function update_progress() {
+              date=$(python3 -c 'import datetime; print(datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"))')
+              msg='{"taskId": "'${NVCT_TASK_ID}'",  "percentComplete": '${PERCENT_COMPLETE}',  "name": "fin",  "metadata": '$(cat metadata.json)',  "lastUpdatedAt": "'${date}'"}'
+              echo ${msg} > "${NVCT_PROGRESS_FILE_PATH}"
+              echo "Updated progress to ${PERCENT_COMPLETE}%"
+            }
+
+            function do_progress_loop() {
+              while true; do update_progress; sleep 30; done
+            }
+
+            do_progress_loop &
+            
+            # Wait for the server to be ready
+            echo "Waiting for server to be ready..."
+            sleep 5
+            until curl -s -o /dev/null -w "%{http_code}" "$HEALTH_CHECK_URL" | grep -q "^200$"; do
+              echo "Server not ready yet ($HEALTH_CHECK_URL), waiting..."
+              sleep 5
+            done
+            sleep 5
+            echo "Server is ready!"
+            TIMESTAMP=$(date +%s)
+
+            echo "Setup directory for results"
+            if [ -z "${RESULTS_PATH}" ]; then
+              RESULTS_DIR=${NVCT_RESULTS_DIR}/results
+            else
+              RESULTS_DIR=${RESULTS_PATH}
+            fi
+            mkdir -p ${RESULTS_DIR}
+
+            echo "Starting the benchmark!"
+
+            # Loop through concurrency values defined in values.yaml
+            for CONCURRENCY in ${CONCURRENCY_RANGE}; do
+              # Loop through use cases defined in values.yaml
+              for value in $USE_CASES; do
+
+                # Calculate total requests using values from values.yaml
+                TOTAL_REQUESTS=$((REQUEST_MULTIPLIER * CONCURRENCY))
+                if [ "$TOTAL_REQUESTS" -lt $MIN_REQUESTS ]; then
+                  TOTAL_REQUESTS=$MIN_REQUESTS
+                fi
+                export TOTAL_REQUESTS
+
+                echo "Concurrency: $CONCURRENCY"
+                echo "DEBUG: TOTAL_REQUESTS=$TOTAL_REQUESTS, MIN_REQUESTS=$MIN_REQUESTS, REQUEST_MULTIPLIER=$REQUEST_MULTIPLIER"
+
+                # Extract the use case name and values
+                use_case=$(echo "$value" | cut -d':' -f1)
+
+                if [ "$use_case" != "chat" ] && [ "$use_case" != "embeddings" ]; then
+                  echo "Error: Unsupported use case '$use_case'. Only 'chat' and 'embeddings' are supported."
+                  exit 1
+                fi
+
+                if [ "$use_case" == "chat" ]; then
+                  use_case="chat"
+
+                  export INPUT_SEQUENCE_LENGTH=$(echo "$value" | cut -d':' -f2 | cut -d'/' -f1)
+                  export OUTPUT_SEQUENCE_LENGTH=$(echo "$value" | cut -d':' -f2 | cut -d'/' -f2)
+
+                  echo "Use Case: $use_case"
+                  echo "Input Sequence Length: $INPUT_SEQUENCE_LENGTH"
+                  echo "Output Sequence Length: $OUTPUT_SEQUENCE_LENGTH"
+                  echo "----------------"
+
+                  # Create export file name using values from values.yaml
+                  EXPORT_FILE="${MODEL_NAME_CLEANED}_${NUM_GPUS}_${CONCURRENCY}_${use_case}_${INPUT_SEQUENCE_LENGTH}_${OUTPUT_SEQUENCE_LENGTH}_${TIMESTAMP}"
+
+                  # Execute command with proper variable expansion
+                  export OUTPUT_DIR=${RESULTS_DIR}/${EXPORT_FILE}
+                  mkdir -p ${OUTPUT_DIR}
+                  
+                  # Generate input JSON with prompts using Python one-liner
+                  python3 -c 'import json,random,string,os;data=[{"payload":[{"messages":[{"role":"user","content":"".join(random.choices(string.ascii_lowercase+" ",k=int(os.environ["INPUT_SEQUENCE_LENGTH"])*4))}],"model":os.environ["MODEL_NAME"],"max_tokens":int(os.environ["OUTPUT_SEQUENCE_LENGTH"]),"min_tokens":int(os.environ["OUTPUT_SEQUENCE_LENGTH"]),"ignore_eos":True,"stream":True}]} for _ in range(int(os.environ["TOTAL_REQUESTS"]))];json.dump({"data":data},open(os.environ["OUTPUT_DIR"]+"/inputs.json","w"));print(f"Generated {len(data)} prompts")'
+                  
+                  # Call perf_analyzer directly (bypass genai-perf)
+                  perf_analyzer \
+                    -m ${MODEL_NAME} \
+                    --async \
+                    --measurement-interval 60000 \
+                    --concurrency-range ${CONCURRENCY} \
+                    --request-count ${TOTAL_REQUESTS} \
+                    -i http \
+                    -u ${BASE_URL} \
+                    --service-kind openai \
+                    --endpoint v1/chat/completions \
+                    --input-data ${OUTPUT_DIR}/inputs.json \
+                    --profile-export-file ${OUTPUT_DIR}/profile_export.json \
+                    -v
+                  
+                  # Post-process results to calculate token-level metrics
+                  python3 /scripts/calculate_token_metrics.py
+                fi
+                if [ "$use_case" == "embeddings" ]; then
+                  use_case="embeddings"
+
+                  export BATCH_SIZE=$(echo "$value" | cut -d':' -f2)
+
+                  SERVER_ENDPOINT="${BASE_URL}"
+
+                  echo "Use Case: $use_case"
+                  echo "Batch Size: $BATCH_SIZE" 
+                  echo "----------------"
+
+                  # Create export file name using values from values.yaml
+                  EXPORT_FILE="${MODEL_NAME_CLEANED}_${NUM_GPUS}_${CONCURRENCY}_${use_case}_${BATCH_SIZE}_${TIMESTAMP}"
+
+                  # Execute command with proper variable expansion
+                  export OUTPUT_DIR=${RESULTS_DIR}/${EXPORT_FILE}
+                  mkdir -p ${OUTPUT_DIR}
+                  
+                  # Generate input JSON for embeddings using Python one-liner
+                  python3 -c 'import json,random,string,os;data=[{"payload":[{"input":["".join(random.choices(string.ascii_lowercase+" ",k=200)) for _ in range(int(os.environ["BATCH_SIZE"]))],"model":os.environ["MODEL_NAME"]}]} for _ in range(int(os.environ["TOTAL_REQUESTS"]))];json.dump({"data":data},open(os.environ["OUTPUT_DIR"]+"/inputs.json","w"));print(f"Generated {len(data)} embedding requests")'
+                  
+                  # Call perf_analyzer directly
+                  perf_analyzer \
+                    -m ${MODEL_NAME} \
+                    --async \
+                    --measurement-interval 60000 \
+                    --concurrency-range ${CONCURRENCY} \
+                    --request-count ${TOTAL_REQUESTS} \
+                    -i http \
+                    -u ${SERVER_ENDPOINT} \
+                    --service-kind openai \
+                    --endpoint v1/embeddings \
+                    --input-data ${OUTPUT_DIR}/inputs.json \
+                    --profile-export-file ${OUTPUT_DIR}/profile_export.json \
+                    -v
+                  
+                  # Create metrics file for embeddings
+                  echo '{}' > ${OUTPUT_DIR}/profile_export_genai_perf.json
+                  
+                fi
+                 
+                            
+              echo '{"'${EXPORT_FILE}'": '$(cat ${OUTPUT_DIR}/profile_export_genai_perf.json)'}' > new_metadata.json
+
+              echo $(jq -s '.[0] + .[1]' metadata.json new_metadata.json) > metadata.json
+
+              done
+            done
+
+            # Create a progress JSON file in the results directory
+            PROGRESS_FILE="${RESULTS_DIR}/progress"
+            CURRENT_TIME=$(date -u +"%Y-%m-%dT%H:%M:%S.%NZ")
+            PERCENT_COMPLETE=100
+            
+            cat > ${PROGRESS_FILE} << EOF
+            {
+              "taskId": "${NVCT_TASK_ID}",
+              "percentComplete": ${PERCENT_COMPLETE},
+              "name": "results",
+              "metadata": $(cat metadata.json),
+              "lastUpdatedAt": "${CURRENT_TIME}"
+            }
+            EOF
+            
+            echo "Created progress file at ${PROGRESS_FILE}"
+            
+            update_progress
+            sleep 10
+            echo "Finished Benchmarking"
+
+        env:
+        - name: SERVER_HEALTH_CHECK_ENDPOINT
+          value: {{ .Values.environment.SERVER_HEALTH_CHECK_ENDPOINT | quote }}
+        - name: SERVER_ENDPOINT
+          value: {{ .Values.environment.SERVER_ENDPOINT | quote }}
+        - name: HF_TOKEN
+          value: {{ .Values.environment.HF_TOKEN | quote }}
+        - name: MODEL_NAME
+          value: {{ .Values.environment.MODEL_NAME | quote }}
+        - name: MODEL_NAME_CLEANED
+          value: {{ .Values.environment.MODEL_NAME_CLEANED | quote }}
+        - name: MIN_REQUESTS
+          value: {{ .Values.environment.MIN_REQUESTS | quote }}
+        - name: CONCURRENCY_RANGE
+          value: {{ .Values.environment.CONCURRENCY_RANGE | quote }}
+        - name: USE_CASES
+          value: {{ .Values.environment.USE_CASES | quote }}
+        - name: MODEL_TOKENIZER
+          value: {{ .Values.environment.MODEL_TOKENIZER | quote }}
+        - name: NUM_GPUS
+          value: {{ .Values.environment.NUM_GPUS | quote }}
+        - name: REQUEST_MULTIPLIER
+          value: {{ .Values.environment.REQUEST_MULTIPLIER | quote }}
+        - name: RESULTS_PATH
+          value: {{ .Values.environment.RESULTS_PATH | quote }}
+        - name: "NVCT_NCA_ID"
+          value: {{ .Values.nvctNcaId | quote }}
+        - name: "NVCT_TASK_ID"
+          value: {{ .Values.nvctTaskId | quote }}
+        - name: "NVCT_TASK_NAME"
+          value: {{ .Values.nvctTaskName | quote }}
+        - name: "NVCT_RESULTS_DIR"
+          value: {{ .Values.nvctResultsDir | quote }}
+        - name: "NVCT_PROGRESS_FILE_PATH"
+          value: {{ .Values.nvctProgressFilePath | quote }}
+  backoffLimit: 4

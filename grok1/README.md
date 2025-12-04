@@ -1,7 +1,20 @@
 # Overview
 
-This recipe contains information and scripts to produce performance results for the Grok 1 training workload on GB200/B200/H100 platforms. The scripts help perform environment setup and launch benchmark jobs.
+This recipe contains information and scripts to produce performance results for the Grok 1 training workload on GB300/GB200/B200/H100 platforms. The scripts help perform environment setup and launch benchmark jobs.
 This variant of the workload is best-suited for clusters with GPUs below:
+
+## GB300
+* At least 128 GPUs with at least 80 GB memory each. Training of this 314-billion parameter variant of the workload will not fit on fewer GPUs with less memory.
+* GB300 GPUs. This workload runs with FP8 and BF16 precision.
+* Weak scaling methodology is used in configurations below.
+
+The GB300 recipes listed below progressively increase GPU count, with configurations weak-scaled to match.
+
+| GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | ETP | DP  | VP  | MBS | GBS  | GA  |
+|------|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
+| 128  | 8192   | 64     | 4   | 1   | 1   | 8   | 4   | 32  | 1   | 1   | 256  | 8   |
+| 256  | 8192   | 64     | 4   | 1   | 1   | 8   | 4   | 64  | 1   | 1   | 512  | 8   |
+| 512  | 8192   | 64     | 4   | 1   | 1   | 8   | 4   | 128 | 1   | 1   | 1024 | 8   |
 
 ## GB200
 * At least 128 GPUs with at least 80 GB memory each. Training of this 314-billion parameter variant of the workload will not fit on fewer GPUs with less memory.
@@ -90,30 +103,26 @@ To calculate time to train with 1T tokens estimate:
 E.g. 1e12 / 1398101 / 86400 = 8.28 days 
 
 
-To calculate the model flops utilization (MFU). Calculation shown [here](#mfu-formula).
+To calculate the model flops utilization (MFU):
 ```shell
-MFU = (global batch size) * (model flops) / (training step time) / (number of GPUs) /peak GPU FLOPS)
+MFU = (achieved TFLOPS_per_GPU Mean) / (peak GPU FLOPS)
 ```
+The peak theoretical throughput for GB200 BF16 is 2.45 PFLOPS.
 
-For GB200 GPUs, peak theoretical throughput for FP8 is 4.9 PFLOPS and for BF16 is 2.45 PFLOPS.
-
-The model flops for Grok 1 for GBS=1 per GPU is 4.27E+15
-
-E.g. Grok 1 FP8 on 128x GB200 GPUs (GBS=256)
+E.g. Grok 1 BF16 on 128x GB200 GPUs (GBS=256)
 ```shell
-peak FLOPS for GB200 = 49 TFLOPS
-training step time = 6.631
-model flops = 4.27E+15
+peak FLOPS for GB200 BF16 = 2.45 PFLOPS
+achieved TFLOPS_per_GPU = 1,112.5 TFLOPS
 
-MFU = 256 * 4.27E+15 / 6.631 / 128 / 4.9E+15 = 26.3%
+MFU = 1,112.5e+12 / 2.45e+15 = 45.41%
 ```
 
 **Peak theoretical throughput across GPUs and Data Types (in TFLOPS)**
 
-| Data Type | B200  | GB200 | H100 |
-| --------  | :---: | :---: | :---:|
-| BF16      | 2250  | 2450  | 989  |
-| FP8       | 4500  | 4900  | 1979 |  
+| Data Type | GB300  | GB200 | B200 | H100 |
+| --------  | :---: | :---: | :---:| :---: |
+| BF16      | 2450  | 2450  | 2250 | 989   |
+| FP8       | 4900  | 4900  | 4500 | 1979  |
 
 
 # Prerequisites
@@ -151,8 +160,6 @@ The following directory layout and key variables are used in the recipe:
 
 
 
-**Migration Note:**
-If you previously used `STAGE_PATH`, replace it with `LLMB_INSTALL` (top-level). All output, logs, and checkpoints will be created under the workload's appropriate `LLMB_WORKLOAD` folder.
 
 # Run Training
 
@@ -186,7 +193,7 @@ Alternatively, you can run training directly using the launch script. This metho
 ### Command Template
 
 ```shell
-JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] ./launch.sh
+JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] [ADDITIONAL_SLURM_PARAMS=<params>] ./launch.sh
 ```
 
 ### Environment Variables
@@ -194,6 +201,7 @@ JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] 
 **Required:**
 - `JOB_TOTAL_GPUS`: Number of GPUs to use (e.g., 128, 256, 512)
 - `GPU_TYPE`: Type of GPU hardware
+  - `gb300` - NVIDIA GB300 GPUs 
   - `gb200` - NVIDIA GB200 GPUs 
   - `b200` - NVIDIA B200 GPUs
   - `h100` - NVIDIA H100 GPUs
@@ -204,7 +212,9 @@ JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] 
   - `bf16` - BFloat16 precision
 - `MODEL_SIZE`: Model variant (fixed: `314b`)
   - `314b` - 314 billion parameter model (only supported size)
-
+- `ADDITIONAL_SLURM_PARAMS`: Additional SLURM parameters (optional)
+  - Format: Semicolon-separated key=value pairs (use semicolons when values contain commas)
+  - Example: `"nodelist=node001,node002;constraint=gpu"`
 
 ### Example Commands
 
@@ -216,6 +226,23 @@ JOB_TOTAL_GPUS=128 GPU_TYPE=gb200 DTYPE=fp8 ./launch.sh
 Train with BF16 precision on 256 GB200 GPUs:
 ```shell
 JOB_TOTAL_GPUS=256 GPU_TYPE=gb200 DTYPE=bf16 ./launch.sh
+```
+
+### SLURM Node Specification Examples
+
+Train on specific nodes:
+```shell
+ADDITIONAL_SLURM_PARAMS="nodelist=node001,node002" JOB_TOTAL_GPUS=128 GPU_TYPE=gb200 DTYPE=fp8 ./launch.sh
+```
+
+Train with node constraints:
+```shell
+ADDITIONAL_SLURM_PARAMS="constraint=gpu&memory;exclusive" JOB_TOTAL_GPUS=256 GPU_TYPE=gb200 DTYPE=fp8 ./launch.sh
+```
+
+Train using a SLURM reservation:
+```shell
+ADDITIONAL_SLURM_PARAMS="reservation=my_reservation" JOB_TOTAL_GPUS=512 GPU_TYPE=h100 DTYPE=fp8 ./launch.sh
 ```
 
 # Output Locations

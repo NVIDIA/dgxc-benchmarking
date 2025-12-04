@@ -31,21 +31,17 @@ set -eu -o pipefail
 export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=grok1
 export MODEL_SIZE=314b
-export GSW_VERSION=25.08
-export FW_VERSION=25.04.00
+export GSW_VERSION=25.10
+export FW_VERSION=25.09.00
 
 export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 export HF_TOKEN=${HF_TOKEN?"Required variable HF_TOKEN"}
 
-# Ensure STAGE_PATH is not set as it's been replaced by LLMB_INSTALL
-if [ -n "${STAGE_PATH+x}" ]; then
-    echo "Error: STAGE_PATH is deprecated and should not be set. Please use LLMB_INSTALL instead."
-    exit 1
-fi
-
 export LLMB_WORKLOAD=$LLMB_INSTALL/workloads/${WORKLOAD_TYPE}_${MODEL_NAME}
 export NEMORUN_HOME=$LLMB_WORKLOAD
 export LLMB_REPO=$PWD
+GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
+GPU_TYPE=${GPU_TYPE,,}
 
 export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh}
 
@@ -58,15 +54,16 @@ ENABLE_GPU_METRICS=${ENABLE_GPU_METRICS:-false}
 ENABLE_GPU_METRICS=${ENABLE_GPU_METRICS,,}
 ENABLE_VBOOST=${ENABLE_VBOOST:-false}
 ENABLE_VBOOST=${ENABLE_VBOOST,,}
-GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
-GPU_TYPE=${GPU_TYPE,,}
 JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
 
-TIME_LIMIT=${TIME_LIMIT:-"00:30:00"}
+TIME_LIMIT=${TIME_LIMIT:-"00:35:00"}
 MAX_STEPS=${MAX_STEPS:-50}
 CPU_PER_TASK_PINNING=${CPU_PER_TASK_PINNING:-0}
 ENABLE_CHECKPOINT=${ENABLE_CHECKPOINT:-false}
 ENABLE_CHECKPOINT=${ENABLE_CHECKPOINT,,}
+
+# Handle additional SLURM parameters from environment variable
+ADDITIONAL_SLURM_PARAMS=${ADDITIONAL_SLURM_PARAMS:-""}
 
 export PROFILE_START_STEP=${PROFILE_START_STEP:-45}
 export PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
@@ -84,7 +81,7 @@ if [[ $CLUSTER_TYPE != "slurm" ]]; then
     exit 1
 fi
 
-if [ $GPU_TYPE = "gb200" ]; then
+if [ $GPU_TYPE = "gb200" ] || [ $GPU_TYPE = "gb300" ]; then
     GPUS_PER_NODE=${GPUS_PER_NODE:-4}
     TP=${TP:-4}
     PP=${PP:-1}
@@ -111,7 +108,7 @@ elif [ $GPU_TYPE = "b200" ]; then
         GBS=$((JOB_TOTAL_GPUS * 2))
     fi
     MBS=${MBS:-1}
-    CUDA_GRAPH=${CUDA_GRAPH:-true}
+    CUDA_GRAPH=${CUDA_GRAPH:-false}
 elif [ $GPU_TYPE = "h100" ]; then
     GPUS_PER_NODE=${GPUS_PER_NODE:-8}
     TP=${TP:-4}
@@ -169,9 +166,23 @@ if [[ -n ${CONTAINER_MOUNTS} ]]; then
     CONFIG_OVERRIDES+=" --custom_mounts $CONTAINER_MOUNTS"
 fi
 
+if [[ $ENABLE_VBOOST == true ]]; then
+    CONFIG_OVERRIDES+=" --enable_vboost true "
+fi
+
+if [[ $DTYPE == fp8 ]]; then
+    CONFIG_OVERRIDES+=" -fr cs "
+fi
+
 pushd $LLMB_WORKLOAD/NeMo
 
 if [ $CLUSTER_TYPE = slurm ]; then
+    # Add additional SLURM parameters if provided
+    SLURM_ARGS=""
+    if [ -n "$ADDITIONAL_SLURM_PARAMS" ]; then
+        SLURM_ARGS="--additional_slurm_params ${ADDITIONAL_SLURM_PARAMS}"
+    fi
+
     python -m scripts.performance.llm.pretrain_grok1_314b \
         --gpu $GPU_TYPE \
         --container_image $IMAGE \
@@ -185,7 +196,8 @@ if [ $CLUSTER_TYPE = slurm ]; then
         --account $SBATCH_ACCOUNT \
         --partition $SBATCH_PARTITION \
         --time_limit $TIME_LIMIT \
-        --log_dir ${NEMORUN_HOME}
+        --log_dir ${NEMORUN_HOME} \
+        $SLURM_ARGS
 else
     python -m scripts.performance.llm.pretrain_grok1_314b \
         --gpu $GPU_TYPE \

@@ -1,0 +1,221 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: MIT
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: oss-gpt120b-bench
+spec:
+  backoffLimit: 1
+  completions: 1
+  parallelism: 1
+  template:
+    metadata:
+      labels:
+        app: oss-gpt120b-bench
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: nvidia.com/dynamo-graph-deployment-name
+                    operator: In
+                    values:
+                      - gpt-oss-agg
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - command:
+        - /bin/sh
+        - -c
+        - |
+          # Install dependencies and aiperf
+          apt-get update && apt-get install -y curl jq procps git && apt-get clean
+          pip install git+https://github.com/ai-dynamo/aiperf.git@70af59489df24a601dba57604a7341966150b366;
+          echo "aiperf installation completed";
+          sysctl -w net.ipv4.ip_local_port_range="1024 65000"
+          cat /proc/sys/net/ipv4/ip_local_port_range
+          export COLUMNS=200
+          EPOCH=$(date +%s)
+          
+          ## Enhanced utility functions with better error handling
+          wait_for_model_ready() {
+            echo "🔍 Debugging service connectivity..."
+            echo "ENDPOINT: $ENDPOINT"
+            echo "TARGET_MODEL: $TARGET_MODEL"
+            
+            # Test basic connectivity first
+            echo "Testing basic connectivity to $ENDPOINT..."
+            if ! curl -s --connect-timeout 10 "http://$ENDPOINT/health" >/dev/null 2>&1; then
+              echo "❌ Cannot reach $ENDPOINT/health, trying /v1/models directly..."
+            fi
+            
+            echo "Waiting for model '$TARGET_MODEL' at $ENDPOINT/v1/models (checking every 5s)..."
+            local attempts=0
+            local max_attempts=30  # 5 minutes total
+            
+            while [ $attempts -lt $max_attempts ]; do
+              echo "[$(date '+%H:%M:%S')] Attempt $((attempts+1))/$max_attempts..."
+              
+              # Get the response and check it
+              response=$(curl -s --connect-timeout 10 --max-time 30 "http://$ENDPOINT/v1/models" 2>&1)
+              curl_exit_code=$?
+              
+              if [ $curl_exit_code -ne 0 ]; then
+                echo "❌ Curl failed with exit code $curl_exit_code: $response"
+                echo "🔍 Troubleshooting network connectivity..."
+                nslookup $ENDPOINT || echo "DNS resolution failed"
+              else
+                echo "✅ Got response: $response"
+                
+                # Check if the model is in the response
+                if echo "$response" | jq -e --arg model "$TARGET_MODEL" '.data[]? | select(.id == $model)' >/dev/null 2>&1; then
+                  echo "✅ Model '$TARGET_MODEL' is now available!"
+                  curl -s "http://$ENDPOINT/v1/models" | jq .
+                  return 0
+                else
+                  echo "⏳ Model not in response yet. Available models:"
+                  echo "$response" | jq -r '.data[]?.id // "none"' || echo "Could not parse JSON"
+                fi
+              fi
+              
+              attempts=$((attempts+1))
+              sleep 5
+            done
+            
+            echo "❌ Failed to find model after $max_attempts attempts"
+            exit 1
+          }
+          run_perf() {
+            local concurrency=$1
+            local isl=$2
+            local osl=$3
+            key=concurrency_${concurrency}
+            export ARTIFACT_DIR="${ROOT_ARTIFACT_DIR}/${EPOCH}_${JOB_NAME}/${key}"
+            mkdir -p "$ARTIFACT_DIR"
+            echo "ARTIFACT_DIR: $ARTIFACT_DIR"
+            aiperf profile --artifact-dir $ARTIFACT_DIR \
+                --model $TARGET_MODEL \
+                --tokenizer /model-cache/hub/models--openai--gpt-oss-120b/snapshots/b5c939de8f754692c1647ca79fbf85e8c1e70f8a  \
+                --endpoint-type chat  --endpoint /v1/chat/completions \
+                --streaming \
+                --url http://$ENDPOINT \
+                --synthetic-input-tokens-mean $isl \
+                --synthetic-input-tokens-stddev 0 \
+                --output-tokens-mean $osl \
+                --output-tokens-stddev 0 \
+                --extra-inputs "{\"max_tokens\":$osl}" \
+                --extra-inputs "{\"min_tokens\":$osl}" \
+                --extra-inputs "{\"ignore_eos\":true}" \
+                --extra-inputs "{\"nvext\":{\"ignore_eos\":true}}" \
+                --extra-inputs "{\"repetition_penalty\":1.0}" \
+                --extra-inputs "{\"temperature\": 0.0}" \
+                --concurrency $concurrency \
+                --request-count $((10*concurrency)) \
+                --request-rate $((5*concurrency)) \
+                --warmup-request-count $((2*$concurrency)) \
+                --conversation-num 12800 \
+                --random-seed 100 \
+                --workers-max 252 \
+                -H 'Authorization: Bearer NOT USED' \
+                -H 'Accept: text/event-stream'\
+                --record-processors 32 \
+                --ui simple
+            echo "ARTIFACT_DIR: $ARTIFACT_DIR"
+            ls -la $ARTIFACT_DIR
+          }
+          #### Actual execution ####
+          wait_for_model_ready
+          mkdir -p "${ROOT_ARTIFACT_DIR}/${EPOCH}_${JOB_NAME}"
+          # Calculate total concurrency based on per-GPU concurrency and GPU count
+          TOTAL_CONCURRENCY=$((CONCURRENCY_PER_GPU * DEPLOYMENT_GPU_COUNT))
+          echo "Calculated total concurrency: $TOTAL_CONCURRENCY (${CONCURRENCY_PER_GPU} per GPU × ${DEPLOYMENT_GPU_COUNT} GPUs)"
+          # Write input_config.json
+          cat > "${ROOT_ARTIFACT_DIR}/${EPOCH}_${JOB_NAME}/input_config.json" <<EOF
+          {
+            "gpu_count": $DEPLOYMENT_GPU_COUNT,
+            "concurrency_per_gpu": $CONCURRENCY_PER_GPU,
+            "total_concurrency": $TOTAL_CONCURRENCY,
+            "mode": "$DEPLOYMENT_MODE",
+            "isl": $ISL,
+            "osl": $OSL,
+            "endpoint": "$ENDPOINT",
+            "model endpoint": "$TARGET_MODEL"
+          }
+          EOF
+
+          # Run perf with calculated total concurrency
+          run_perf $TOTAL_CONCURRENCY $ISL $OSL
+          echo "done with concurrency $TOTAL_CONCURRENCY"
+        env:
+        - name: TARGET_MODEL
+          value: openai/gpt-oss-120b
+        - name: ENDPOINT
+          value: gpt-oss-agg-frontend:8000
+        - name: CONCURRENCY_PER_GPU
+          value: "900"
+        - name: DEPLOYMENT_GPU_COUNT
+          value: "4"
+        - name: ISL
+          value: "128"
+        - name: OSL
+          value: "1000"
+        - name: DEPLOYMENT_MODE
+          value: agg
+        - name: AIPERF_HTTP_CONNECTION_LIMIT
+          value: "252"
+        - name: JOB_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.labels['job-name']
+        - name: ROOT_ARTIFACT_DIR
+          value: /model-cache/perf
+        - name: HF_HOME
+          value: /model-cache
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        image: python:3.12-slim
+        imagePullPolicy: IfNotPresent
+        name: perf
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: model-cache
+          mountPath: /model-cache
+        workingDir: /workspace
+      imagePullSecrets:
+      - name: nvcrimagepullsecret
+      restartPolicy: Never
+      schedulerName: default-scheduler
+      tolerations:
+      - key: "dedicated"
+        operator: "Equal"
+        value: "user-workload"
+        effect: "NoSchedule"
+      - key: "dedicated"
+        operator: "Equal"
+        value: "user-workload"
+        effect: "NoExecute"
+      volumes:
+      - name: model-cache
+        persistentVolumeClaim:
+          claimName: model-cache

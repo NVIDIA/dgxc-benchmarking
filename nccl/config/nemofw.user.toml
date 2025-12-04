@@ -1,0 +1,13 @@
+CUDA_HOME = "/usr/local/cuda"
+MPI_HOME = "/usr/local/mpi"
+HPCX_HOME = "/opt/hpcx/"
+LD_LIBRARY_PATH = "$CUDA_HOME/lib64:$MPI_HOME/lib:$LD_LIBRARY_PATH"
+PATH = "$MPI_HOME/bin:$PATH"
+SWEEP_LOG_ROOT="/nvcomms-workspace"
+NCCL_TEST_PATH="/usr/local/bin/"
+
+pyxis = [
+    "--container-image=$LLMB_INSTALL/images/nvidia+nemo+25.09.00.sqsh --no-container-mount-home"
+]
+NVCOMMS_PERF_TOOLS_BINARY_SUFFIX="_mpi"
+NVCOMMS_PERF_TOOLS_WORKSPACE="$LLMB_INSTALL/workloads/microbenchmark_nccl/experiments/"
