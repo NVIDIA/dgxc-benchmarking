@@ -31,7 +31,6 @@ set -eu -o pipefail
 export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=deepseek-v3
 export FW_VERSION=25.09.00
-export GSW_VERSION=25.10
 
 export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 

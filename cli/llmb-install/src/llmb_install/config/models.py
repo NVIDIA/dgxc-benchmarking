@@ -50,6 +50,7 @@ class InstallConfig:
     # Optional fields (with defaults)
     slurm: Optional[SlurmConfig] = None
     selected_workloads: List[str] = field(default_factory=list)
+    workload_selection_mode: str = 'custom'  # 'custom' or 'exemplar'
     install_method: str = 'local'  # 'local' or 'slurm'
     ui_mode: str = 'simple'  # 'simple', 'rich', 'express'
     environment_vars: Dict[str, str] = field(default_factory=dict)
@@ -69,6 +70,7 @@ class InstallConfig:
             'gpu_type': self.gpu_type,
             'node_architecture': self.node_architecture,
             'selected_workloads': self.selected_workloads,
+            'workload_selection_mode': self.workload_selection_mode,
             'install_method': self.install_method,
             'ui_mode': self.ui_mode,
             'environment_vars': self.environment_vars,
@@ -113,6 +115,7 @@ class InstallConfig:
             node_architecture=data['node_architecture'],
             slurm=slurm_config,
             selected_workloads=data.get('selected_workloads', []),
+            workload_selection_mode=data.get('workload_selection_mode', 'custom'),
             install_method=data.get('install_method', 'local'),
             ui_mode=data.get('ui_mode', 'simple'),
             environment_vars=data.get('environment_vars', {}),

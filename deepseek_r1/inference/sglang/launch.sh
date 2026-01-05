@@ -37,7 +37,6 @@ export GPU_TYPE=${GPU_TYPE,,}
 
 export WORKLOAD_TYPE=inference
 export MODEL_NAME=deepseek-r1-sglang
-export GSW_VERSION=25.10
 
 if [[ $GPU_TYPE == "gb200" ]]; then
     export FW_VERSION=v0.5.3-cu129-gb200

@@ -269,8 +269,8 @@ Baseline performance metrics for GB300 workloads were collected using systems eq
   * 2x B300 GPUs
     * 288GB HBM3e per GPU (576GB total per superchip)
     * Memory bandwidth 12 TB/s per GPU
-* NVLink: NVLink 6th Generation
-  * 2.4 TB/s per GPU bidirectional bandwidth
+* NVLink: NVLink 5th Generation
+  * 1.8 TB/s per GPU bandwidth
 * System Memory: Coherent memory architecture between Grace CPU and Blackwell GPUs
 
 ## GB200 Reference Architecture
@@ -287,7 +287,7 @@ Baseline performance metrics for GB200 workloads were collected using the NVIDIA
   * 2x Blackwell GPUs
     * Memory bandwidth 16 TB/s
 * NVLink: NVLink 5th Generation
-  * 3.6 TB/s
+  * 1.8 TB/s per GPU bandwidth
 
 ## B200 Reference Architecture
 
@@ -302,7 +302,7 @@ Baseline performance metrics for B200 workloads were collected using systems equ
   * RAM: 1 TiB | 1.6 TB/s per socket
   * 48x PCIe Gen5 lanes
 * NVLink: NVLink 5th Generation
-  * 1.8 TB/s per GPU bidirectional bandwidth
+  * 1.8 TB/s per GPU bandwidth
   * 18 Links per GPU
 * InfiniBand:
   * Compute links: 8x 400 Gbit/s
@@ -321,7 +321,7 @@ Baseline performance metrics for H100 workloads were collected using the NVIDIA 
   * Numa nodes per socket = 1
   * PCIe Gen5
 * NVLink: NVLink 4th Generation
-  * 900 GB/s (GPU to GPU NVLink bidirectional bandwidth)
+  * 900 GB/s per GPU bandwidth
   * 18 Links per GPU
 * InfiniBand:
   * Compute links: 8x 400 Gbit/s

@@ -154,6 +154,11 @@ def resolve_gpu_overrides(workloads: Dict[str, Dict[str, Any]], gpu_type: str) -
         if repos_cfg:
             wd_copy['repositories'] = _resolve_repositories_for_gpu(repos_cfg, gpu_type)
 
+        # Resolve setup (top-level by_gpu wrapper supported)
+        setup_cfg = wd_copy.get('setup', {}) or {}
+        if setup_cfg:
+            wd_copy['setup'] = _select_from_by_gpu(setup_cfg, gpu_type, "setup")
+
         # Resolve tools (top-level by_gpu wrapper supported)
         tools_cfg = wd_copy.get('tools', {}) or {}
         if tools_cfg:

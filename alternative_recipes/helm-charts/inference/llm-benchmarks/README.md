@@ -62,3 +62,38 @@ or
 microk8s helm install sg-benchmark llm-benchmark-chart/ --set ngcImagePullSecretName=<image-pull-secret-name> -f sg-llm-server-values.yaml
 ```
 
+## Running in NVCF
+
+### Upload chart
+
+First create Helm Chart in the NGC Web UI
+
+```
+helm package llm-benchmark-chart
+ngc registry chart push <org-id>/llm-benchmark-chart:0.1.1
+```
+
+See here for more info: https://docs.nvidia.com/ngc/gpu-cloud/ngc-private-registry-user-guide/index.html#managing-helm-charts-using-helm-cli
+
+### Run task
+
+```shell
+ngc cf task create --name benchmark --helm-chart <org-name>/llm-benchmark-chart:<version> --result-handling-strategy NONE   --configuration '{
+    "RESULTS_PATH": "",
+    "HF_TOKEN": "<token>",
+    "NUM_GPUS": <number-of-gpus>,
+  }' \
+--gpu-specification <GPU>:<InstanceName>:<ClusterName>
+```
+
+Example:
+```shell
+ngc cf task create --name benchmark --helm-chart qdrlnbkss8u1/llm-benchmark-chart:0.1.1 --result-handling-strategy NONE    --configuration '{
+    "RESULTS_PATH": "",
+    "HF_TOKEN": "<token>",
+    "NUM_GPUS": 1,
+  }' \
+--gpu-specification H100:GPU.H100_1x
+```
+
+

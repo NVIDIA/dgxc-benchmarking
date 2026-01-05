@@ -77,15 +77,11 @@ def build_workload_dict(root_dir: str) -> Dict[str, Dict[str, Any]]:
             if workload_type and workload:
                 key = f"{workload_type}_{workload}"
 
-                # Store metadata sections and the parent directory path for later use
+                # Store all metadata and add installer-specific path field
+                # This future-proofs against new metadata fields (e.g., downloads, models, etc.)
                 workload_dict[key] = {
-                    'general': general,
-                    'container': metadata.get('container', {}),
-                    'repositories': metadata.get('repositories', {}),
-                    'setup': metadata.get('setup', {}),
-                    'run': metadata.get('run', {}),
-                    'tools': metadata.get('tools', {}),
-                    'path': str(file_path.parent),
+                    **metadata,
+                    'path': str(file_path.parent),  # Installer-specific field
                 }
 
         except Exception as e:

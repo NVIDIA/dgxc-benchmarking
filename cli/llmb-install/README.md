@@ -4,6 +4,32 @@ The installer is an interactive tool that simplifies the setup and deployment of
 
 ## Quick Start
 
+### Installation
+
+The recommended way to install llmb-install is using the automated installer script:
+
+```bash
+# Run the installer script
+$LLMB_REPO/install.sh
+```
+
+This script will setup the environment and install the necessary tools.
+
+### Manual Installation
+
+If you prefer to install manually, you can use one of the following methods.
+
+#### Option 1: Install using uv (Recommended)
+
+`uv` is a fast Python package manager that can install tools in isolated environments.
+
+```bash
+# Install from the project directory (assuming $LLMB_REPO is your repository root)
+uv tool install $LLMB_REPO/cli/llmb-install
+```
+
+#### Option 2: Install as a Package (pip)
+
 It is recommended to run installer in a virtual environment (uv, conda or venv with python 3.12.x). The installer has been tested with these three environment types; other solutions may work but are not officially supported. Make sure to have the environment activated 
 before running commands below.
 
@@ -79,7 +105,7 @@ llmb-install express /work/llmb --workloads nemotron,llama3.1
 llmb-install express
 ```
 
-Express mode uses saved system configuration (SLURM settings, GPU type, etc.) and only prompts for:
+Express mode uses saved system configuration (SLURM settings, GPU type, image folder, etc.) and only prompts for:
 - Installation path (if not provided)
 - Workload selection (if not specified)
 
@@ -302,7 +328,10 @@ llmb-install express --help
 | `--record FILE` | Save configuration without installing | `llmb-install --record config.yaml` |
 | `--play FILE` | Automated installation from config | `llmb-install --play config.yaml` |
 
-**Note on image folder**: Highly recommended for multi-user or multi-installation setups. Container images are 5-60 GB each and read-only, so sharing saves significant space with no downsides.
+**Note on image folder**: 
+- **Purpose**: Highly recommended for multi-user or multi-installation setups. Container images are 5-60 GB each and read-only, so sharing saves significant space with no downsides.
+- **Persistence**: The image folder path is saved to `~/.config/llmb/system_config.yaml` after successful installation and automatically reused in future installs.
+- **Override**: Use `-i` flag to override the saved location for a specific installation, or for first time installs.
 
 ### Express Mode Flags
 
@@ -310,6 +339,7 @@ llmb-install express --help
 |------|---------|---------|
 | `install_path` (positional) | Installation directory | `llmb-install express /work/llmb` |
 | `-w, --workloads` | Workloads to install | `--workloads all` or `--workloads nemotron,llama3.1` |
+| `--exemplar` | Install all 'pretrain' reference workloads (Exemplar Cloud) | `llmb-install express --exemplar` |
 | `--list-workloads` | Show available workloads and exit | `llmb-install express --list-workloads` |
 
 **Combined example**:
@@ -325,9 +355,16 @@ When developing or testing recipes, use `--dev-mode` to work directly with the o
 
 ```bash
 llmb-install express -d /work/llmb --workloads test_workload
+# OR for interactive mode with streamlined selection:
+llmb-install -d
 ```
 
-This uses the original repo location (no copy to `LLMB_INSTALL/llmb_repo`), allowing git operations and version control. Not recommended for production installations.
+Dev mode features:
+- **Direct repo access**: Uses the original repo location (no copy to `LLMB_INSTALL/llmb_repo`), allowing git operations and version control
+- **Streamlined workflow**: In interactive mode, skips the "Exemplar Cloud vs Custom" prompt and goes straight to workload selection
+- **No resume support**: Resume functionality disabled in dev mode
+
+Not recommended for production installations.
 
 ### Resuming Failed Installations
 
@@ -383,12 +420,49 @@ The installer recognizes the following environment variables to control behavior
 | `LLMB_DISABLE_RESUME` | Disable resume functionality | `1`, `true`, or `yes` to disable |
 | `LLMB_DISABLE_GIT_CACHE` | Disable git repository caching | `1`, `true`, or `yes` to disable |
 | `LLMB_USE_PIP_FALLBACK` | Use standard pip instead of uv pip in uv environments | `1`, `true`, or `yes` to enable |
+| `LLMB_DISABLE_MANAGED_PYTHON` | Disable enforced managed python usage for UV environments | `1`, `true`, or `yes` to disable |
 
 **Resume Control**: Set `LLMB_DISABLE_RESUME=1` to prevent automatic resume detection and always start fresh installations.
 
 **Git Caching**: Set `LLMB_DISABLE_GIT_CACHE=1` to skip local git cache and clone repositories directly from remote sources.
 
 **Pip Fallback**: Set `LLMB_USE_PIP_FALLBACK=1` to use standard pip instead of uv pip when using uv environments. Useful as a workaround for packages that fail with uv pip install.
+
+**Managed Python**: By default, UV environments use managed python versions for consistency. Set `LLMB_DISABLE_MANAGED_PYTHON=1` to use system python instead if available.
+
+## Development
+
+This project uses `uv` for dependency management and `tox` for multi-environment testing.
+
+### Environment Setup
+
+1. **Install uv**: [Follow official instructions](https://docs.astral.sh/uv/getting-started/installation/).
+2. **Sync environment**: Creates a virtualenv and installs dependencies from `uv.lock`.
+   ```bash
+   uv sync
+   ```
+
+### Managing Dependencies
+
+- **Add a dependency**: `uv add <package>`
+- **Add a dev dependency**: `uv add --dev <package>`
+- **Update lockfile**: Run this after modifying `pyproject.toml` (including version bumps) or dependencies.
+   ```bash
+   uv lock
+   ```
+
+### Running Tests
+
+- **Quick (Current Python)**:
+  ```bash
+  uv run pytest
+  ```
+- **Full Matrix (Multiple Python versions)**:
+  ```bash
+  # Requires tox and tox-uv
+  uv tool install tox --with tox-uv
+  tox
+  ```
 
 ## Documentation
 

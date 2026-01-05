@@ -1,3 +1,12 @@
+## [v25.10.01] - 2026-01-05
+
+### Added
+  - NVCF support to inference recipes deployable via Helm Charts.
+  - Offline mode support for Grok1 and Nemotron4 (15B and 340B) pretrain recipes on SLURM clusters. Tokenizers are pre-downloaded during installation and mounted into containers at runtime, eliminating the need for HuggingFace API access during workload execution.
+
+### Fixed
+  - Fixed Nemotron 340B runtime failures caused by rate limiting (HTTP 429 errors) when connecting to HuggingFace Hub. The workload now operates in offline mode using pre-downloaded tokenizer files, preventing API rate limit exhaustion during training runs.
+
 ## [v25.10] - 2025-12-03
 
 ### Added

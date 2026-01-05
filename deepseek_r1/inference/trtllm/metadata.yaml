@@ -2,7 +2,6 @@
 general:
   workload: deepseek-r1
   workload_type: inference
-  gsw_version: '25.10'
   framework: trt-llm
 
 container:

@@ -39,7 +39,6 @@ fi
 export WORKLOAD_TYPE=inference
 export MODEL_NAME=llama3.3
 export FW_VERSION=1.1.0rc5
-export GSW_VERSION=25.10
 
 export LLMB_INSTALL=${LLMB_INSTALL:?Please set LLMB_INSTALL to the path of the installation directory for all workloads}
 export LLMB_WORKLOAD=$LLMB_INSTALL/workloads/${WORKLOAD_TYPE}_${MODEL_NAME}

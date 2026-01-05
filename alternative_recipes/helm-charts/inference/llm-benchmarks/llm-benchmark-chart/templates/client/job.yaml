@@ -28,78 +28,68 @@ spec:
     spec:
       serviceAccountName: {{ include "benchmark_chart.serviceAccountName" . }}
       restartPolicy: Never
+{{- if .Values.ngcImagePullSecretName }}
       imagePullSecrets:
-        - name: {{ .Values.ngcImagePullSecretName }}
+      - name: {{ .Values.ngcImagePullSecretName }}
+{{- end }}
       {{- if .Values.tolerations }}
       tolerations:
 {{ toYaml .Values.tolerations | indent 8 }}
       {{- end }}
-      volumes:
       {{- if .Values.environment.RESULTS_PATH }}
+      volumes:
       - name: results-volume
         hostPath:
           path: {{ .Values.environment.RESULTS_PATH }}
           type: DirectoryOrCreate
       {{- end }}
-      - name: metrics-script
-        configMap:
-          name: {{ .Release.Name }}-metrics-calculator
-          defaultMode: 0755
       containers:
       - name: benchmarking-client
         image: {{ .Values.environment.BENCHMARK_SERVER_IMAGE }}
-        volumeMounts:
         {{- if .Values.environment.RESULTS_PATH }}
+        volumeMounts:
         - name: results-volume
           mountPath: {{ .Values.environment.RESULTS_PATH }}
         {{- end }}
-        - name: metrics-script
-          mountPath: /scripts
         command: ["sh", "-c"]
         args:
           - |
             BASE_URL="http://{{ .Release.Name }}-server:{{ .Values.environment.SERVER_PORT }}"
             HEALTH_CHECK_URL="${BASE_URL}/${SERVER_HEALTH_CHECK_ENDPOINT}"
-            echo '{
-                "model": "'$MODEL_NAME'",
-                "num_gpus": '$NUM_GPUS',
-                "concurrency_range": "'$CONCURRENCY_RANGE'",
-                "use_cases": "'$USE_CASES'"
-            }' > metadata.json
+            echo '{ "model": "'$MODEL_NAME'", "num_gpus": '$NUM_GPUS', "concurrency_range": "'$CONCURRENCY_RANGE'", "use_cases": "'$USE_CASES'" }' > metadata.json
 
-            PERCENT_COMPLETE=1
+            export PERCENT_COMPLETE=1
+
+            echo "Setup directory for results"
+            if [ -z "${RESULTS_PATH}" ]; then
+              RESULTS_DIR=${NVCT_RESULTS_DIR}
+            else
+              RESULTS_DIR=${RESULTS_PATH}
+            fi
+            mkdir -p ${RESULTS_DIR}
+
+            export EXPORT_FOLDER="nothing_new"
+            mkdir -p ${RESULTS_DIR}/${EXPORT_FOLDER}
 
             function update_progress() {
               date=$(python3 -c 'import datetime; print(datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"))')
-              msg='{"taskId": "'${NVCT_TASK_ID}'",  "percentComplete": '${PERCENT_COMPLETE}',  "name": "fin",  "metadata": '$(cat metadata.json)',  "lastUpdatedAt": "'${date}'"}'
+              msg='{"taskId": "'${NVCT_TASK_ID}'",  "percentComplete": '${PERCENT_COMPLETE}',  "name": "'${EXPORT_FOLDER}'",  "metadata": '$(cat metadata.json)',  "lastUpdatedAt": "'${date}'"}'
+              echo "Updating progress with message: ${msg}"
               echo ${msg} > "${NVCT_PROGRESS_FILE_PATH}"
-              echo "Updated progress to ${PERCENT_COMPLETE}%"
             }
-
-            function do_progress_loop() {
-              while true; do update_progress; sleep 30; done
-            }
-
-            do_progress_loop &
+            update_progress
             
             # Wait for the server to be ready
             echo "Waiting for server to be ready..."
             sleep 5
             until curl -s -o /dev/null -w "%{http_code}" "$HEALTH_CHECK_URL" | grep -q "^200$"; do
               echo "Server not ready yet ($HEALTH_CHECK_URL), waiting..."
+              update_progress
               sleep 5
             done
-            sleep 5
+            sleep ${SERVER_STARTUP_DELAY:-10}
             echo "Server is ready!"
             TIMESTAMP=$(date +%s)
-
-            echo "Setup directory for results"
-            if [ -z "${RESULTS_PATH}" ]; then
-              RESULTS_DIR=${NVCT_RESULTS_DIR}/results
-            else
-              RESULTS_DIR=${RESULTS_PATH}
-            fi
-            mkdir -p ${RESULTS_DIR}
 
             echo "Starting the benchmark!"
 
@@ -113,10 +103,8 @@ spec:
                 if [ "$TOTAL_REQUESTS" -lt $MIN_REQUESTS ]; then
                   TOTAL_REQUESTS=$MIN_REQUESTS
                 fi
-                export TOTAL_REQUESTS
 
                 echo "Concurrency: $CONCURRENCY"
-                echo "DEBUG: TOTAL_REQUESTS=$TOTAL_REQUESTS, MIN_REQUESTS=$MIN_REQUESTS, REQUEST_MULTIPLIER=$REQUEST_MULTIPLIER"
 
                 # Extract the use case name and values
                 use_case=$(echo "$value" | cut -d':' -f1)
@@ -129,8 +117,10 @@ spec:
                 if [ "$use_case" == "chat" ]; then
                   use_case="chat"
 
-                  export INPUT_SEQUENCE_LENGTH=$(echo "$value" | cut -d':' -f2 | cut -d'/' -f1)
-                  export OUTPUT_SEQUENCE_LENGTH=$(echo "$value" | cut -d':' -f2 | cut -d'/' -f2)
+                  INPUT_SEQUENCE_LENGTH=$(echo "$value" | cut -d':' -f2 | cut -d'/' -f1)
+                  OUTPUT_SEQUENCE_LENGTH=$(echo "$value" | cut -d':' -f2 | cut -d'/' -f2)
+
+                  SERVER_ENDPOINT="${BASE_URL}"
 
                   echo "Use Case: $use_case"
                   echo "Input Sequence Length: $INPUT_SEQUENCE_LENGTH"
@@ -138,37 +128,30 @@ spec:
                   echo "----------------"
 
                   # Create export file name using values from values.yaml
-                  EXPORT_FILE="${MODEL_NAME_CLEANED}_${NUM_GPUS}_${CONCURRENCY}_${use_case}_${INPUT_SEQUENCE_LENGTH}_${OUTPUT_SEQUENCE_LENGTH}_${TIMESTAMP}"
+                  export EXPORT_FOLDER="${MODEL_NAME_CLEANED}_${NUM_GPUS}_${CONCURRENCY}_${use_case}_${INPUT_SEQUENCE_LENGTH}_${OUTPUT_SEQUENCE_LENGTH}_${TIMESTAMP}"
 
                   # Execute command with proper variable expansion
-                  export OUTPUT_DIR=${RESULTS_DIR}/${EXPORT_FILE}
-                  mkdir -p ${OUTPUT_DIR}
-                  
-                  # Generate input JSON with prompts using Python one-liner
-                  python3 -c 'import json,random,string,os;data=[{"payload":[{"messages":[{"role":"user","content":"".join(random.choices(string.ascii_lowercase+" ",k=int(os.environ["INPUT_SEQUENCE_LENGTH"])*4))}],"model":os.environ["MODEL_NAME"],"max_tokens":int(os.environ["OUTPUT_SEQUENCE_LENGTH"]),"min_tokens":int(os.environ["OUTPUT_SEQUENCE_LENGTH"]),"ignore_eos":True,"stream":True}]} for _ in range(int(os.environ["TOTAL_REQUESTS"]))];json.dump({"data":data},open(os.environ["OUTPUT_DIR"]+"/inputs.json","w"));print(f"Generated {len(data)} prompts")'
-                  
-                  # Call perf_analyzer directly (bypass genai-perf)
-                  perf_analyzer \
-                    -m ${MODEL_NAME} \
-                    --async \
-                    --measurement-interval 60000 \
-                    --concurrency-range ${CONCURRENCY} \
-                    --request-count ${TOTAL_REQUESTS} \
-                    -i http \
-                    -u ${BASE_URL} \
-                    --service-kind openai \
-                    --endpoint v1/chat/completions \
-                    --input-data ${OUTPUT_DIR}/inputs.json \
-                    --profile-export-file ${OUTPUT_DIR}/profile_export.json \
-                    -v
-                  
-                  # Post-process results to calculate token-level metrics
-                  python3 /scripts/calculate_token_metrics.py
+                  OUTPUT_DIR=${RESULTS_DIR}/${EXPORT_FOLDER}
+                  genai-perf profile \
+                  -m ${MODEL_NAME} \
+                  --endpoint-type ${use_case} \
+                  --streaming -u ${SERVER_ENDPOINT} \
+                  --num-prompts ${TOTAL_REQUESTS} \
+                  --synthetic-input-tokens-mean ${INPUT_SEQUENCE_LENGTH} \
+                  --synthetic-input-tokens-stddev 0 \
+                  --concurrency ${CONCURRENCY} \
+                  --output-tokens-mean ${OUTPUT_SEQUENCE_LENGTH} \
+                  --extra-inputs max_tokens:${OUTPUT_SEQUENCE_LENGTH} \
+                  --extra-inputs min_tokens:${OUTPUT_SEQUENCE_LENGTH} \
+                  --extra-inputs ignore_eos:true \
+                  --artifact-dir ${OUTPUT_DIR} \
+                  --tokenizer ${MODEL_TOKENIZER} \
+                  -- -v --max-threads=${CONCURRENCY} --request-count ${TOTAL_REQUESTS}
                 fi
                 if [ "$use_case" == "embeddings" ]; then
                   use_case="embeddings"
 
-                  export BATCH_SIZE=$(echo "$value" | cut -d':' -f2)
+                  BATCH_SIZE=$(echo "$value" | cut -d':' -f2)
 
                   SERVER_ENDPOINT="${BASE_URL}"
 
@@ -177,63 +160,35 @@ spec:
                   echo "----------------"
 
                   # Create export file name using values from values.yaml
-                  EXPORT_FILE="${MODEL_NAME_CLEANED}_${NUM_GPUS}_${CONCURRENCY}_${use_case}_${BATCH_SIZE}_${TIMESTAMP}"
+                  export EXPORT_FOLDER="${MODEL_NAME_CLEANED}_${NUM_GPUS}_${CONCURRENCY}_${use_case}_${BATCH_SIZE}_${TIMESTAMP}"
 
                   # Execute command with proper variable expansion
-                  export OUTPUT_DIR=${RESULTS_DIR}/${EXPORT_FILE}
-                  mkdir -p ${OUTPUT_DIR}
-                  
-                  # Generate input JSON for embeddings using Python one-liner
-                  python3 -c 'import json,random,string,os;data=[{"payload":[{"input":["".join(random.choices(string.ascii_lowercase+" ",k=200)) for _ in range(int(os.environ["BATCH_SIZE"]))],"model":os.environ["MODEL_NAME"]}]} for _ in range(int(os.environ["TOTAL_REQUESTS"]))];json.dump({"data":data},open(os.environ["OUTPUT_DIR"]+"/inputs.json","w"));print(f"Generated {len(data)} embedding requests")'
-                  
-                  # Call perf_analyzer directly
-                  perf_analyzer \
-                    -m ${MODEL_NAME} \
-                    --async \
-                    --measurement-interval 60000 \
-                    --concurrency-range ${CONCURRENCY} \
-                    --request-count ${TOTAL_REQUESTS} \
-                    -i http \
-                    -u ${SERVER_ENDPOINT} \
-                    --service-kind openai \
-                    --endpoint v1/embeddings \
-                    --input-data ${OUTPUT_DIR}/inputs.json \
-                    --profile-export-file ${OUTPUT_DIR}/profile_export.json \
-                    -v
-                  
-                  # Create metrics file for embeddings
-                  echo '{}' > ${OUTPUT_DIR}/profile_export_genai_perf.json
+                  OUTPUT_DIR=${RESULTS_DIR}/${EXPORT_FOLDER}
+                  genai-perf profile \
+                  -m ${MODEL_NAME} \
+                  --endpoint-type ${use_case} \
+                  -u ${SERVER_ENDPOINT} \
+                  --concurrency ${CONCURRENCY} \
+                  --batch-size-text ${BATCH_SIZE} \
+                  --artifact-dir ${OUTPUT_DIR} \
+                  --tokenizer ${MODEL_TOKENIZER} \
+                  -- -v --max-threads=${CONCURRENCY} --request-count ${TOTAL_REQUESTS}
                   
                 fi
-                 
-                            
-              echo '{"'${EXPORT_FILE}'": '$(cat ${OUTPUT_DIR}/profile_export_genai_perf.json)'}' > new_metadata.json
 
-              echo $(jq -s '.[0] + .[1]' metadata.json new_metadata.json) > metadata.json
+              export PERCENT_COMPLETE=$((PERCENT_COMPLETE + 1))
+              update_progress
 
               done
             done
-
-            # Create a progress JSON file in the results directory
-            PROGRESS_FILE="${RESULTS_DIR}/progress"
-            CURRENT_TIME=$(date -u +"%Y-%m-%dT%H:%M:%S.%NZ")
-            PERCENT_COMPLETE=100
             
-            cat > ${PROGRESS_FILE} << EOF
-            {
-              "taskId": "${NVCT_TASK_ID}",
-              "percentComplete": ${PERCENT_COMPLETE},
-              "name": "results",
-              "metadata": $(cat metadata.json),
-              "lastUpdatedAt": "${CURRENT_TIME}"
-            }
-            EOF
-            
-            echo "Created progress file at ${PROGRESS_FILE}"
-            
-            update_progress
             sleep 10
-            echo "Finished Benchmarking"
+
+            export PERCENT_COMPLETE=100
+            export EXPORT_FOLDER="nothing_new"
+            update_progress
+            echo "Finished Benchmarking! Sleeping for ${COMPLETION_DELAY:-60} seconds to allow the progress to be updated"
+            sleep ${COMPLETION_DELAY:-60}
 
         env:
         - name: SERVER_HEALTH_CHECK_ENDPOINT

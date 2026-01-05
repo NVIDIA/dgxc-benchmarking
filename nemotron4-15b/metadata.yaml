@@ -3,17 +3,20 @@ general:
   model: nemotron4
   workload: nemotron4-15b
   workload_type: pretrain
-  gsw_version: '25.10'
   framework: nemo2
 
 container:
   images: 
     - 'nvcr.io#nvidia/nemo:25.09.00'
 
+downloads:
+  hf_tokenizers:
+    - 'nvidia/Nemotron-4-340B-Base'
+
 repositories:
   nemo:
     url: "https://github.com/NVIDIA-NeMo/NeMo.git"
-    commit: "9957a50be311d2279d240e890b93d88a659f772d"
+    commit: "032e4de5b7b69d2a53ca76397cf79ff0941951b1"
   megatron_core:
     url: "https://github.com/NVIDIA/Megatron-LM.git"
     commit: "20d73fe76eb03672c02f637e9b47e562b9010d4c"

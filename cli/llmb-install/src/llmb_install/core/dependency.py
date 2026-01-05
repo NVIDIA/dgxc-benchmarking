@@ -117,6 +117,12 @@ def _resolve_dependencies(workload_data: Dict[str, Any]) -> Optional[Dict[str, A
     if not dependencies:
         return None
 
+    if not isinstance(dependencies, dict):
+        raise TypeError(
+            f"Invalid 'dependencies' format in metadata.yaml. Expected a dictionary with 'git' or 'pip' keys, but got {type(dependencies).__name__}. "
+            "Please check your yaml structure (e.g. ensure items are under 'pip:' key, not a direct list)."
+        )
+
     repositories = workload_data.get('repositories', {})
 
     # Resolve git dependencies

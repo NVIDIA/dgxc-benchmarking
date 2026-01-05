@@ -70,7 +70,7 @@ spec:
         {{- end }}
         {{- end }}
         env:
-        {{- if and (eq .Values.environment.SERVER_TYPE "NIM") .Values.ngcApiKeySecretName }}
+        {{- if eq .Values.environment.SERVER_TYPE "NIM" }}
         - name: NGC_API_KEY
           valueFrom:
             secretKeyRef:

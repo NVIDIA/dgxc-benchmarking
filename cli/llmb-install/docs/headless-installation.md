@@ -101,6 +101,9 @@ llmb-install express --list-workloads
 
 # Specific workloads (comma-separated, no spaces)
 llmb-install express /work/llmb --workloads nemotron,llama3.1
+
+# Exemplar Cloud (all pretrain workloads)
+llmb-install express /work/llmb --exemplar
 ```
 
 ### Requirements
@@ -109,10 +112,21 @@ llmb-install express /work/llmb --workloads nemotron,llama3.1
 - Reuses: SLURM settings, GPU type, environment type
 - Still prompts for: install path and workloads (if not specified)
 
+### Workload Selection Options
+
+Express mode supports three workload selection methods:
+
+- **`--workloads all`**: Install all available workloads for your GPU type
+- **`--workloads <list>`**: Install specific workloads (comma-separated, e.g., `nemotron,llama3.1`)
+- **`--exemplar`**: Install only 'pretrain' reference workloads (Exemplar Cloud suite)
+
 ### Typical Workflow
 
 1. **First installation** (interactive): `llmb-install`
-2. **Subsequent installations** (express): `llmb-install express /new/path --workloads all`
+2. **Subsequent installations** (express):
+   - All workloads: `llmb-install express /new/path --workloads all`
+   - Exemplar Cloud only: `llmb-install express /new/path --exemplar`
+   - Specific workloads: `llmb-install express /new/path --workloads nemotron,llama3.1`
 
 ## Complete Examples
 
@@ -141,6 +155,7 @@ llmb-install  # Creates ~/.config/llmb/system_config.yaml
 # Subsequent: Quick repeat installations
 llmb-install express /work/project1 --workloads all
 llmb-install express /work/project2 --workloads nemotron,llama3.1
+llmb-install express /work/exemplar --exemplar  # Pretrain workloads only
 llmb-install express /work/test --workloads test_recipe
 ```
 
@@ -149,6 +164,9 @@ llmb-install express /work/test --workloads test_recipe
 ```bash
 # Verbose, shared images, dev mode
 llmb-install express -v -i /shared/containers -d /work/dev --workloads test
+
+# Express with Exemplar Cloud
+llmb-install express -v -i /shared/containers /work/llmb --exemplar
 
 # Play mode with verbose output
 llmb-install --play config.yaml -v

@@ -26,6 +26,7 @@ import itertools
 import logging
 import re
 from dataclasses import dataclass, field
+from typing import Any, Dict, Optional
 
 import yaml
 
@@ -47,6 +48,7 @@ class WorkloadTask:
     profile: bool = False
     env_overrides: dict = field(default_factory=dict)
     model_overrides: dict = field(default_factory=dict)
+    extra_slurm_params: Optional[Dict[str, Any]] = field(default_factory=dict)
 
 
 def merge_dicts(default, override):
@@ -340,6 +342,7 @@ def generate_submit_all_tasks(
     dtype_filter=None,
     workload_filter=None,
     specific_scales=None,
+    extra_slurm_params: Optional[Dict[str, Any]] = None,
 ):
     """Generate tasks for all installed workloads up to max_scale.
 
@@ -353,6 +356,7 @@ def generate_submit_all_tasks(
         dtype_filter: List of dtypes to filter by, or None for all (default: None)
         workload_filter: List of workloads to filter by, or None for all (default: None)
         specific_scales: List of specific scales to run, or None to use max_scale/min_scale logic (default: None)
+        extra_slurm_params: Optional dictionary of extra Slurm parameters to apply to jobs.
 
     Returns:
         list: List of WorkloadTask objects for all valid configurations
@@ -423,6 +427,7 @@ def generate_submit_all_tasks(
             dtype_filter,
             workload_filter,
             specific_scales,
+            extra_slurm_params,
         )
 
     logger.info(f"Generated {len(task_list)} tasks across {len(filtered_workloads)} workloads")
@@ -441,6 +446,7 @@ def _generate_workload_tasks(
     dtype_filter=None,
     workload_filter=None,
     specific_scales=None,
+    extra_slurm_params: Optional[Dict[str, Any]] = None,
 ):
     """Generate tasks for a single workload and add them to task_list.
 
@@ -456,6 +462,7 @@ def _generate_workload_tasks(
         dtype_filter: List of dtypes to filter by, or None for all (default: None)
         workload_filter: List of workload filters, may include workload_modelsize (default: None)
         specific_scales: List of specific scales to run, or None to use max_scale/min_scale logic (default: None)
+        extra_slurm_params: Optional dictionary of extra Slurm parameters to apply to jobs.
     """
     metadata = workload_data['metadata']
     gpu_configs = metadata.get('run', {}).get('gpu_configs', {})
@@ -575,6 +582,7 @@ def _generate_workload_tasks(
                             dtype=dtype,
                             scale=scale,
                             profile=profile,
+                            extra_slurm_params=extra_slurm_params,
                         )
                     )
 

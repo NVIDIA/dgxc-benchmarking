@@ -31,7 +31,6 @@ set -eu -o pipefail
 export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=llama3.1
 export FW_VERSION=25.09.00
-export GSW_VERSION=25.10.1
 
 export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh}
 

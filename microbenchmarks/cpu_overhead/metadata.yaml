@@ -2,7 +2,6 @@
 general:
   workload: cpu_overhead
   workload_type: microbenchmark
-  gsw_version: '25.10'
   framework: trt-llm
 
 container:

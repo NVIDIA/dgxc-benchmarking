@@ -40,7 +40,7 @@ environment:
   CONCURRENCY_RANGE: ""
   REQUEST_MULTIPLIER: ""
   NUM_GPUS: ""  # Configure the number of GPUs to use (e.g., "1", "2", "4", "8")
-  BENCHMARK_SERVER_IMAGE: "nvcr.io/nvidia/tritonserver:25.04-py3-sdk"  # Path to benchmark server image that contains genai-perf
+  BENCHMARK_SERVER_IMAGE: "nvcr.io/nvidia/tritonserver:25.07-py3-sdk"  # Path to benchmark server image that contains genai-perf
 
   # Results Configuration
   RESULTS_PATH: ""  # Directory where benchmark results will be stored

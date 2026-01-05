@@ -39,7 +39,6 @@ set -eu -o pipefail
 export WORKLOAD_TYPE=finetune
 export MODEL_NAME=llama3
 export FW_VERSION=25.09.00
-export GSW_VERSION=25.10
 
 export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 
@@ -103,7 +102,7 @@ if [ $GPU_TYPE = "gb200" ]; then
     CP=${CP:-1}
     VP=${VP:-20}
     MBS=${MBS:-1}
-    GBS=${GBS:-64}
+    GBS=${GBS:-$((JOB_TOTAL_GPUS * 8))}
     CUDA_GRAPH=${CUDA_GRAPH:-true}
     TIME_LIMIT=${TIME_LIMIT:-"00:15:00"}
 elif [ $GPU_TYPE = "b200" ]; then
@@ -115,7 +114,7 @@ elif [ $GPU_TYPE = "b200" ]; then
     CP=${CP:-1}
     VP=${VP:-20}
     MBS=${MBS:-1}
-    GBS=${GBS:-32}
+    GBS=${GBS:-$((JOB_TOTAL_GPUS * 4))}
     CUDA_GRAPH=${CUDA_GRAPH:-false}
     TIME_LIMIT=${TIME_LIMIT:-"00:15:00"}
 elif [ $GPU_TYPE = "h100" ]; then
@@ -127,7 +126,7 @@ elif [ $GPU_TYPE = "h100" ]; then
     CP=${CP:-1}
     VP=${VP:-20}
     MBS=${MBS:-1}
-    GBS=${GBS:-32}
+    GBS=${GBS:-$((JOB_TOTAL_GPUS * 4))}
     CUDA_GRAPH=${CUDA_GRAPH:-false}
     TIME_LIMIT=${TIME_LIMIT:-"00:15:00"}
 else

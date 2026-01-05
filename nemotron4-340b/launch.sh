@@ -31,7 +31,6 @@ set -eu -o pipefail
 export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=nemotron4-340b
 export FW_VERSION=25.09.00 # FW version
-export GSW_VERSION=25.10
 
 export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 
@@ -67,7 +66,9 @@ CPU_PER_TASK_PINNING=${CPU_PER_TASK_PINNING:-0}
 ENABLE_CHECKPOINT=${ENABLE_CHECKPOINT:-false}
 ENABLE_CHECKPOINT=${ENABLE_CHECKPOINT,,}
 
-CONTAINER_MOUNTS=""
+# Mount Hugging Face cache for tokenizers
+export HF_HOME="$LLMB_INSTALL/.cache/huggingface"
+CONTAINER_MOUNTS="$HF_HOME"
 if [[ -n ${RUN_CONF_MOUNTS:-""} ]]; then
     if [[ -n ${CONTAINER_MOUNTS} ]]; then
         CONTAINER_MOUNTS+=","
@@ -188,7 +189,6 @@ if [ $CLUSTER_TYPE = slurm ]; then
         --num_gpus $JOB_TOTAL_GPUS \
         --gpus_per_node $GPUS_PER_NODE \
         --max_steps $MAX_STEPS \
-        --hf_token ${HF_TOKEN:?HF_TOKEN is required} \
         $CONFIG_OVERRIDES \
         slurm \
         --account $SBATCH_ACCOUNT \

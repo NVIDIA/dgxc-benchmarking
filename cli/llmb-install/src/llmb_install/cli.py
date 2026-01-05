@@ -126,11 +126,20 @@ Examples:
         help='Installation directory (alternative to positional argument)',
     )
 
-    express_parser.add_argument(
+    # Create mutually exclusive group for workload selection
+    workload_group = express_parser.add_mutually_exclusive_group()
+
+    workload_group.add_argument(
         '-w',
         '--workloads',
         type=str,
         help="Workloads to install: 'all' or comma-separated list (e.g. 'nemotron,llama3.1')",
+    )
+
+    workload_group.add_argument(
+        '--exemplar',
+        action='store_true',
+        help="Install all 'pretrain' workloads (Exemplar Cloud certification process)",
     )
 
     express_parser.add_argument(

@@ -53,6 +53,7 @@ class SystemConfig:
     install_method: str  # 'local' or 'slurm'
     gpu_type: str  # 'h100', 'gb200', 'b200'
     node_architecture: str  # 'x86_64', 'aarch64'
+    workload_selection_mode: str = 'custom'  # 'custom' or 'exemplar'
 
     # SLURM settings (stable for a cluster)
     slurm: Optional[SlurmConfig] = None
@@ -75,6 +76,7 @@ class SystemConfig:
             'install_method': self.install_method,
             'gpu_type': self.gpu_type,
             'node_architecture': self.node_architecture,
+            'workload_selection_mode': self.workload_selection_mode,
             'environment_vars': self.environment_vars,
             'image_folder': self.image_folder,
         }
@@ -111,6 +113,7 @@ class SystemConfig:
             install_method=data['install_method'],
             gpu_type=data['gpu_type'],
             node_architecture=data['node_architecture'],
+            workload_selection_mode=data.get('workload_selection_mode', 'custom'),
             slurm=slurm_config,
             environment_vars=data.get('environment_vars', {}),
             image_folder=data.get('image_folder'),
@@ -128,6 +131,7 @@ class SystemConfig:
             install_method=install_config.install_method,
             gpu_type=install_config.gpu_type,
             node_architecture=install_config.node_architecture,
+            workload_selection_mode=install_config.workload_selection_mode,
             slurm=install_config.slurm,
             environment_vars=install_config.environment_vars.copy(),
             image_folder=install_config.image_folder,

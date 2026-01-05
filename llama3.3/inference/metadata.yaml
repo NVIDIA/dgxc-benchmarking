@@ -2,7 +2,6 @@
 general:
   workload: llama3.3
   workload_type: inference
-  gsw_version: '25.10'
   framework: trt-llm
 
 container:
@@ -50,19 +49,7 @@ run:
       model_configs:
         - model_size: '70b'
           dtypes: ['nvfp4']
-          scales: [1, 4]
-          exact_scales: true
-    b200:
-      model_configs:
-        - model_size: '70b'
-          dtypes: ['nvfp4']
           scales: [1]
-          exact_scales: true
-    h100:
-      model_configs:
-        - model_size: '70b'
-          dtypes: ['fp8']
-          scales: [2]
           exact_scales: true
     h100:
       model_configs:

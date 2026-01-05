@@ -279,8 +279,12 @@ class SbatchLauncher(JobLauncher):
             "-N",
             num_nodes,
             f"--ntasks-per-node={ntasks_per_node}",
-            "launch.sh",
         ]
+
+        if task.extra_slurm_params and 'nice' in task.extra_slurm_params:
+            cmd.append(f"--nice={task.extra_slurm_params['nice']}")
+
+        cmd.append("launch.sh")
 
         env = os.environ.copy()
 
@@ -460,6 +464,27 @@ class Nemo2Launcher(JobLauncher):
                 else:
                     logger.info(format_task_output(task, prefix="LAUNCHED: ", suffix=f"jobid={job_id}"))
                     logger.info(f"JobID: {job_id}, Workdir: {local_dir}")
+
+                    # Apply scontrol nice if specified
+                    if nice_value := task.extra_slurm_params.get('nice'):
+                        scontrol_cmd = ["scontrol", "update", f"jobid={job_id}", f"nice={nice_value}"]
+                        try:
+                            scontrol_result = subprocess.run(
+                                scontrol_cmd, capture_output=True, check=False, text=True, timeout=10
+                            )
+                            if scontrol_result.returncode != 0:
+                                # Log non-zero return codes for debugging, as this can happen if the job already started.
+                                logger.debug(
+                                    f"scontrol failed for job {job_id} (nice={nice_value}): {scontrol_result.stderr.strip()}"
+                                )
+                        except FileNotFoundError:
+                            logger.warning("`scontrol` command not found. Cannot apply nice value.")
+                        except subprocess.TimeoutExpired:
+                            logger.warning(f"Timeout executing `scontrol` for job {job_id}.")
+                        except Exception as e:
+                            logger.warning(
+                                f"An unexpected error occurred while executing scontrol for job {job_id}: {e}"
+                            )
 
                     # Create llmb-config.yaml file in the experiment directory
                     create_llmb_config(task, job_id, local_dir, self.config, self.workloads)
