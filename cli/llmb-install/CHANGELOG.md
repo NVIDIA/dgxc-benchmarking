@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2025-12-18
+
+### Fixed
+  - Missing `urllib.error` import for download error handling in tools module
+  - Improved validation error messages for null/invalid `downloads` metadata
+
+## [1.4.1] - 2025-12-17
+
+### Fixed
+  - HuggingFace tokenizer downloads now uses hf login, instead of relying on token passed to individual functions.
+
+## [1.4.0] - 2025-12-15
+
+### Added
+- HuggingFace tokenizer download support via `hf_tokenizers` in metadata.yaml
+
+### Changed
+- Refactored download code into unified `downloads/` module
+
+## [1.3.13] - 2025-12-10
+### Added
+- "Exemplar Cloud" option to workload selection, which automatically selects all standard pre-training reference workloads.
+- Added `--exemplar` flag to `llmb-install express` for automated installation of Exemplar Cloud workloads.
+
+## [1.3.12] - 2025-12-10
+
+### Added
+- `setup` configuration in `metadata.yaml` now supports `by_gpu` conditional logic.
+
+## [1.3.11] - 2025-12-05
+
+### Changed
+- Migrated dependency management to uv and added lockfiles.
+
+## [1.3.10] - 2025-12-03
+
+### Changed
+- Enforce managed python version for UV environments by default
+- Added `LLMB_DISABLE_MANAGED_PYTHON` env var to disable managed python enforcement
+
 ## [1.3.9] - 2025-12-03
 
 ### Fixed

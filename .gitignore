@@ -1,53 +1,46 @@
-**/*.out
+# Python
 *.pyc
-nemotron/results*
-nemotron/dataset/*
-common/nemo/*.tar.gz
-common/nemo/*.whl
-common/nemo/nsight*
-nemotron/common-utils.sh
-nemotron/nemo-utils.sh
+*.egg-info
+__pycache__/
+.venv/
+.tox/
+.pytest_cache/
+.coverage
+build/
 
-nemo_megatron/common-utils.sh
-nemo_megatron/nemo-utils.sh
-nemo_megatron/gsw/*
-nemo_megatron/*.patch
-index_mapping
-_output/
+# Output and temporary files
+**/*.out
+*.err
+*.swp
 *.tar.gz
 *.sqsh
-*.swp
-*.err
-.DS_Store
+_output/
+out/
+results/
+index_mapping
 perf-gaps
-results*
-gpt3-dataset
-maxtext/*results*
-maxtext/*logs*
-maxtext/*local_train*
 
+# Editor/IDE
+.DS_Store
+.vscode/settings.json
+.vscode/launch.json
+llm-benchmarking-collection-internal.cursor-workspace.code-workspace
+
+# Script outputs
 scripts/results/
 scripts/nvdf/
 
-# cloudperf scripts
-recipe-directories.txt 
-out/
+# Cloudperf scripts
+recipe-directories.txt
 
-# run ai deploy script
+# Run AI deploy script
 generated/
-*/mysetup.sh
+**/mysetup.sh
 nsys_analysis_build/
 
-# cloned repos
-nemotron/0
+# Cloned repos
 **/NeMo
 
-*.egg-info
-build/
-.venv/
-.pytest_cache/
-.coverage
-__pycache__/
-llm-benchmarking-collection-internal.cursor-workspace.code-workspace
-.vscode/settings.json
-.vscode/launch.json
+# AI agent files
+GEMINI.md
+plans/

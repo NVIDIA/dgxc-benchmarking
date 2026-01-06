@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.10] - 2025-12-05
+
+### Changed
+- Migrated dependency management to uv and added lockfiles.
+
+## [1.3.9] - 2025-11-19
+
+### Changed
+- Refactored post-processing steps.
+
+## [1.3.8] - 2025-11-12
+
+### Added
+- Added `--nice` flag to `llmb-run submit-all` to lower job priority using Slurm's `--nice` feature.
+
+## [1.3.7] - 2025-11-10
+
+### Added
+- `llmb-run submit-all` now submits jobs sorted by scale in descending order (largest jobs first).
+
 ## [1.3.6] - 2025-11-07
 
 ### Added

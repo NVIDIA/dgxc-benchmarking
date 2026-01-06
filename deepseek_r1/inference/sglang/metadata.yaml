@@ -2,7 +2,6 @@
 general:
   workload: deepseek-r1-sglang
   workload_type: inference
-  gsw_version: '25.10'
   framework: sglang
 
 container:

@@ -31,7 +31,6 @@ set -eu -o pipefail
 export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=nemotron4-15b
 export FW_VERSION=25.09.00 # Nemo Version
-export GSW_VERSION=25.10
 
 export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 
@@ -64,7 +63,9 @@ ENABLE_CHECKPOINT=${ENABLE_CHECKPOINT,,}
 # Handle additional SLURM parameters from environment variable
 ADDITIONAL_SLURM_PARAMS=${ADDITIONAL_SLURM_PARAMS:-""}
 
-CONTAINER_MOUNTS=""
+# Mount Hugging Face cache for tokenizers
+export HF_HOME="$LLMB_INSTALL/.cache/huggingface"
+CONTAINER_MOUNTS="$HF_HOME"
 if [[ -n ${RUN_CONF_MOUNTS:-""} ]]; then
     if [[ -n ${CONTAINER_MOUNTS} ]]; then
         CONTAINER_MOUNTS+=","
@@ -185,7 +186,6 @@ if [ $CLUSTER_TYPE = slurm ]; then
         --num_gpus $JOB_TOTAL_GPUS \
         --gpus_per_node $GPUS_PER_NODE \
         --max_steps $MAX_STEPS \
-        --hf_token ${HF_TOKEN:?HF_TOKEN is required} \
         $CONFIG_OVERRIDES \
         slurm \
         --account $SBATCH_ACCOUNT \

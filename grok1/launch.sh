@@ -31,11 +31,9 @@ set -eu -o pipefail
 export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=grok1
 export MODEL_SIZE=314b
-export GSW_VERSION=25.10
 export FW_VERSION=25.09.00
 
 export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
-export HF_TOKEN=${HF_TOKEN?"Required variable HF_TOKEN"}
 
 export LLMB_WORKLOAD=$LLMB_INSTALL/workloads/${WORKLOAD_TYPE}_${MODEL_NAME}
 export NEMORUN_HOME=$LLMB_WORKLOAD
@@ -68,7 +66,9 @@ ADDITIONAL_SLURM_PARAMS=${ADDITIONAL_SLURM_PARAMS:-""}
 export PROFILE_START_STEP=${PROFILE_START_STEP:-45}
 export PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
 
-CONTAINER_MOUNTS=""
+# Mount Hugging Face cache for tokenizers
+export HF_HOME="$LLMB_INSTALL/.cache/huggingface"
+CONTAINER_MOUNTS="$HF_HOME"
 if [[ -n ${RUN_CONF_MOUNTS:-""} ]]; then
     if [[ -n ${CONTAINER_MOUNTS} ]]; then
         CONTAINER_MOUNTS+=","
@@ -190,7 +190,6 @@ if [ $CLUSTER_TYPE = slurm ]; then
         --num_gpus $JOB_TOTAL_GPUS \
         --gpus_per_node $GPUS_PER_NODE \
         --max_steps $MAX_STEPS \
-        --hf_token $HF_TOKEN \
         $CONFIG_OVERRIDES \
         slurm \
         --account $SBATCH_ACCOUNT \
@@ -206,7 +205,7 @@ else
         --num_gpus $JOB_TOTAL_GPUS \
         --gpus_per_node $GPUS_PER_NODE \
         --max_steps $MAX_STEPS \
-        --hf_token $HF_TOKEN \
+        --hf_token ${HF_TOKEN:?HF_TOKEN is required for RunAI} \
         $CONFIG_OVERRIDES \
         runai \
         --base_url $BASE_URL \

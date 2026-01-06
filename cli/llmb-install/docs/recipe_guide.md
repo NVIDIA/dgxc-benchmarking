@@ -8,6 +8,7 @@ Each workload recipe requires a `metadata.yaml` file that defines:
 - **General Information**: Workload identification and framework
 - **Container Images**: Runtime environment containers
 - **Repositories**: Git repositories for dependencies
+- **Downloads**: Offline assets (tokenizers, models, datasets)
 - **Setup**: Virtual environment and dependency installation
 - **Tools**: Workload-specific tool versions (e.g., nsys)
 - **Run Configuration**: GPU configs, model sizes, and test scales
@@ -25,6 +26,9 @@ container:
   
 repositories:  # Optional
   # Git repositories
+
+downloads:  # Optional
+  # Offline assets (tokenizers, models, datasets)
   
 tools:  # Optional
   # Tool versions
@@ -143,6 +147,30 @@ repositories:
 ```
 
 **Important**: Commit must be the full 40-character SHA hash, not a short hash or tag.
+
+## Downloads Section (Optional)
+
+Specifies offline assets to download during installation. Currently supports HuggingFace tokenizers.
+
+### HuggingFace Tokenizers
+
+Download tokenizers for offline use (required when workloads need tokenizers in air-gapped environments):
+
+```yaml
+downloads:
+  hf_tokenizers:
+    - 'meta-llama/Meta-Llama-3-70B'
+    - 'nvidia/Nemotron-4-340B-Base'
+```
+
+Tokenizers are cached in `$LLMB_INSTALL/.cache/huggingface` and available offline to workload scripts via the `HF_HOME` environment variable.
+
+**When to use**:
+- Workload needs tokenizers at runtime
+- Running in offline/air-gapped environment
+- Want consistent tokenizer versions across runs
+
+**Note**: Requires `HF_TOKEN` environment variable for private/gated models.
 
 ## Tools Section (Optional)
 
@@ -413,6 +441,10 @@ repositories:
   nemo_run:
     url: "https://github.com/NVIDIA/NeMo-Run.git"
     commit: "04f900a9c1cde79ce6beca6a175b4c62b99d7982"
+
+downloads:
+  hf_tokenizers:
+    - 'nvidia/Nemotron-4-340B-Base'
 
 tools:
   nsys:

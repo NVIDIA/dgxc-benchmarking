@@ -26,7 +26,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from llmb_install.container.image import is_enroot_installed
+from llmb_install.downloads.image import is_enroot_installed
 from llmb_install.ui.interface import UIInterface
 
 

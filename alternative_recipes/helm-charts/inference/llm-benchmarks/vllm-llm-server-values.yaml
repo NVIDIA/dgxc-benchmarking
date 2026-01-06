@@ -23,24 +23,24 @@ environment:
   # Server Configuration
   SERVER_TYPE: "vLLM"  # Can be "vLLM" or "NIM"
   SERVER_IMAGE: "vllm/vllm-openai:latest"  # Path to server image
-  SERVER_ARGS:
+  SERVER_ARGS: ""
   SERVER_PORT: "8000"  # The port the server will listen on
   SERVER_HEALTH_CHECK_ENDPOINT: "health"
   SERVER_ENDPOINT: "v1/chat/completions"  # The endpoint for chat completions
   
   # Model Configuration
-  MODEL_NAME: "meta-llama/Llama-3.2-1B-Instruct"
-  MODEL_NAME_CLEANED: "llama-3.2-1b-instruct"  # used in the benchmark result file name
-  MODEL_TOKENIZER: "meta-llama/Llama-3.2-1B-Instruct"  # matches the path of the tokenizer on the HF registry
+  MODEL_NAME: "Qwen/Qwen3-0.6B"
+  MODEL_NAME_CLEANED: "qwen3-0.6b"  # used in the benchmark result file name
+  MODEL_TOKENIZER: "Qwen/Qwen3-0.6B"  # matches the path of the tokenizer on the HF registry
   HF_TOKEN: ""  # Your Hugging Face API token
 
   # Benchmark Parameters
-  MIN_REQUESTS: "200"  # Must be >= max concurrency to avoid perf_analyzer errors
+  MIN_REQUESTS: "200"
   USE_CASES: "chat:128/128 chat:4096/512"
   CONCURRENCY_RANGE: "1 25 50 100"
   REQUEST_MULTIPLIER: "5"
   NUM_GPUS: "1"  # Configure the number of GPUs to use (e.g., "1", "2", "4", "8")
-  BENCHMARK_SERVER_IMAGE: "nvcr.io/nvidia/tritonserver:25.04-py3-sdk"  # Path to benchmark server image that contains genai-perf
+  # BENCHMARK_SERVER_IMAGE: "nvcr.io/nvidia/tritonserver:25.04-py3-sdk"  # Path to benchmark server image that contains genai-perf
 
   # Results Configuration
   RESULTS_PATH: "/vllm-llm-results"  # Directory where benchmark results will be stored

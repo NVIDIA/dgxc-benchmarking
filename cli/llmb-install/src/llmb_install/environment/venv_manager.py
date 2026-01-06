@@ -75,16 +75,24 @@ def create_virtual_environment(venv_path: str, venv_type: str) -> None:
             raise
 
     elif venv_type == 'uv':
+        uv_cmd = [
+            'uv',
+            'venv',
+            '--clear',
+            '--python',
+            MIN_PYTHON_VERSION,
+        ]
+
+        # Force managed python unless explicitly disabled
+        # This ensures consistent python versions across different systems
+        if os.environ.get('LLMB_DISABLE_MANAGED_PYTHON', '').lower() not in ('1', 'true', 'yes'):
+            uv_cmd.append('--managed-python')
+
+        uv_cmd.append(venv_path)
+
         try:
             subprocess.run(
-                [
-                    'uv',
-                    'venv',
-                    '--clear',
-                    '--python',
-                    MIN_PYTHON_VERSION,
-                    venv_path,
-                ],
+                uv_cmd,
                 check=True,
                 capture_output=True,
                 text=True,

@@ -131,6 +131,7 @@ def parse_arguments():
     submit_all_parser.add_argument(
         '-v', '--verbose', action='store_true', help='Enable verbose output including debug information.'
     )
+    submit_all_parser.add_argument('--nice', type=int, help='Lower the priority of the job using Slurm --nice feature.')
 
     # Single Job Subparser
     single_parser = subparsers.add_parser('single', help='Submit a single job with specified parameters.')
@@ -392,6 +393,10 @@ def main():
             workload_filter = [w.strip() for w in args.workloads.split(',')] if args.workloads else None
 
             # Generate tasks for all installed workloads
+            extra_slurm_params = {}
+            if args.nice is not None:
+                extra_slurm_params['nice'] = args.nice
+
             task_list = generate_submit_all_tasks(
                 workloads,
                 cluster_config,
@@ -402,7 +407,11 @@ def main():
                 dtype_filter=dtype_filter,
                 workload_filter=workload_filter,
                 specific_scales=specific_scales,
+                extra_slurm_params=extra_slurm_params,
             )
+
+            # Sort tasks by scale in descending order (largest first)
+            task_list.sort(key=lambda task: task.scale, reverse=True)
 
             if not task_list:
                 logger.error("No tasks generated. Check that workloads are installed and compatible with your cluster.")

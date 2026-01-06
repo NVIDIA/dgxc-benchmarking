@@ -24,6 +24,7 @@ environment:
   SERVER_TYPE: "SGLang"  # Can be "vLLM", "NIM", or "SGLang"
   SERVER_IMAGE: "lmsysorg/sglang:latest"  # Path to server image
   SERVER_ARGS: ""
+  SERVER_PORT: "8000"  # The port the server will listen on
   SERVER_HEALTH_CHECK_ENDPOINT: "health"  # The endpoint to check if the server is ready
   SERVER_ENDPOINT: "v1/chat/completions"  # The endpoint for chat completions
   

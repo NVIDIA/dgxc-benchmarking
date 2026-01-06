@@ -22,7 +22,7 @@
 
 """Workload selection prompts for LLMB installer."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from llmb_install.ui.interface import UIInterface
 
@@ -33,7 +33,9 @@ def prompt_workload_selection(
     default_selected: Optional[List[str]] = None,
     show_install_all: bool = True,
     allow_empty: bool = False,
-) -> Optional[List[str]]:
+    show_exemplar_option: bool = False,
+    default_mode: str = 'custom',
+) -> Tuple[Optional[List[str]], str]:
     """Prompt the user to select workloads to install.
 
     Args:
@@ -42,14 +44,65 @@ def prompt_workload_selection(
         default_selected: List of workload keys to pre-select
         show_install_all: Whether to show "Install all workloads" option
         allow_empty: Whether to allow selecting no workloads (for resume scenarios)
+        show_exemplar_option: Whether to show "Exemplar Cloud" selection option
+        default_mode: Default selection mode ('custom' or 'exemplar')
 
     Returns:
-        Optional[List[str]]: List of selected workload keys, or None if cancelled
+        Tuple[Optional[List[str]], str]: (List of selected workload keys or None if cancelled, selection mode)
     """
     if not workloads:
         ui.log("No workloads found!")
-        return None
+        return None, 'custom'
 
+    selection_mode = 'custom'
+
+    if show_exemplar_option:
+        ui.print_section("Workload Selection")
+
+        choice = ui.prompt_select(
+            "Workload Selection Mode:",
+            choices=[
+                {
+                    'name': "Exemplar Cloud (Install all recipes required for Exemplar Cloud certification)",
+                    'value': "exemplar",
+                },
+                {'name': "Custom (Manually select specific recipes)", 'value': "custom"},
+            ],
+            default=default_mode,
+        )
+
+        if choice is None:
+            return None, 'custom'  # User cancelled
+
+        selection_mode = choice
+
+        if choice == "exemplar":
+            # Select all 'pretrain' recipes using metadata
+            selected = []
+            for key, data in workloads.items():
+                if data.get('general', {}).get('workload_type') == 'pretrain':
+                    selected.append(key)
+
+            if not selected:
+                ui.log("No 'pretrain' recipes found for this configuration.", level='warning')
+                ui.log("Falling back to custom selection.")
+                selection_mode = 'custom'
+            else:
+                return selected, selection_mode
+
+    selected = _prompt_manual_workload_selection(ui, workloads, default_selected, show_install_all, allow_empty)
+
+    return selected, selection_mode
+
+
+def _prompt_manual_workload_selection(
+    ui: UIInterface,
+    workloads: Dict[str, Dict[str, Any]],
+    default_selected: Optional[List[str]] = None,
+    show_install_all: bool = True,
+    allow_empty: bool = False,
+) -> Optional[List[str]]:
+    """Handle manual checkbox selection of workloads."""
     choices = []
 
     # Add "Install all workloads" option if requested

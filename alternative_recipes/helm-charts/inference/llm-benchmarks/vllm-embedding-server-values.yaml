@@ -23,12 +23,12 @@ environment:
   # Server Configuration
   SERVER_TYPE: "vLLM"  # Using vLLM for embeddings
   SERVER_IMAGE: "vllm/vllm-openai:v0.8.5"  # Path to server image
-  SERVER_ARGS:
+  SERVER_ARGS: ""
   SERVER_HEALTH_CHECK_ENDPOINT: "health"
   SERVER_ENDPOINT: "v1/embeddings"  # The endpoint for embeddings
   
   # Model Configuration
-  MODEL_NAME: "BAAI/bge-multilingual-gemma2"  # A good multilingual embedding model
+  MODEL_NAME: "BAAI/bge-multilingual-gemma2"  # A good embedding model for English
   MODEL_NAME_CLEANED: "bge-multilingual-gemma2"  # used in the benchmark result file name
   MODEL_TOKENIZER: "BAAI/bge-multilingual-gemma2"  # matches the path of the tokenizer on the HF registry
   HF_TOKEN: ""  # Your Hugging Face API token

@@ -364,7 +364,19 @@ See [example_llmb_config.yaml](example_llmb_config.yaml) for a complete example.
 
 These methods require additional setup and are recommended only for advanced users:
 
-### Option 1: Install as a Package
+### Option 1: Install using uv (Recommended for Manual Install)
+
+`uv` is a fast Python package manager that can install tools in isolated environments.
+
+```bash
+# Install from the project directory (assuming $LLMB_REPO is your repository root)
+uv tool install $LLMB_REPO/cli/llmb-run
+
+# Or from git
+# uv tool install git+https://github.com/NVIDIA/dgxc-benchmarking#subdirectory=cli/llmb-run
+```
+
+### Option 2: Install as a Package (pip)
 ```bash
 # Install from the project directory
 cd llmb-run
@@ -375,7 +387,7 @@ pip install .
 # 2. Always run llmb-run from the directory containing cluster_config.yaml
 ```
 
-### Option 2: Direct Execution
+### Option 3: Direct Execution
 ```bash
 # Make the script executable
 chmod +x llmb-run
@@ -383,7 +395,7 @@ chmod +x llmb-run
 # Run directly (must be in directory with cluster_config.yaml)
 ./llmb-run --help
 ```
-### Option 3: Python Module
+### Option 4: Python Module
 ```bash
 # Run as a Python module (must be in directory with cluster_config.yaml)
 llmb-run --help
@@ -406,6 +418,36 @@ The following environment variables are recognized to control behavior:
 |---|---|---|
 | `LLMB_SKIP_PP` | Disable post-processing job submission | `1`, `true`, or `yes` to disable |
 
+## Development
 
+This project uses `uv` for dependency management and `tox` for multi-environment testing.
 
+### Environment Setup
 
+1. **Install uv**: [Follow official instructions](https://docs.astral.sh/uv/getting-started/installation/).
+2. **Sync environment**: Creates a virtualenv and installs dependencies from `uv.lock`.
+   ```bash
+   uv sync
+   ```
+
+### Managing Dependencies
+
+- **Add a dependency**: `uv add <package>`
+- **Add a dev dependency**: `uv add --dev <package>`
+- **Update lockfile**: Run this after modifying `pyproject.toml` (including version bumps) or dependencies.
+   ```bash
+   uv lock
+   ```
+
+### Running Tests
+
+- **Quick (Current Python)**:
+  ```bash
+  uv run pytest
+  ```
+- **Full Matrix (Multiple Python versions)**:
+  ```bash
+  # Requires tox and tox-uv
+  uv tool install tox --with tox-uv
+  tox
+  ```

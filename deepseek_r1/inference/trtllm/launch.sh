@@ -39,7 +39,6 @@ fi
 export WORKLOAD_TYPE=inference
 export MODEL_NAME=deepseek-r1
 export FW_VERSION=1.1.0rc5
-export GSW_VERSION=25.10
 
 export MODE=${MODE:-"max_throughput"}
 # Validate mode
