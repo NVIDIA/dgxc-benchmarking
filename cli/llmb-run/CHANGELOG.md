@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3] - 2026-01-05
+
+### Fixed
+- Improved YAML header parsing with better validation and error messages
+
+## [1.5.2] - 2025-12-31
+
+### Fixed
+- Zero-jobs error now shows available configurations instead of generic message
+
+## [1.5.1] - 2025-12-24
+
+### Fixed
+- Deprecated `single` command: AttributeError when accessing extra_slurm_params
+
+## [1.5.0] - 2025-12-23
+
+### Added
+- `exemplar` command for cloud certification
+
+## [1.4.0] - 2025-12-22
+
+### Added
+- `llmb-run submit`: unified job submission command (single, discovery, and file-based).
+
+### Deprecated
+- `llmb-run single`, `llmb-run submit-all`, `llmb-run bulk` (use `llmb-run submit`).
+
+### Changed
+- **[BREAKING INTERNAL]** Migrated CLI framework from argparse to Typer (intended to be user-facing compatible).
+- Reduced default verbosity of `llmb-run submit` output (use `-v` for discovery/details).
+
 ## [1.3.10] - 2025-12-05
 
 ### Changed

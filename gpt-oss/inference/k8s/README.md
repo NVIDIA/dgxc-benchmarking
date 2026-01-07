@@ -901,8 +901,7 @@ echo "📉 Scaled back to single node"
 ```
 
 ### 💡 Performance Tips
-
-- **🎯 Run to Run Variability**: You can tweak the "-request-rate" flag of AIPerf in bench.yaml. A rate of R over concurrency C will mean the load generate takes C/R seconds to ramp up load. We found tuning this at higher concurrencies is helpful.
+- **🎯 Run-to-run variability**: You can tune the `--request-rate` flag in `bench.yaml`. A rate of \(R\) over concurrency \(C\) means the load generator takes \(C/R\) seconds to ramp. We’ve found tuning this helps at higher concurrencies.
 - **📈 Linear scaling**: Performance scales linearly with GPU count
 - **⏱️ Warmup time**: Increases with scale (allow extra time for large deployments)
 - **⚡ Stable concurrency**: 1k per node avoids connection timeouts
@@ -912,11 +911,10 @@ echo "📉 Scaled back to single node"
 ---
 
 
-
 ## 📚 Additional Resources
 
 - **Model Information**: [GPT-OSS on HuggingFace](https://huggingface.co/openai/gpt-oss-120b)
-- **NVIDIA Dynamo**: [Documentation](https://docs.nvidia.com/nim/)
+- **NVIDIA Dynamo**: [Documentation](https://docs.nvidia.com/dynamo/latest/index.html)
 - **TensorRT-LLM**: [GitHub Repository](https://github.com/NVIDIA/TensorRT-LLM)
 - **Kubernetes**: [Official Documentation](https://kubernetes.io/docs/home/)
 

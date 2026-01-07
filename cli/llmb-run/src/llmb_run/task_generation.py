@@ -19,317 +19,203 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-"""Task management for workload execution."""
+"""Unified task generation logic for llmb-run."""
 
-import ast
-import itertools
 import logging
-import re
-from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
-
-import yaml
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 from llmb_run.metadata_utils import normalize_model_dtype_config
-from llmb_run.workload_validator import (
-    format_validation_error,
-    validate_workload_with_details,
+from llmb_run.task_loader import (
+    flatten_yaml_tasks,
+    gen_tasks,
+    get_tasks_wrapper,
 )
+from llmb_run.tasks import WorkloadTask
 
-logger = logging.getLogger('llmb_run.task_manager')
+logger = logging.getLogger('llmb_run.task_generation')
+
+
+class ValidationError(Exception):
+    """Custom exception for validation errors during task generation."""
+
+    pass
 
 
 @dataclass
-class WorkloadTask:
-    workload_key: str  # Full workload key (e.g., 'pretraining_nemotron')
-    model_size: str
-    dtype: str
-    scale: int
+class TaskGenerationRequest:
+    """Encapsulates all task generation parameters."""
+
+    workloads: Dict[str, Any]
+    cluster_config: Dict[str, Any]
+
+    # Specification methods
+    workload: Optional[str] = None  # Single or comma-separated
+    model_size: Optional[str] = None  # Only for explicit mode
+    dtype: Optional[str] = None  # Single or comma-separated
+    scale: Optional[str] = None  # Single or comma-separated
+    max_scale: Optional[int] = None  # For discovery
+    min_scale: bool = False  # For discovery
+    file_path: Optional[str] = None  # For file mode
+
+    # Modifiers
+    repeats: int = 1
     profile: bool = False
-    env_overrides: dict = field(default_factory=dict)
-    model_overrides: dict = field(default_factory=dict)
-    extra_slurm_params: Optional[Dict[str, Any]] = field(default_factory=dict)
+    extra_slurm_params: Optional[Dict[str, Any]] = None
 
-
-def merge_dicts(default, override):
-    """Helper to merge two dictionaries (override takes precedence)."""
-    result = default.copy()
-    result.update(override)
-    return result
-
-
-def get_tasks_simple(workloads, input_file, cluster_config=None):
-    """Parse a simple format task file into workload configurations.
-
-    The simple format is designed for quick task specification with minimal syntax.
-    Each workload section starts with a header and contains one or more task lines.
-
-    Format:
-    workload_modelsize:
-    (dtype_list, scale_list, repeats, profile=False)
-
-    Example:
-    pretraining_grok1_314b:
-    (['fp8', 'bf16'], [128, 256], 3)
-    ('fp8', [128, 256, 512], 1, True)  # With profiling enabled
-
-    Args:
-        workloads: Dictionary of available workloads
-        input_file: Path to the task specification file
-        cluster_config: Optional cluster configuration for validation
-
-    Returns:
-        dict: Nested dictionary of workload tasks
-
-    Raises:
-        FileNotFoundError: If input_file does not exist
-        ValueError: If task format is invalid
-    """
-    header_re = re.compile(r'^([\w\.]+)_([\w\.]+):$')  # Capture workload and model size
-    task_re = re.compile(r'^\s*\((.*)\)\s*$')  # Match entire task line
-
-    workload_tasks = {}
-    current_workload_key = None
-    current_model_size = None
-    current_tasks = []
-
-    try:
-        with open(input_file, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if not line:  # Empty line indicates end of current workload section
-                    if current_workload_key:
-                        workload_tasks.setdefault(current_workload_key, {})[current_model_size] = current_tasks
-                    current_workload_key = current_model_size = None
-                    current_tasks = []
-                    continue
-
-                if header_match := header_re.match(line):
-                    workload_key, model_size = header_match.groups()
-
-                    is_valid, error_type, error_msg, suggestions = validate_workload_with_details(
-                        workloads, workload_key, model_size, cluster_config=cluster_config
-                    )
-                    if not is_valid:
-                        user_error = format_validation_error(
-                            workload_key,
-                            model_size,
-                            None,
-                            None,
-                            cluster_config.get('launcher', {}).get('gpu_type') if cluster_config else None,
-                            error_type,
-                            error_msg,
-                            suggestions,
-                        )
-                        logger.error(user_error)
-                        logger.error(f"Skipping invalid workload specification: {workload_key}_{model_size}")
-                        # Reset state to skip tasks for this invalid workload
-                        current_workload_key = None
-                        current_model_size = None
-                        current_tasks = []
-                        continue
-
-                    current_workload_key = workload_key
-                    current_model_size = model_size
-                    current_tasks = []
-
-                elif task_match := task_re.match(line):
-                    if not current_workload_key:
-                        # Skip tasks for invalid workloads
-                        continue
-                    try:
-                        task_data = ast.literal_eval(task_match.group(1))
-                        current_tasks.append((current_workload_key,) + task_data)
-                    except (SyntaxError, ValueError) as e:
-                        logger.error(f"Invalid task format in line: {line}")
-                        raise ValueError(f"Invalid task format: {e}") from e
-
-        # Handle the last workload if file doesn't end with newline
-        if current_workload_key:
-            workload_tasks.setdefault(current_workload_key, {})[current_model_size] = current_tasks
-    except FileNotFoundError:
-        logger.error(f"Input file not found: {input_file}")
-        raise
-    except Exception as e:
-        logger.error(f"Error processing input file: {e}")
-        raise
-    return workload_tasks
-
-
-def get_tasks_yaml(input_file):
-    """Parse an advanced YAML workload file.
-
-    The expected YAML format is described in the README.md file.
-
-    Returns a dictionary in the same nested format:
-      { workload: { model_size: [ list of tuples ] } }
-    where each tuple is:
-      (workload, model_size, dtype, scale, profile, env_overrides, model_overrides)
-    """
-    with open(input_file, 'r') as f:
-        data = yaml.safe_load(f)
-
-    workload_tasks = {}
-    for header, spec in data.items():
-        if "_" not in header:
-            raise ValueError(f"Invalid header format: {header}. Expected 'workload_modelsize'.")
-        workload, model_size = header.rsplit("_", 1)
-        tasks_list = []
-        defaults = spec.get("defaults", {})
-        default_env = defaults.get("env", {})
-        default_params = defaults.get("params", {})
-
-        # Get top level settings
-        top_dtypes = spec.get("dtypes")
-        top_scales = spec.get("scales")
-        top_repeats = spec.get("repeats", 1)
-        top_add_profile = spec.get("add_profile", False)
-
-        for task in spec.get("tasks", []):
-            # Get task-specific settings, falling back to top level if not specified
-            dtypes = task.get("dtypes", top_dtypes)
-            if dtypes is None:
-                raise ValueError(f"Missing required field 'dtypes' in task: {task}")
-            dtypes = [dtypes] if isinstance(dtypes, str) else dtypes
-            if not isinstance(dtypes, list):
-                raise ValueError(f"'dtypes' must be a string or list, got {type(dtypes)}")
-
-            scales = task.get("scales", top_scales)
-            if scales is None:
-                raise ValueError(f"Missing required field 'scales' in task: {task}")
-            if isinstance(scales, int):
-                scales = [scales]
-            elif not isinstance(scales, list):
-                raise ValueError(f"'scales' must be an integer or list, got {type(scales)}")
-
-            repeats = task.get("repeats", top_repeats)
-            profile = task.get("profile", False)
-            add_profile = task.get("add_profile", top_add_profile)
-
-            # Validate that only one profiling mode is set
-            if profile and add_profile:
-                raise ValueError("Cannot specify both 'profile' and 'add_profile' in the same task")
-
-            overrides = task.get("overrides", {})
-
-            # Env Overrides
-            task_env = merge_dicts(default_env, overrides.get("env", {}))
-
-            # Model Specific Overrides
-            param_overrides = overrides.get("params", {})
-
-            # Find parameters that need to be swept
-            regular_params = {}
-            sweep_params = {}
-            for key, value in param_overrides.items():
-                if isinstance(value, list):
-                    sweep_params[key] = value
-                else:
-                    regular_params[key] = value
-
-            if sweep_params:
-                # Generate all combinations of sweep parameters
-                param_names = list(sweep_params.keys())
-                param_values = [sweep_params[name] for name in param_names]
-                for param_combination in itertools.product(*param_values):
-                    # Create a copy of the base params
-                    current_params = merge_dicts(default_params, regular_params)
-
-                    # Apply the current combination of sweep parameters
-                    for name, value in zip(param_names, param_combination, strict=False):
-                        current_params[name] = value
-
-                    # Generate tasks for this combination
-                    for dtype, scale in itertools.product(dtypes, scales):
-                        # Add regular performance runs
-                        for _r in range(repeats):
-                            tasks_list.append((workload, model_size, dtype, scale, profile, task_env, current_params))
-                        # Add one profiling run if requested
-                        if add_profile:
-                            tasks_list.append((workload, model_size, dtype, scale, True, task_env, current_params))
-            else:
-                # No sweeps needed, proceed as before
-                current_params = default_params.copy()
-                current_params.update(regular_params)
-                for dtype, scale in itertools.product(dtypes, scales):
-                    # Add regular performance runs
-                    for _r in range(repeats):
-                        tasks_list.append((workload, model_size, dtype, scale, profile, task_env, current_params))
-                    # Add one profiling run if requested
-                    if add_profile:
-                        tasks_list.append((workload, model_size, dtype, scale, True, task_env, current_params))
-
-        workload_tasks.setdefault(workload, {})[model_size] = tasks_list
-    return workload_tasks
-
-
-def get_tasks_wrapper(workloads, input_file, cluster_config=None):
-    """Dispatcher for task parsing based on file extension."""
-    if input_file.endswith(('.yaml', '.yml')):
-        return get_tasks_yaml(input_file)
-    else:
-        return get_tasks_simple(workloads, input_file, cluster_config)
-
-
-def gen_tasks(simple_tasks):
-    """Convert parsed simple workload spec into a list of WorkloadTasks.
-    This function expects that each task in simple_tasks is a tuple of the form:
-      (workload_key, dtype_list, scale_list, repeat_count, *optional_params)
-    """
-    task_list = []
-    for workload_key in simple_tasks:
-        for model_size in simple_tasks[workload_key]:
-            for task in simple_tasks[workload_key][model_size]:
-                workload_key_from_task, dtype, scales, repeats, *params = task
-                if isinstance(dtype, str):
-                    dtype = [dtype]
-                for dt, scale in itertools.product(dtype, scales):
-                    for _r in range(repeats):
-                        # If optional params exist, the first is profile.
-                        profile = params[0] if params else False
-                        task_list.append(WorkloadTask(workload_key_from_task, model_size, dt, scale, profile))
-    return task_list
-
-
-def flatten_yaml_tasks(advanced_tasks):
-    """Flatten tasks from YAML advanced format to WorkloadTask objects."""
-    task_list = []
-    for workload in advanced_tasks:
-        for model_size in advanced_tasks[workload]:
-            for t in advanced_tasks[workload][model_size]:
-                # t is a tuple: (workload, model_size, dtype, scale, profile, env_overrides, model_overrides)
-                w, m, dt, scale, profile, env_overrides, model_overrides = t
-                task_list.append(
-                    WorkloadTask(w, m, dt, scale, profile, env_overrides=env_overrides, model_overrides=model_overrides)
+    def validate(self) -> None:
+        """Validate parameter combinations."""
+        # File mode restrictions
+        if self.file_path:
+            if any([self.workload, self.model_size, self.max_scale, self.min_scale]):
+                raise ValidationError(
+                    "Cannot mix --file with workload specifications\n"
+                    "Either use: llmb-run submit -f my-tests.yaml\n"
+                    "Or specify: llmb-run submit -w X -s Y -d Z --scale N"
                 )
-    return task_list
+
+        # Model size restrictions
+        if self.model_size:
+            if not self.workload:
+                raise ValidationError("--model-size requires --workload")
+
+            # If model_size provided, only one workload allowed
+            if ',' in (self.workload or ''):
+                raise ValidationError(
+                    "Global '--model-size' / '-s' cannot be used with multiple workloads.\n\n"
+                    "To target specific model sizes, append them to the workload name.\n"
+                    "Workloads without a suffix will run ALL available sizes.\n\n"
+                    "Example:\n"
+                    "  llmb-run submit -w pretrain_llama3.1_70b,pretrain_nemotron-h"
+                )
+
+        # Scale mutual exclusivity
+        if self.scale and (self.max_scale or self.min_scale):
+            raise ValidationError(
+                "Cannot use --scale with --max-scale or --min-scale\n"
+                "Either specify exact scale(s): --scale 128,256,512\n"
+                "Or use discovery: --max-scale 512"
+            )
+
+        # Scale requirement: Always required except in file mode
+        if not self.file_path:
+            if not any([self.scale, self.max_scale, self.min_scale]):
+                raise ValidationError(
+                    "Must specify scale parameter\n"
+                    "Either specify exact scale(s): --scale 128,256,512\n"
+                    "Or use discovery: --max-scale 512 or --min-scale"
+                )
 
 
-def format_task_output(task, prefix="", suffix=""):
-    """Format task details in a consistent way with aligned columns."""
-    # Fixed width fields for alignment
-    workload_field = f"{task.workload_key}_{task.model_size}"
-    dtype_field = f"dtype={task.dtype}"
-    scale_field = f"scale={task.scale}"
-    profile_field = f"profile={task.profile}"
+def generate_tasks(request: TaskGenerationRequest) -> List[WorkloadTask]:
+    """Generate tasks from unified request specification."""
+    try:
+        request.validate()
+    except ValidationError as e:
+        # Re-raise as ValueError to be compatible with typical main.py handling or catch explicitly
+        raise ValueError(str(e)) from e
 
-    # Build the base output with aligned fields
-    output = f"{prefix}{workload_field:<30} {dtype_field:<12} {scale_field:<12} {profile_field:<15}"
+    if request.file_path:
+        return _generate_from_file(request)
 
-    # Add optional fields if they exist
-    if task.env_overrides:
-        output += f" env={task.env_overrides}"
-    if task.model_overrides:
-        output += f" params={task.model_overrides}"
-    if suffix:
-        output += f" {suffix}"
-    return output
+    if request.model_size:
+        # Has explicit model size
+        # Always use discovery/targeted mode logic which supports metadata validation,
+        # implicit dtypes, and various scale specifications (exact, max, min).
+        return _generate_explicit_workload_with_scale_discovery(request)
+    else:
+        # Discovery mode: workload names include size
+        return _generate_discovery_tasks(request)
 
 
-def print_tasks(task_list):
-    """Print task details in a consistent format."""
-    for task in task_list:
-        logger.info(format_task_output(task, prefix="Task: "))
+def parse_comma_list(value: Optional[str]) -> List[str]:
+    """Parse comma-separated list, handling spaces."""
+    if not value:
+        return []
+    # Strip spaces and filter empty strings
+    return [item.strip() for item in value.split(',') if item.strip()]
+
+
+def _generate_explicit_workload_with_scale_discovery(request: TaskGenerationRequest) -> List[WorkloadTask]:
+    """Generate tasks for explicit workload with scale discovery.
+
+    Example: llmb-run submit -w pretrain_nemotron4 -s 340b -d fp8 --max-scale 512
+    Generates: nemotron4_340b at all supported scales up to 512
+    """
+    workload_key = request.workload
+    model_size = request.model_size
+
+    # Filter by the specific workload_modelsize combo
+    # generate_submit_all_tasks supports filtering by "workload_key" or "workload_key_model_size"
+    workload_filter = [f"{workload_key}_{model_size}"]
+
+    dtype_filter = parse_comma_list(request.dtype) if request.dtype else None
+
+    # Handle specific scales if provided
+    specific_scales = parse_comma_list(request.scale)
+    if specific_scales:
+        specific_scales = [int(s) for s in specific_scales]
+    else:
+        specific_scales = None
+
+    return generate_submit_all_tasks(
+        request.workloads,
+        request.cluster_config,
+        request.max_scale,
+        request.repeats,
+        request.profile,
+        min_scale=request.min_scale,
+        dtype_filter=dtype_filter,
+        workload_filter=workload_filter,
+        specific_scales=specific_scales,
+        extra_slurm_params=request.extra_slurm_params,
+    )
+
+
+def _generate_discovery_tasks(request: TaskGenerationRequest) -> List[WorkloadTask]:
+    """Generate tasks using discovery mode (workload names include size)."""
+    # Reuse existing generate_submit_all_tasks logic
+    workload_filter = parse_comma_list(request.workload) if request.workload else None
+    dtype_filter = parse_comma_list(request.dtype) if request.dtype else None
+
+    # If request.scale is provided (specific scales), we pass it.
+    # Discovery mode supports --scale 128,256 too (applied to filtered workloads).
+    specific_scales = parse_comma_list(request.scale)
+    if specific_scales:
+        specific_scales = [int(s) for s in specific_scales]
+    else:
+        specific_scales = None
+
+    return generate_submit_all_tasks(
+        request.workloads,
+        request.cluster_config,
+        request.max_scale,
+        request.repeats,
+        request.profile,
+        min_scale=request.min_scale,
+        dtype_filter=dtype_filter,
+        workload_filter=workload_filter,
+        specific_scales=specific_scales,
+        extra_slurm_params=request.extra_slurm_params,
+    )
+
+
+def _generate_from_file(request: TaskGenerationRequest) -> List[WorkloadTask]:
+    """Generate tasks from file specification."""
+    # Reuse existing get_tasks_wrapper logic
+    tasks_parsed = get_tasks_wrapper(request.workloads, request.file_path, request.cluster_config)
+
+    if request.file_path.endswith(('.yaml', '.yml')):
+        tasks = flatten_yaml_tasks(tasks_parsed)
+    else:
+        tasks = gen_tasks(tasks_parsed)
+
+    # Propagate extra_slurm_params to all generated tasks
+    if request.extra_slurm_params:
+        for task in tasks:
+            task.extra_slurm_params = request.extra_slurm_params
+
+    return tasks
 
 
 def generate_submit_all_tasks(
@@ -370,13 +256,13 @@ def generate_submit_all_tasks(
         return []
 
     max_scale_str = max_scale if max_scale is not None else "metadata scales"
-    logger.info(
+    logger.debug(
         f"Discovering tasks for installed workloads (max_scale: {max_scale_str}, repeats: {repeats}, profile: {profile}, min_scale: {min_scale})"
     )
     if dtype_filter:
-        logger.info(f"Filtering dtypes: {dtype_filter}")
+        logger.debug(f"Filtering dtypes: {dtype_filter}")
     if workload_filter:
-        logger.info(f"Filtering workloads: {workload_filter}")
+        logger.debug(f"Filtering workloads: {workload_filter}")
 
     task_list = []
     filtered_workloads = {}
@@ -411,7 +297,7 @@ def generate_submit_all_tasks(
         logger.info("No installed pretrain/finetuning workloads found")
         return []
 
-    logger.info(f"Found {len(filtered_workloads)} eligible workloads: {', '.join(filtered_workloads.keys())}")
+    logger.debug(f"Found {len(filtered_workloads)} eligible workloads: {', '.join(filtered_workloads.keys())}")
 
     # Generate tasks for each eligible workload
     for workload_key, workload_data in filtered_workloads.items():
@@ -430,7 +316,7 @@ def generate_submit_all_tasks(
             extra_slurm_params,
         )
 
-    logger.info(f"Generated {len(task_list)} tasks across {len(filtered_workloads)} workloads")
+    logger.debug(f"Generated {len(task_list)} tasks across {len(filtered_workloads)} workloads")
     return task_list
 
 
@@ -582,7 +468,7 @@ def _generate_workload_tasks(
                             dtype=dtype,
                             scale=scale,
                             profile=profile,
-                            extra_slurm_params=extra_slurm_params,
+                            extra_slurm_params=extra_slurm_params or {},
                         )
                     )
 

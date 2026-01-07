@@ -30,7 +30,7 @@ set -eu -o pipefail
 
 export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=llama3.1
-export FW_VERSION=25.09.00
+export FW_VERSION=25.11.01
 
 export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh}
 
@@ -49,10 +49,12 @@ MODEL_SIZE=${MODEL_SIZE:-405b}
 MODEL_SIZE=${MODEL_SIZE,,}
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 PROFILE_ENABLED=${PROFILE_ENABLED,,}
-GPU_METRICS_ENABLED=${ENABLE_GPU_METRICS:-false}
-GPU_METRICS_ENABLED=${GPU_METRICS_ENABLED,,}
+ENABLED_GPU_METRICS=${ENABLE_GPU_METRICS:-false}
+ENABLED_GPU_METRICS=${ENABLED_GPU_METRICS,,}
 ENABLE_VBOOST=${ENABLE_VBOOST:-false}
 ENABLE_VBOOST=${ENABLE_VBOOST,,}
+PROFILE_START_STEP=${PROFILE_START_STEP:-45}
+PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
 
 GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
 GPU_TYPE=${GPU_TYPE,,}
@@ -82,6 +84,7 @@ MAX_STEPS=${MAX_STEPS:-50}
 CPU_PER_TASK_PINNING=${CPU_PER_TASK_PINNING:-0}
 ENABLE_CHECKPOINT=${ENABLE_CHECKPOINT:-false}
 ENABLE_CHECKPOINT=${ENABLE_CHECKPOINT,,}
+CHECKPOINT_INTERVAL=${CHECKPOINT_INTERVAL:-$MAX_STEPS} # Default: save checkpoint at end of training
 
 if [[ -n ${TP-} ]]; then
     CONFIG_OVERRIDES+="-tp $TP "
@@ -107,11 +110,6 @@ if [[ $CLUSTER_TYPE != "slurm" ]]; then
     exit 1
 fi
 
-if [[ $ENABLE_CHECKPOINT == true ]] || [[ -n ${LOAD_CHECKPOINT_PATH-} ]]; then
-    echo "Error: Checkpointing features are not supported for this workload"
-    exit 1
-fi
-
 if [[ $MODEL_SIZE == 405b ]]; then
     LLAMA_MODEL="llama31"
 elif [[ $MODEL_SIZE == 70b ]]; then
@@ -120,10 +118,19 @@ else
     LLAMA_MODEL="llama3"
 fi
 
+# Checkpoint configuration
 if [[ $ENABLE_CHECKPOINT == true ]]; then
     CONFIG_OVERRIDES+=" --checkpoint_save=True "
-else
-    CONFIG_OVERRIDES+=" --checkpoint_save=False "
+
+    # Set checkpoint directory if specified (defaults to experiment dir)
+    if [[ -n ${CHECKPOINT_DIR-} ]]; then
+        CONFIG_OVERRIDES+=" --checkpoint_dir=$CHECKPOINT_DIR "
+    fi
+
+    # Set checkpoint interval if specified (defaults to MAX_STEPS)
+    if [[ -n ${CHECKPOINT_INTERVAL-} ]]; then
+        CONFIG_OVERRIDES+=" --checkpoint_interval=$CHECKPOINT_INTERVAL "
+    fi
 fi
 
 if [[ -n ${LOAD_CHECKPOINT_PATH-} ]]; then
@@ -131,19 +138,33 @@ if [[ -n ${LOAD_CHECKPOINT_PATH-} ]]; then
     CONFIG_OVERRIDES+=" --checkpoint_load_path=$LOAD_CHECKPOINT_PATH "
 fi
 
+# Pass MAX_STEPS to training configuration (must be after checkpoint section which may set MAX_STEPS=1)
+CONFIG_OVERRIDES+=" --max_steps $MAX_STEPS "
+
 if [[ -n ${CONTAINER_MOUNTS} ]]; then
     CONFIG_OVERRIDES+=" --custom_mounts $CONTAINER_MOUNTS"
 fi
 
 if [[ $PROFILE_ENABLED == "true" ]]; then
-    CONFIG_OVERRIDES+=" --enable_nsys "
-    if [[ $GPU_METRICS_ENABLED == true ]]; then
+    CONFIG_OVERRIDES+=" --enable_nsys --profiling_start_step=$PROFILE_START_STEP --profiling_stop_step=$PROFILE_STOP_STEP "
+    if [[ $ENABLED_GPU_METRICS == true ]]; then
         CONFIG_OVERRIDES+=" --profiling_gpu_metrics "
     fi
 fi
 
 if [[ $DTYPE == "fp8" ]]; then
-    CONFIG_OVERRIDES+=" --fp8_recipe $FP8_RECIPE "
+    case "$FP8_RECIPE" in
+        cs | mx)
+            CONFIG_OVERRIDES+=" --compute_dtype fp8_$FP8_RECIPE "
+            ;;
+        *)
+            echo "Error: Other FP8 types are not allowed"
+            exit 1
+            ;;
+    esac
+
+else
+    CONFIG_OVERRIDES+=" --compute_dtype $DTYPE "
 fi
 
 if [[ $ENABLE_VBOOST == true ]]; then
@@ -159,14 +180,14 @@ fi
 #run command
 pushd $LLMB_WORKLOAD/Megatron-Bridge
 
-python -m scripts.performance.setup_experiment \
+python scripts/performance/setup_experiment.py \
     --gpu $GPU_TYPE \
     --container_image $IMAGE \
-    --compute_dtype $DTYPE \
     --num_gpus $JOB_TOTAL_GPUS \
     --gpus_per_node $GPUS_PER_NODE \
     --model_name $LLAMA_MODEL \
     --model_size $MODEL_SIZE \
+    --hf_token ${HF_TOKEN:?HF_TOKEN is required} \
     $CONFIG_OVERRIDES \
     --account $SBATCH_ACCOUNT \
     --partition $SBATCH_PARTITION \

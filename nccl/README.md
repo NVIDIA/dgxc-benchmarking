@@ -127,11 +127,11 @@ export LLMB_INSTALL=<path to your installation directory> (e.g. /lustre/llmb/)
 cd $LLMB_INSTALL
 
 # Run a benchmark (scale = total GPUs)
-llmb-run single -w microbenchmark_nccl -s nccl --dtype fp8 --scale <NUM_GPUS>
+llmb-run submit -w microbenchmark_nccl -s nccl --dtype fp8 --scale <NUM_GPUS>
 
 # Examples
-llmb-run single -w microbenchmark_nccl -s nccl --dtype fp8 --scale 2
-llmb-run single -w microbenchmark_nccl -s nccl --dtype fp8 --scale 16
+llmb-run submit -w microbenchmark_nccl -s nccl --dtype fp8 --scale 2
+llmb-run submit -w microbenchmark_nccl -s nccl --dtype fp8 --scale 16
 ```
 
 Note: `--dtype` and `-s` are placeholders required by llmb-run today; NCCL ignores them. We plan to remove these in a future release.

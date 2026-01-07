@@ -19,7 +19,24 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-"""Workload validation and discovery functionality."""
+"""Workload validation and discovery functionality.
+
+Workload Naming Convention:
+---------------------------
+Throughout this codebase, workloads use a consistent naming structure:
+
+- workload_key: Full identifier in format "{workload_type}_{workload}"
+  Example: "pretrain_nemotron4"
+
+- workload_type: Category of workload (e.g., "pretrain", "finetune", "inference")
+  Example: "pretrain"
+
+- workload: Base workload name (e.g., "nemotron4", "llama3.1")
+  Example: "nemotron4"
+
+The relationship is: workload_key = f"{workload_type}_{workload}"
+This format is established when loading metadata and used consistently throughout the tool.
+"""
 
 import glob
 import logging
@@ -93,7 +110,7 @@ def get_workloads(config):
 
 
 def validate_workload_with_details(
-    workloads, workload_key, model_size, dtype=None, scale=None, cluster_gpu_type=None, cluster_config=None
+    workloads, workload_key, model_size, cluster_gpu_type, cluster_config, dtype=None, scale=None
 ):
     """Validate workload and return detailed results for better error reporting.
 
@@ -122,17 +139,12 @@ def validate_workload_with_details(
 
     gpu_configs = metadata.get('run', {}).get('gpu_configs', {})
 
-    if cluster_gpu_type and cluster_gpu_type not in gpu_configs:
+    if cluster_gpu_type not in gpu_configs:
         supported_gpu_types = list(gpu_configs.keys())
         error_msg = f"GPU type '{cluster_gpu_type}' not supported for workload '{workload_key}'."
         return False, ValidationErrorType.GPU_TYPE_NOT_SUPPORTED, error_msg, supported_gpu_types
 
-    if cluster_gpu_type:
-        model_configs = gpu_configs.get(cluster_gpu_type, {}).get('model_configs', [])
-    else:
-        model_configs = []
-        for gpu_config in gpu_configs.values():
-            model_configs.extend(gpu_config.get('model_configs', []))
+    model_configs = gpu_configs.get(cluster_gpu_type, {}).get('model_configs', [])
 
     model_config = None
     for config_entry in model_configs:
@@ -142,7 +154,7 @@ def validate_workload_with_details(
 
     if not model_config:
         available_sizes = sorted({config.get('model_size') for config in model_configs if config.get('model_size')})
-        gpu_info = f" for GPU type '{cluster_gpu_type}'" if cluster_gpu_type else ""
+        gpu_info = f" for GPU type '{cluster_gpu_type}'"
         error_msg = f"Model size '{model_size}' not supported for workload '{workload_key}'{gpu_info}."
         return False, ValidationErrorType.MODEL_SIZE_NOT_SUPPORTED, error_msg, available_sizes
 
@@ -218,7 +230,7 @@ def format_validation_error(
     workload_key, model_size, dtype, scale, cluster_gpu_type, error_type, error_msg, suggestions
 ):
     """Format a user-friendly validation error message with suggestions."""
-    lines = [f"Error: {error_msg}"]
+    lines = [error_msg]
 
     if suggestions:
         if error_type == ValidationErrorType.WORKLOAD_NOT_FOUND:
@@ -239,19 +251,43 @@ def format_validation_error(
     return "\n".join(lines)
 
 
-def print_avail_workloads(workloads, cluster_gpu_type=None, verbose=False, cluster_config=None):
-    """Print available workloads with their supported configurations."""
+def print_avail_workloads(workloads, cluster_config, cluster_gpu_type=None, verbose=False, workload_filter=None):
+    """Print available workloads with their supported configurations.
+
+    Args:
+        workloads: Dictionary of all workloads
+        cluster_config: Cluster configuration
+        cluster_gpu_type: Optional GPU type filter
+        verbose: Whether to show detailed configuration
+        workload_filter: Optional workload key(s) to show - can be string, list, or None
+    """
     if not workloads:
         logger.info("No workloads found.")
-        return
+        return True
 
     installed_workloads = cluster_config.get('workloads', {}).get('installed', [])
 
-    filtered_workloads = {k: v for k, v in workloads.items() if k in installed_workloads}
+    # Filter by workload_filter if specified
+    if workload_filter:
+        # Normalize to list for consistent handling
+        filter_list = [workload_filter] if isinstance(workload_filter, str) else workload_filter
+
+        filtered_workloads = {}
+        for wf in filter_list:
+            if wf not in workloads:
+                logger.error(f"Workload '{wf}' not found.")
+                return False
+            if installed_workloads and wf not in installed_workloads:
+                logger.error(f"Workload '{wf}' is not installed on this cluster.")
+                logger.info(f"Installed workloads: {', '.join(installed_workloads)}")
+                return False
+            filtered_workloads[wf] = workloads[wf]
+    else:
+        filtered_workloads = {k: v for k, v in workloads.items() if k in installed_workloads}
 
     if not filtered_workloads:
         logger.info("No installed workloads found.")
-        return
+        return True
 
     logger.info("Available workloads:")
     logger.info("=" * 50)
@@ -356,53 +392,4 @@ def print_avail_workloads(workloads, cluster_gpu_type=None, verbose=False, clust
         logger.info("\nUse --verbose to see detailed configuration for each workload.")
     logger.info("")
 
-
-def show_workload_details(workloads, workload_key, cluster_gpu_type=None, cluster_config=None):
-    """Show detailed information about a specific workload."""
-    if workload_key not in workloads:
-        logger.error(f"Workload '{workload_key}' not found.")
-        return
-
-    installed_workloads = cluster_config.get('workloads', {}).get('installed', [])
-    if installed_workloads and workload_key not in installed_workloads:
-        logger.error(f"Workload '{workload_key}' is not installed on this cluster.")
-        logger.info(f"Installed workloads: {', '.join(installed_workloads)}")
-        return
-
-    metadata = workloads[workload_key]['metadata']
-    gpu_configs = metadata.get('run', {}).get('gpu_configs', {})
-
-    logger.info(f"Workload: {workload_key}")
-    logger.info("=" * (len(workload_key) + 10))
-
-    # Filter by cluster GPU type if specified
-    if cluster_gpu_type and cluster_gpu_type in gpu_configs:
-        relevant_configs = {cluster_gpu_type: gpu_configs[cluster_gpu_type]}
-    else:
-        relevant_configs = gpu_configs
-
-    for gpu_type, config in relevant_configs.items():
-        logger.info(f"\nGPU Type: {gpu_type}")
-        model_configs = config.get('model_configs', [])
-
-        for model_config in model_configs:
-            model_size = model_config.get('model_size', 'Unknown')
-            dtypes = model_config.get('dtypes', [])
-            # Ensure dtypes is always a list, even if it's a single string
-            if isinstance(dtypes, str):
-                dtypes = [dtypes]
-            scales = model_config.get('scales', [])
-            exact_scales = model_config.get('exact_scales', False)
-
-            logger.info(f"  Model Size: {model_size}")
-            logger.info(f"    Data types: {', '.join(dtypes) if dtypes else 'None specified'}")
-
-            if scales:
-                scale_info = f"    Scales: {', '.join(map(str, scales))}"
-                if exact_scales:
-                    scale_info += " (exact matches only)"
-                else:
-                    scale_info += f" (or higher, max tested: {max(scales)})"
-                logger.info(scale_info)
-            else:
-                logger.info("    Scales: None specified")
+    return True

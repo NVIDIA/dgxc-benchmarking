@@ -205,7 +205,7 @@ else
         --num_gpus $JOB_TOTAL_GPUS \
         --gpus_per_node $GPUS_PER_NODE \
         --max_steps $MAX_STEPS \
-        --hf_token ${HF_TOKEN:?HF_TOKEN is required for RunAI} \
+        --hf_token $HF_TOKEN \
         $CONFIG_OVERRIDES \
         runai \
         --base_url $BASE_URL \

@@ -22,8 +22,10 @@
 
 """Workload selection prompts for LLMB installer."""
 
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from llmb_install.core.exemplar import get_exemplar_workloads, validate_exemplar_workloads
 from llmb_install.ui.interface import UIInterface
 
 
@@ -35,6 +37,8 @@ def prompt_workload_selection(
     allow_empty: bool = False,
     show_exemplar_option: bool = False,
     default_mode: str = 'custom',
+    llmb_repo: Optional[Path] = None,
+    gpu_type: Optional[str] = None,
 ) -> Tuple[Optional[List[str]], str]:
     """Prompt the user to select workloads to install.
 
@@ -46,6 +50,8 @@ def prompt_workload_selection(
         allow_empty: Whether to allow selecting no workloads (for resume scenarios)
         show_exemplar_option: Whether to show "Exemplar Cloud" selection option
         default_mode: Default selection mode ('custom' or 'exemplar')
+        llmb_repo: Path to LLMB repository root (required for exemplar mode)
+        gpu_type: GPU type (required for exemplar mode)
 
     Returns:
         Tuple[Optional[List[str]], str]: (List of selected workload keys or None if cancelled, selection mode)
@@ -77,18 +83,22 @@ def prompt_workload_selection(
         selection_mode = choice
 
         if choice == "exemplar":
-            # Select all 'pretrain' recipes using metadata
-            selected = []
-            for key, data in workloads.items():
-                if data.get('general', {}).get('workload_type') == 'pretrain':
-                    selected.append(key)
+            # Use exemplar.yaml to select workloads
+            if not llmb_repo or not gpu_type:
+                ui.log("Error: llmb_repo and gpu_type are required for Exemplar Cloud mode", level='error')
+                return None, 'custom'
 
-            if not selected:
-                ui.log("No 'pretrain' recipes found for this configuration.", level='warning')
+            try:
+                # Convert to Path if it's a string
+                llmb_repo_path = Path(llmb_repo) if isinstance(llmb_repo, str) else llmb_repo
+                base_keys = get_exemplar_workloads(llmb_repo_path, gpu_type)
+                selected = validate_exemplar_workloads(base_keys, workloads, gpu_type)
+                return selected, selection_mode
+            except ValueError as e:
+                ui.log(f"Error: {e}", level='error')
+                ui.log("")  # Blank line for readability
                 ui.log("Falling back to custom selection.")
                 selection_mode = 'custom'
-            else:
-                return selected, selection_mode
 
     selected = _prompt_manual_workload_selection(ui, workloads, default_selected, show_install_all, allow_empty)
 

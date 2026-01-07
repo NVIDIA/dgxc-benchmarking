@@ -44,6 +44,7 @@ Depending on your cluster's job scheduler, ensure the following are met:
    git clone https://github.com/NVIDIA/dgxc-benchmarking.git
    cd dgxc-benchmarking
    ```
+
 2. Obtain Model Access (if required):
    Some workloads require special access or HuggingFace tokens. Please refer to the [Model Access Requirements](#model-access-requirements) table to determine if your chosen workloads need additional approvals or a HuggingFace token (HF_TOKEN in installer). If a token is required, generate one from [HuggingFace settings](https://huggingface.co/settings/tokens) as applicable.
    
@@ -83,19 +84,15 @@ Depending on your cluster's job scheduler, ensure the following are met:
    
    **Important:** Installation may take several hours, influenced by selected recipes, internet speed, and your current node's resources. Consider using a tool like `tmux` or `screen`.
 
+   This will set up a supported Python environment (reusing your current `uv`/venv/conda env if compatible, otherwise creating `../llmb_venv` one directory above the repo), then launch the interactive installer.
+
    ```bash
-   # The installer will add packages to your current Python environment.
-   # We recommend to activate a virtual environment with python 3.12.x before running installer command below.
-   # The installer has been tested with venv and conda environments; other solutions may work but are not officially supported.
-   
    ./install.sh
    ```
    The installer will:
-   - Install required Python packages in your current environment
-   - Set up your benchmarking environment
-   - Configure SLURM settings
-   - Let you select workloads to install
-   - Prepare all necessary dependencies
+   - Ensure Python 3.12.x support via `uv`, venv, or conda (creating a venv if needed)
+   - Install the CLI tools (`llmb-run`, `llmb-install`)
+   - Prompt you to configure your cluster and select workloads to install
 
    > **Note:** For detailed installation options, workload-specific virtual environments, and troubleshooting, see the [Installer README](cli/llmb-install/README.md).
 
@@ -104,9 +101,17 @@ Depending on your cluster's job scheduler, ensure the following are met:
    # Navigate to your installed workload directory
    cd $LLMB_INSTALL
    
-   # Example: Run Nemotron4 340B pretrain on 256 GPUs with FP8 precision
-   llmb-run single -w pretrain_nemotron4 -s 340b --dtype fp8 --scale 256
+   # Example: Run Llama 3.1 405B pretraining on 256 GPUs with FP8 precision
+   llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 256
    ```
+
+### Shell Completion (Optional)
+
+Enable tab completion for `llmb-run` commands and options:
+```bash
+llmb-run --install-completion
+```
+Restart your shell after installation for changes to take effect.
 
 ### Directory Layout and Key Variables
 
@@ -152,14 +157,16 @@ The following tables list each benchmark used to evaluate the model's performanc
 
 | Type | Framework | Model | Container Version | Model Size | Scale (# of GPUs) | Precision | Model Access Required | Checkpointing | Cluster Type |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Pretrain | Megatron-Bridge | [DeepSeek V3](deepseek_v3/pretrain/README.md) | 25.09.00 | 671B | 128-512 | FP8, BF16 | Yes | No | Slurm |
-| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.09.00 | 405B | 128-1024 | FP8 | Yes | No | Slurm |
-| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.09.00 | 70B | 64-1024 | FP8 | Yes | No | Slurm |
-| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.09.00 | 8B | 8-128 | FP8 | Yes | No | Slurm |
+| Pretrain | Megatron-Bridge | [DeepSeek V3](deepseek_v3/pretrain/megatron_bridge/README.md) | 25.11.01 | 671B | 128-512 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.11.01 | 405B | 128-512 | FP8 | Yes | Yes | Slurm |
+| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.11.01 | 70B | 64-512 | FP8, NVFP4 | Yes | Yes | Slurm |
+| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.11.01 | 8B | 8-128 | FP8, NVFP4 | Yes | Yes | Slurm |
+| Pretrain | Megatron-Bridge | [Qwen3](qwen3/pretrain/README.md) | 25.11.01 | 235B | 64-512 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | Megatron-Bridge | [Qwen3](qwen3/pretrain/README.md) | 25.11.01 | 30B | 8-64 | FP8, BF16 | Yes | No | Slurm |
 | Pretrain | NeMo | [Nemotron4](nemotron4-15b/README.md) | 25.09.00 | 15B | 16-512 | FP8, BF16 | No | Yes | Slurm |
 | Pretrain | NeMo | [Nemotron4](nemotron4-340b/README.md) | 25.09.00 | 340B | 128-512 | FP8, BF16 | No | Yes | Slurm |
 | Pretrain | NeMo | [Grok1](grok1/README.md) | 25.09.00 | 314B | 128-512 | FP8, BF16 | Yes | No | Slurm |
-| Pretrain | NeMo | [Nemotron-H](nemotron-h/README.md) | 25.09.00 | 56B | 32-512 | FP8 | No | No | Slurm |
+| Pretrain | Megatron-Bridge | [Nemotron-H](nemotron-h/README.md) | 25.11.01 | 56B | 32-512 | FP8 | No | No | Slurm |
 
 
 ### GB200 Workloads
@@ -168,18 +175,21 @@ The following tables list each benchmark used to evaluate the model's performanc
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | Pretrain | NeMo | [Nemotron4](nemotron4-15b/README.md) | 25.09.00 | 15B | 16-512 | FP8, BF16 | No | Yes | Slurm |
 | Pretrain | NeMo | [Nemotron4](nemotron4-340b/README.md) | 25.07.01 | 340B | 128-512 | FP8, BF16 | No | Yes | Slurm |
-| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.09.00 | 405B | 128-512 | FP8 | Yes | No | Slurm |
-| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.09.00 | 70B | 64-512 | FP8 | Yes | No | Slurm |
-| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.09.00 | 8B | 8-128 | FP8 | Yes | No | Slurm |
-| Pretrain | NeMo | [DeepSeek V3](deepseek_v3/pretrain/README.md) | 25.09.00 | 671B | 128-512 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.11.01 | 405B | 128-512 | FP8 | Yes | Yes | Slurm |
+| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.11.01 | 70B | 64-512 | FP8, NVFP4 | Yes | Yes | Slurm |
+| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.11.01 | 8B | 8-128 | FP8, NVFP4 | Yes | Yes | Slurm |
+| Pretrain | Megatron-Bridge | [Qwen3](qwen3/pretrain/README.md) | 25.11.01 | 235B | 64-512 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | Megatron-Bridge | [Qwen3](qwen3/pretrain/README.md) | 25.11.01 | 30B | 8-64 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | Megatron-Bridge | [DeepSeek V3](deepseek_v3/pretrain/megatron_bridge/README.md) | 25.11.01 | 671B | 256-512 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | TorchTitan | [DeepSeek V3](deepseek_v3/pretrain/torchtitan/README.md) | 25.10-py3 | 671B | 256 | BF16 | Yes | No | Slurm |
 | Pretrain | NeMo | [Grok1](grok1/README.md) | 25.09.00 | 314B | 128-512 | FP8, BF16 | Yes | No | Slurm |
-| Pretrain | NeMo | [Nemotron-H](nemotron-h/README.md) | 25.09.00 | 56B | 32-512 | FP8 | No | No | Slurm |
-| Inference | TRT-LLM | [DeepSeek R1](deepseek_r1/inference/trtllm/README.md) | 1.1.0rc5 | 671B | 4 | nvfp4 | No | No | Slurm |
+| Pretrain | Megatron-Bridge | [Nemotron-H](nemotron-h/README.md) | 25.11.01 | 56B | 32-512 | FP8 | No | No | Slurm |
+| Inference | TRT-LLM | [DeepSeek R1](deepseek_r1/inference/trtllm/README.md) | 1.1.0rc5 | 671B | 4 | NVFP4 | No | No | Slurm |
 | Inference | Dynamo | [DeepSeek R1](deepseek_r1/inference/dynamo/README.md) | 0.6.1 | 671B | 32 | NVFP4 | No | No | Slurm |
-| Inference | SGLang | [DeepSeek R1](deepseek_r1/inference/sglang/README.md) | v0.5.3-cu129-gb200 | 671B | 4 | nvfp4 | No | No | Slurm |
-| Inference | TRT-LLM | [Llama 3.3](llama3.3/inference/README.md) | 1.1.0rc5 | 70b | 1-4 | nvfp4 | Yes | No | Slurm |
-| Inference | Dynamo + TRT-LLM | [GPT-OSS Inference](gpt-oss/inference/README.md) | 0.5.1-rc0.pre3 | 120B | 4+ | mxfp4 | No | No | Kubernetes |
-| Microbenchmark | TRT-LLM | [GPT-OSS](microbenchmarks/cpu_overhead/README.md) | 1.1.0rc5 | 120B | 1-4 | mxfp4 | Yes | No | Slurm |
+| Inference | SGLang | [DeepSeek R1](deepseek_r1/inference/sglang/README.md) | v0.5.3-cu129-gb200 | 671B | 4 | NVFP4 | No | No | Slurm |
+| Inference | TRT-LLM | [Llama 3.3](llama3.3/inference/README.md) | 1.1.0rc5 | 70b | 1-4 | NVFP4 | Yes | No | Slurm |
+| Inference | Dynamo + TRT-LLM | [GPT-OSS Inference](gpt-oss/inference/k8s/README.md) | 0.5.1-rc0.pre3 | 120B | 4+ | MXFP4 | No | No | Kubernetes |
+| Microbenchmark | TRT-LLM | [GPT-OSS](microbenchmarks/cpu_overhead/README.md) | 1.1.0rc5 | 120B | 1-4 | MXFP4 | Yes | No | Slurm |
 
 
 ### B200 Workloads
@@ -188,38 +198,44 @@ The following tables list each benchmark used to evaluate the model's performanc
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | Pretrain | NeMo | [Nemotron4](nemotron4-15b/README.md) | 25.09.00 | 15B | 16-1024 | FP8, BF16 | No | Yes | Slurm |
 | Pretrain | NeMo | [Nemotron4](nemotron4-340b/README.md) | 25.07.01 | 340B | 128-1024 | FP8, BF16 | No | Yes | Slurm |
-| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.09.00 | 405B | 128-1024 | FP8 | Yes | No | Slurm |
-| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.09.00 | 70B | 64-1024 | FP8 | Yes | No | Slurm |
-| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.09.00 | 8B | 8-128 | FP8 | Yes | No | Slurm |
-| Pretrain | NeMo | [DeepSeek V3](deepseek_v3/pretrain/README.md) | 25.09.00 | 671B | 128-1024 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.11.01 | 405B | 128-1024 | FP8, NVFP4 | Yes | Yes | Slurm |
+| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.11.01 | 70B | 64-1024 | FP8, NVFP4 | Yes | Yes | Slurm |
+| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.11.01 | 8B | 8-128 | FP8, NVFP4 | Yes | Yes | Slurm |
+| Pretrain | Megatron-Bridge | [Qwen3](qwen3/pretrain/README.md) | 25.11.01 | 235B | 64-512 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | Megatron-Bridge | [Qwen3](qwen3/pretrain/README.md) | 25.11.01 | 30B | 8-64 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | Megatron-Bridge | [DeepSeek V3](deepseek_v3/pretrain/megatron_bridge/README.md) | 25.11.01 | 671B | 256-512 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | TorchTitan | [DeepSeek V3](deepseek_v3/pretrain/torchtitan/README.md) | 25.10-py3 | 671B | 256 | BF16 | Yes | No | Slurm |
 | Pretrain | NeMo | [Grok1](grok1/README.md) | 25.09.00 | 314B | 256-1024 | FP8, BF16 | Yes | No | Slurm |
-| Pretrain | NeMo | [Nemotron-H](nemotron-h/README.md) | 25.09.00 | 56B | 32-512 | FP8 | No | No | Slurm |
+| Pretrain | Megatron-Bridge | [Nemotron-H](nemotron-h/README.md) | 25.11.01 | 56B | 64-512 | FP8 | No | No | Slurm |
 | Inference | Dynamo | [DeepSeek R1](deepseek_r1/inference/dynamo/README.md) | 0.6.1 | 671B | 32 | NVFP4 | No | No | Slurm |
-| Inference | SGLang | [DeepSeek R1](deepseek_r1/inference/sglang/README.md) | v0.5.3rc0-cu128-b200 | 671B | 8 | nvfp4 | No | No | Slurm |
-| Microbenchmark | TRT-LLM | [GPT-OSS](microbenchmarks/cpu_overhead/README.md) | 1.1.0rc5 | 120B | 1-4 | mxfp4 | Yes | No | Slurm |
+| Inference | SGLang | [DeepSeek R1](deepseek_r1/inference/sglang/README.md) | v0.5.3rc0-cu128-b200 | 671B | 8 | NVFP4 | No | No | Slurm |
+| Microbenchmark | TRT-LLM | [GPT-OSS](microbenchmarks/cpu_overhead/README.md) | 1.1.0rc5 | 120B | 1-4 | MXFP4 | Yes | No | Slurm |
 
 ### H100 Workloads
 
 Baseline performance metrics were collected using workloads on the NVIDIA DGX H100 Reference Architecture. For more information see [DGX H100 Systems](https://blogs.nvidia.com/blog/dgx-h100-systems-shipping/).
 
-| Type | Framework | Model | FW Container Version | Model Size | Scale (# of GPUs) | Precision | Model Access Required | Checkpointing | Cluster Type |
+| Type | Framework | Model | Container Version | Model Size | Scale (# of GPUs) | Precision | Model Access Required | Checkpointing | Cluster Type |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | Pretrain | NeMo | [Nemotron4](nemotron4-15b/README.md) | 25.09.00 | 15B | 16-2048 | FP8, BF16 | No | Yes | Slurm, Run:ai |
 | Pretrain | NeMo | [Nemotron4](nemotron4-340b/README.md) | 25.09.00 | 340B | 256-2048 | FP8, BF16 | No | Yes | Slurm, Run:ai |
-| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.09.00 | 405B | 1024 | FP8 | Yes | No | Slurm |
-| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.09.00 | 70B | 64-1024 | FP8 | Yes | No | Slurm |
-| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.09.00 | 8B | 8-128 | FP8 | Yes | No | Slurm |
-| Pretrain | NeMo | [DeepSeek V3](deepseek_v3/pretrain/README.md) | 25.09.00 | 671B | 1024 | BF16 | Yes | No | Slurm |
+| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.11.01 | 405B | 1024 | BF16, FP8 | Yes | Yes | Slurm |
+| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.11.01 | 70B | 64-1024 | BF16, FP8 | Yes | Yes | Slurm |
+| Pretrain | Megatron-Bridge | [Llama 3.1](llama3.1/README.md) | 25.11.01 | 8B | 8-128 | BF16, FP8 | Yes | Yes | Slurm |
+| Pretrain | Megatron-Bridge | [Qwen3](qwen3/pretrain/README.md) | 25.11.01 | 235B | 256-512 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | Megatron-Bridge | [Qwen3](qwen3/pretrain/README.md) | 25.11.01 | 30B | 16-128 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | Megatron-Bridge | [DeepSeek V3](deepseek_v3/pretrain/megatron_bridge/README.md) | 25.09.00 | 671B | 512-1024 | FP8, BF16 | Yes | No | Slurm |
+| Pretrain | TorchTitan | [DeepSeek V3](deepseek_v3/pretrain/torchtitan/README.md) | 25.10-py3 | 671B | 512 | BF16 | Yes | No | Slurm |
 | Pretrain | NeMo | [Grok1](grok1/README.md) | 25.09.00 | 314B | 512-2048 | FP8, BF16 | Yes | No | Slurm |
-| Pretrain | NeMo | [Nemotron-H](nemotron-h/README.md) | 25.09.00 | 56B | 64-2048 | FP8 | No | No | Slurm |
-| Inference | TRT-LLM | [DeepSeek R1](deepseek_r1/inference/trtllm/README.md) | 1.1.0rc5 | 671B | 16 | fp8 | No | No | Slurm |
+| Pretrain | Megatron-Bridge | [Nemotron-H](nemotron-h/README.md) | 25.11.01 | 56B | 64-1024 | FP8 | No | No | Slurm |
+| Inference | TRT-LLM | [DeepSeek R1](deepseek_r1/inference/trtllm/README.md) | 1.1.0rc5 | 671B | 16 | FP8 | No | No | Slurm |
 | Inference | Dynamo | [DeepSeek R1](deepseek_r1/inference/dynamo/README.md) | 0.6.1 | 671B | 48 | FP8 | No | No | Slurm |
-| Inference | TRT-LLM | [Llama 3.3](llama3.3/inference/README.md) | 1.1.0rc5 | 70b | 2 | fp8 | Yes | No | Slurm |
-| Microbenchmark | TRT-LLM | [GPT-OSS](microbenchmarks/cpu_overhead/README.md) | 1.1.0rc5 | 120B | 1-4 | mxfp4 | Yes | No | Slurm |
+| Inference | TRT-LLM | [Llama 3.3](llama3.3/inference/README.md) | 1.1.0rc5 | 70b | 2 | FP8 | Yes | No | Slurm |
+| Microbenchmark | TRT-LLM | [GPT-OSS](microbenchmarks/cpu_overhead/README.md) | 1.1.0rc5 | 120B | 1-4 | MXFP4 | Yes | No | Slurm |
 
 ### Deprecated
 
-| Type | Framework | Model | FW Container Version | Model Size | Scale (# of GPUs) | Precision | Model Access Required | Checkpointing | Cluster Type | Last Version |
+| Type | Framework | Model | Container Version | Model Size | Scale (# of GPUs) | Precision | Model Access Required | Checkpointing | Cluster Type | Last Version |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | Finetuning | HF | Llama 2 | 24.02-py3 | 70B | 8-512 | FP8, BF16 | Yes | No | Slurm | 25.01.1 |
 | Finetuning | HF | Mistral | 24.02-py3 | 7B | 8-256 | FP8, BF16 | Yes | No | Slurm | 25.01.1 |
@@ -231,9 +247,9 @@ Baseline performance metrics were collected using workloads on the NVIDIA DGX H1
 | Fine-Tuning (SFT, LORA) | NeMo | Llama 3 | 24.12 | 8B, 70B | 8-32 | FP8, BF16 | Yes | No | Slurm | 25.04.02 |
 | Finetune | NeMo Maverick | Llama4 | 25.07.01 | 400B | 256 | FP8, BF16 | Yes | No | Slurm | 25.08 |
 | Inference | NIM | Llama 3 | 1.0.3 | 70B | 4 | FP8 | Yes | No | Slurm | 25.05.04 |
-| Inference | NIM, SGLang | DeepSeek R1 | 1.7.2 | 671B | 16 | fp8 | No | No | Slurm | 25.08 |
-| Inference | NIM & NeMo Retriever (NVIDIA Enterprise RAG) | Llama 3.1 and 3.2 | instruct:1.3.3, rerank:1.3, embed:1.3.1 | 70b, 1b | 1-8 | n/a | Yes | No | Slurm | 25.08 |
-| Inference | TRT-LLM | Llama 4 | 1.0.0rc1 | 17b | 8 | fp8 | Yes | No | Slurm | 25.08 |
+| Inference | NIM, SGLang | DeepSeek R1 | 1.7.2 | 671B | 16 | FP8 | No | No | Slurm | 25.08 |
+| Inference | NIM & NeMo Retriever (NVIDIA Enterprise RAG) | Llama 3.1 and 3.2 | instruct:1.3.3, rerank:1.3, embed:1.3.1 | 70b, 1b | 1-8 | N/A | Yes | No | Slurm | 25.08 |
+| Inference | TRT-LLM | Llama 4 | 1.0.0rc1 | 17b | 8 | FP8 | Yes | No | Slurm | 25.08 |
 
 ## Model Access Requirements
 
@@ -246,7 +262,9 @@ Some models require a HuggingFace account and HF_TOKEN, others require repo spec
 | Pretrain       | Llama 3.1        | Yes                      | Yes                          | [HuggingFace Llama 3.1](https://huggingface.co/meta-llama/Llama-3.1-405B) |
 | Pretrain       | DeepSeek V3      | Yes                      | No                           | N/A                                                                   |
 | Pretrain       | Grok1            | Yes                      | Yes                          | [HuggingFace Llama 3](https://huggingface.co/meta-llama/Meta-Llama-3-70B) |
-| Pretrain       | Nemotron4        | Yes                      | No                           | N/A                                                                   |
+| Pretrain       | Nemotron4        | Yes                      | No                           | N/A                |
+| Pretrain       | Qwen3 235B        | Yes                      | No                           | [HuggingFace Qwen3 235B](https://huggingface.co/Qwen/Qwen3-235B-A22B)  |                               
+| Pretrain       | Qwen3 30B        | Yes                      | No                           | [HuggingFace Qwen3 30B](https://huggingface.co/Qwen/Qwen3-30B-A3B) |
 | Inference      | Llama 3.3        | Yes                      | Yes                          | [HuggingFace Llama 3.3 70B Instruct](https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct) |
 | Inference      | DeepSeek R1      | Yes                      | No                           | N/A                                                                    |
 | Microbenchmark | CPU overhead     | Yes                      | No                           | [HuggingFace GPT-OSS-120B](https://huggingface.co/openai/gpt-oss-120b) |

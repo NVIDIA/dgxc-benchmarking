@@ -1,0 +1,92 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: MIT
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+config:
+  scale: 512
+  repeats: 3
+  profile: true
+
+workloads:
+  gb300:
+    - pretrain_deepseek-v3_671b:
+        dtypes: ['bf16', 'fp8']
+    - pretrain_grok1_314b:
+        dtypes: ['fp8', 'bf16']
+    - pretrain_llama3.1_405b:
+        dtypes: ['fp8']
+    - pretrain_llama3.1_70b:
+        dtypes: ['fp8', 'nvfp4']
+    - pretrain_nemotron-h_56b:
+        dtypes: ['fp8']
+    - pretrain_nemotron4-15b_15b:
+        dtypes: ['fp8', 'bf16']
+    - pretrain_nemotron4-340b_340b:
+        dtypes: ['fp8', 'bf16']
+    - pretrain_qwen3_235b:
+        dtypes: ['bf16', 'fp8']
+  gb200:
+    - pretrain_deepseek-v3_671b:
+        dtypes: ['bf16', 'fp8']
+    - pretrain_grok1_314b:
+        dtypes: ['fp8', 'bf16']
+    - pretrain_llama3.1_405b:
+        dtypes: ['fp8']
+    - pretrain_llama3.1_70b:
+        dtypes: ['fp8', 'nvfp4']
+    - pretrain_nemotron-h_56b:
+        dtypes: ['fp8']
+    - pretrain_nemotron4-15b_15b:
+        dtypes: ['fp8', 'bf16']
+    - pretrain_nemotron4-340b_340b:
+        dtypes: ['fp8', 'bf16']
+    - pretrain_qwen3_235b:
+        dtypes: ['bf16', 'fp8']
+  b200:
+    - pretrain_deepseek-v3_671b:
+        dtypes: ['bf16', 'fp8']
+    - pretrain_grok1_314b:
+        dtypes: ['fp8', 'bf16']
+    - pretrain_llama3.1_405b:
+        dtypes: ['fp8', 'nvfp4']
+    - pretrain_llama3.1_70b:
+        dtypes: ['fp8', 'nvfp4']
+    - pretrain_nemotron-h_56b:
+        dtypes: ['fp8']
+    - pretrain_nemotron4-15b_15b:
+        dtypes: ['fp8', 'bf16']
+    - pretrain_nemotron4-340b_340b:
+        dtypes: ['fp8', 'bf16']
+    - pretrain_qwen3_235b:
+        dtypes: ['bf16', 'fp8']
+  h100:
+    - pretrain_deepseek-v3_671b:
+        dtypes: ['fp8']
+    - pretrain_grok1_314b:
+        dtypes: ['fp8', 'bf16']
+    - pretrain_llama3.1_70b:
+        dtypes: ['bf16', 'fp8']
+    - pretrain_nemotron-h_56b:
+        dtypes: ['fp8']
+    - pretrain_nemotron4-15b_15b:
+        dtypes: ['fp8', 'bf16']
+    - pretrain_nemotron4-340b_340b:
+        dtypes: ['fp8', 'bf16']
+    - pretrain_qwen3_235b:
+        dtypes: ['bf16', 'fp8']

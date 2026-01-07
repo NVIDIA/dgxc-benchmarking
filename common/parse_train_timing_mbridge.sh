@@ -20,10 +20,10 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-# Parse train_step_timing and TFLOPS_per_GPU from experiment log files and calculate mean and std dev for iterations 35-44
+# Parse train_step_timing and model TFLOPS_per_GPU from experiment log files and calculate mean and std dev for iterations 35-44
 # Usage: ./parse_train_timing.sh [options] [experiments_directory]
 
-set -e
+set -eu -o pipefail
 
 # Constants
 readonly MIN_ITERATION=35
@@ -153,9 +153,9 @@ output_result() {
 output_header() {
     case "$OUTPUT_FORMAT" in
         table)
-            echo "Elapsed Time (ms) and TFLOPS/GPU Analysis (iterations $MIN_ITERATION-$MAX_ITERATION)"
+            echo "Elapsed Time (ms) and MODEL_TFLOPS/GPU Analysis (iterations $MIN_ITERATION-$MAX_ITERATION)"
             echo "================================================================================"
-            printf "%-90s %8s %13s %12s %19s %18s\n" "Experiment" "Status" "Time Mean (ms)" "Time Std (ms)" "TFLOPS_per_GPU Mean" "TFLOPS_per_GPU Std"
+            printf "%-90s %8s %13s %12s %19s %18s\n" "Experiment" "Status" "Time Mean (ms)" "Time Std (ms)" "MODEL_TFLOPS_per_GPU Mean" "MODEL_TFLOPS_per_GPU Std"
             printf "%-90s %8s %13s %12s %19s %18s\n" "$(printf '%*s' 90 '' | tr ' ' '-')" "--------" "-------------" "------------" "-------------------" "------------------"
             ;;
         csv)
@@ -221,7 +221,7 @@ if [ ! -d "$EXPERIMENTS_DIR" ]; then
     exit 1
 fi
 
-out_files=$(find "$EXPERIMENTS_DIR" -name "*.out" -type f)
+out_files=$(find "$EXPERIMENTS_DIR" -name "log*.out" -type f)
 
 if [ -z "$out_files" ]; then
     echo "Error: No .out files found in $EXPERIMENTS_DIR" >&2
@@ -249,18 +249,18 @@ while IFS= read -r file; do
     esac
 
     # Check if file contains any of the new-format timing data
-    has_timing_data=$(grep -q -E "elapsed time per iteration \(ms\):|TFLOP\/s\/GPU" "$file" 2> /dev/null && echo "yes" || echo "no")
+    has_timing_data=$(grep -q -E "elapsed time per iteration \(ms\):|MODEL_TFLOP\/s\/GPU" "$file" 2> /dev/null && echo "yes" || echo "no")
 
     if [[ $has_timing_data == "yes" ]]; then
         # AWK now:
-        #  - captures the numeric token immediately before "TFLOP/s/GPU" (handles scientific notation),
+        #  - captures the numeric token immediately before "MODEL_TFLOP/s/GPU" (handles scientific notation),
         #  - stores it into last_tflop,
         #  - when an iteration line with "elapsed time per iteration (ms)" is found within the iteration window,
         #    it pairs that elapsed time with the last_tflop (and then clears last_tflop so it isn't reused).
         result=$(awk -v min_iter="$MIN_ITERATION" -v max_iter="$MAX_ITERATION" '
-            # capture the numeric token right before TFLOP/s/GPU (handles 1234.5 and scientific)
-            /TFLOP\/s\/GPU/ {
-                if (match($0, /([0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?)\s*TFLOP\/s\/GPU/, tf_arr)) {
+            # capture the numeric token right before MODEL_TFLOP/s/GPU (handles 1234.5 and scientific)
+            /MODEL_TFLOP\/s\/GPU/ {
+                if (match($0, /([0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?)\s*MODEL_TFLOP\/s\/GPU/, tf_arr)) {
                     last_tflop = tf_arr[1]
                 }
             }
@@ -377,6 +377,6 @@ fi
 output_footer "$files_processed" "$incomplete_count" "$failed_early_count" "$total_experiment_files"
 
 if [ $files_processed -eq 0 ]; then
-    echo "Error: No valid complete elapsed-time and TFLOPS data found in any .out files" >&2
+    echo "Error: No valid complete elapsed-time and MODEL_TFLOPS data found in any .out files" >&2
     exit 1
 fi

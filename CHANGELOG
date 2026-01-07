@@ -1,3 +1,13 @@
+## [v25.12] - 2026-01-07
+
+### Added
+  - Qwen3 pretrain recipes 30B-A3B and 235B-A22B.
+  - DeepSeek V3 Torchtitan pretrain recipe.
+
+### Changed
+  - Updated recipes to NeMo 25.11.01 where applicable.
+  - Consolidated llmb-run submit commands (see `cli/llmb-run/CHANGELOG.md` for details).
+
 ## [v25.10.01] - 2026-01-05
 
 ### Added

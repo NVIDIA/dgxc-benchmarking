@@ -42,7 +42,7 @@ Examples:
   llmb-install                           # Interactive installation
   llmb-install -d                        # Interactive installation in dev mode
   llmb-install express /lustre/work      # Express mode with install path
-  llmb-install express -d --workloads all   # Express mode in dev mode
+  llmb-install -d express --workloads all   # Express mode in dev mode
   llmb-install --play config.yaml       # Fully automated from config file
         """,
     )
@@ -110,8 +110,8 @@ Examples:
   llmb-install express /lustre/work                    # Prompt for workloads
   llmb-install express --install-path /lustre/work    # Prompt for workloads  
   llmb-install express --workloads all                # Prompt for install path
-  llmb-install express /work --workloads nemotron     # Fully specified
-  llmb-install express -d /work --workloads all       # Dev mode, no repo copy
+  llmb-install express /work --workloads pretrain_nemotron-h,pretrain_llama3.1  # Fully specified
+  llmb-install -d express /work --workloads all       # Dev mode, no repo copy
         """,
     )
 
@@ -133,13 +133,13 @@ Examples:
         '-w',
         '--workloads',
         type=str,
-        help="Workloads to install: 'all' or comma-separated list (e.g. 'nemotron,llama3.1')",
+        help="Workloads to install: 'all' or comma-separated list (e.g. 'pretrain_nemotron-h,pretrain_llama3.1')",
     )
 
     workload_group.add_argument(
         '--exemplar',
         action='store_true',
-        help="Install all 'pretrain' workloads (Exemplar Cloud certification process)",
+        help="Install workloads specified in exemplar.yaml for this GPU type (Exemplar Cloud certification)",
     )
 
     express_parser.add_argument(

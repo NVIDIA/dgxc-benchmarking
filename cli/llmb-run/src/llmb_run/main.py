@@ -19,26 +19,25 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-import argparse
 import logging
 import os
 import sys
+from typing import Annotated, Optional
+
+import typer
 
 from llmb_run.config_manager import get_cluster_config
+from llmb_run.exemplar import generate_exemplar_tasks
 from llmb_run.job_launcher import run_tests
-from llmb_run.task_manager import (
-    WorkloadTask,
-    flatten_yaml_tasks,
-    gen_tasks,
-    generate_submit_all_tasks,
-    get_tasks_wrapper,
-    print_tasks,
+from llmb_run.metadata_utils import parse_workload_name
+from llmb_run.task_generation import TaskGenerationRequest, ValidationError, generate_tasks
+from llmb_run.tasks import (
+    format_task_output,
 )
 from llmb_run.workload_validator import (
     format_validation_error,
     get_workloads,
     print_avail_workloads,
-    show_workload_details,
     validate_workload_with_details,
 )
 
@@ -73,96 +72,72 @@ console_handler.setFormatter(LevelFormatter(formatters))
 logger.addHandler(console_handler)
 
 
-def parse_arguments():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(
-        description='llmb-run: Tool for launching multiple or single LLM benchmarking workloads.'
-    )
-
-    subparsers = parser.add_subparsers(dest='mode', required=True, help='Mode of operation')
-
-    # List Mode Subparser
-    list_parser = subparsers.add_parser('list', help='List available workloads and their configurations.')
-    list_parser.add_argument('-w', '--workload', type=str, help='Show detailed information for a specific workload.')
-
-    # Bulk Mode Subparser
-    bulk_parser = subparsers.add_parser('bulk', help='Submit multiple jobs from a specification file.')
-    bulk_parser.add_argument(
-        '-d', '--dryrun', action='store_true', help='List all jobs to be submitted without actually submitting them.'
-    )
-    bulk_parser.add_argument(
-        '-v', '--verbose', action='store_true', help='Enable verbose output including debug information.'
-    )
-    bulk_parser.add_argument(
-        'input_file', type=str, help='Path to the workload specification file (simple .txt or advanced .yaml).'
-    )
-
-    # Submit All Subparser
-    submit_all_parser = subparsers.add_parser('submit-all', help='Submit jobs for all installed recipes.')
-    submit_all_parser.add_argument('--max-scale', type=int, help='Maximum scale (number of GPUs) to test up to.')
-    submit_all_parser.add_argument(
-        '--min-scale',
-        action='store_true',
-        help='When set, only run the minimum scale per the metadata for all installed workloads.',
-    )
-    submit_all_parser.add_argument(
-        '--scales',
-        type=str,
-        help='Comma-separated list of specific scales to run (e.g., "8,16,32" or "16"). Mutually exclusive with --min-scale and --max-scale.',
-    )
-    submit_all_parser.add_argument(
-        '--dtype',
-        type=str,
-        help='Comma separated list of dtypes to run. If unset, run all available dtypes per metadata for a workload.',
-    )
-    submit_all_parser.add_argument(
-        '--workloads',
-        '-w',
-        type=str,
-        help='Comma separated list of workloads to run. Reduces scope to only the specified workloads.',
-    )
-    submit_all_parser.add_argument(
-        '--repeats', type=int, default=1, help='Number of repeats for each test configuration (default: 1).'
-    )
-    submit_all_parser.add_argument('-p', '--profile', action='store_true', help='Enable profiling for all jobs.')
-    submit_all_parser.add_argument(
-        '-d', '--dryrun', action='store_true', help='List all jobs to be submitted without actually submitting them.'
-    )
-    submit_all_parser.add_argument(
-        '-v', '--verbose', action='store_true', help='Enable verbose output including debug information.'
-    )
-    submit_all_parser.add_argument('--nice', type=int, help='Lower the priority of the job using Slurm --nice feature.')
-
-    # Single Job Subparser
-    single_parser = subparsers.add_parser('single', help='Submit a single job with specified parameters.')
-    single_parser.add_argument(
-        '-w', '--workload', type=str, required=True, help='Name of the workload (e.g., "pretraining_nemotron").'
-    )
-    single_parser.add_argument('-s', '--model_size', type=str, required=True, help='Size of the model (e.g., 7b, 13b).')
-    single_parser.add_argument('--dtype', type=str, required=True, help='Data type (e.g., fp16, bf16).')
-    single_parser.add_argument(
-        '--scale', type=int, required=True, help='Scale parameter indicating the number of GPUs.'
-    )
-    single_parser.add_argument('-p', '--profile', action='store_true', help='Enable Profiling for job.')
-    single_parser.add_argument(
-        '-d', '--dryrun', action='store_true', help='List the job to be submitted without actually submitting it.'
-    )
-    single_parser.add_argument(
-        '-v', '--verbose', action='store_true', help='Enable verbose output including debug information.'
-    )
-    single_parser.add_argument(
-        '-f', '--force', action='store_true', help='Skip workload validation (for debugging purposes).'
-    )
-
-    return parser.parse_args()
+# Exit codes
+EXIT_SUCCESS = 0
+EXIT_VALIDATION_ERROR = 1
+EXIT_SYSTEM_ERROR = 2
 
 
-def setup_logging(verbose=False):
-    """Configure logging based on verbosity level."""
+# Create the Typer app
+app = typer.Typer(
+    help='llmb-run: Tool for launching multiple or single LLM benchmarking workloads.',
+    no_args_is_help=True,
+    add_completion=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
+
+
+class AppContext:
+    """Context object to share configuration across commands."""
+
+    def __init__(self):
+        self.cluster_config = None
+        self.workloads = None
+        self.verbose = False
+
+
+@app.callback()
+def main_callback(
+    ctx: typer.Context,
+    verbose: Annotated[
+        bool, typer.Option('-v', '--verbose', help='Enable verbose output including debug information.')
+    ] = False,
+):
+    """
+    Main callback that runs before any command.
+    Loads cluster configuration and workloads once, and configures logging.
+    """
+    # Check for SLURM environment
+    if 'SLURM_JOB_ID' in os.environ:
+        logger.error(
+            "🚫: `llmb-run` does not currently support running within a SLURM allocation. Please run this script directly from a login node outside of a SLURM job."
+        )
+        raise typer.Exit(code=EXIT_VALIDATION_ERROR)
+
+    # Set up logging
     if verbose:
         console_handler.setLevel(logging.DEBUG)
     else:
         console_handler.setLevel(logging.INFO)
+
+    # Create context object
+    app_ctx = AppContext()
+    app_ctx.verbose = verbose
+    ctx.obj = app_ctx
+
+    # Load configuration
+    try:
+        app_ctx.cluster_config = get_cluster_config()
+    except (FileNotFoundError, ValueError) as e:
+        logger.error(f"Configuration error: {e}")
+        raise typer.Exit(code=EXIT_VALIDATION_ERROR) from e
+
+    # Load workloads
+    try:
+        app_ctx.workloads = get_workloads(app_ctx.cluster_config)
+    except Exception as e:
+        logger.error(f"Failed to load workloads: {e}")
+        raise typer.Exit(code=EXIT_SYSTEM_ERROR) from e
 
 
 def validate_bulk_tasks(task_list, workloads, cluster_config):
@@ -202,6 +177,39 @@ def validate_bulk_tasks(task_list, workloads, cluster_config):
             error_summary[error_key]['count'] += 1
 
     return validated_tasks, error_summary
+
+
+def _handle_no_tasks_error(app_ctx: AppContext, request: TaskGenerationRequest):
+    """Provide helpful error when no tasks are generated."""
+    logger.error("No matching job configurations found.")
+
+    # YAML file case: specific hint, skip list output
+    if request.file_path and request.file_path.endswith(('.yaml', '.yml')):
+        logger.error("For YAML files, ensure you have at least one entry under 'tasks:'")
+        logger.error("  Example: tasks:")
+        logger.error("             - dtypes: fp8")
+        logger.error("               scales: [128, 256]")
+    else:
+        # Show what IS available - print_avail_workloads() handles the header
+        logger.info("")  # Empty line for spacing
+
+        # Build workload filter: either specific workloads or None for all
+        workload_filter = None
+        if request.workload:
+            # Parse comma-separated workload list and strip model size suffixes.
+            # Users can specify workloads as "pretrain_foo_7b" in discovery mode,
+            # but print_avail_workloads expects base workload keys like "pretrain_foo".
+            parsed = [parse_workload_name(w.strip())[0] for w in request.workload.split(',') if w.strip()]
+            workload_filter = parsed if parsed else None
+
+        # Call once with the filter (single or multiple workloads, or None for all)
+        print_avail_workloads(
+            app_ctx.workloads,
+            app_ctx.cluster_config,
+            cluster_gpu_type=app_ctx.cluster_config.get('launcher', {}).get('gpu_type'),
+            verbose=True,
+            workload_filter=workload_filter,
+        )
 
 
 def report_validation_results(validated_tasks, error_summary, task_list, cluster_config, mode_name="job"):
@@ -244,203 +252,387 @@ def report_validation_results(validated_tasks, error_summary, task_list, cluster
 
             # Split the formatted error and add prefix to first line, indent others
             error_lines = formatted_error.split('\n')
-            logger.error(f"{prefix}: {error_lines[0].replace('Error: ', '')}")
+            logger.error(f"{prefix}: {error_lines[0]}")
             for line in error_lines[1:]:
                 logger.error(f"     {line}")
 
         if not validated_tasks:
             logger.error(f"❌ No valid tasks found. Aborting {mode_name} submission.")
-            raise SystemExit(1)
+            raise typer.Exit(code=EXIT_VALIDATION_ERROR)
         else:
             logger.warning(f"⚠️  Proceeding with {len(validated_tasks)} valid tasks out of {len(task_list)} total.")
     else:
         logger.debug(f"✅ All {len(task_list)} tasks validated successfully.")
 
 
-def main():
-    """Main entry point for the llmb-run CLI."""
-    if 'SLURM_JOB_ID' in os.environ:
-        logger.error(
-            "🚫: `llmb-run` does not currently support running within a SLURM allocation. Please run this script directly from a login node outside of a SLURM job."
-        )
-        raise SystemExit(1)
-    args = parse_arguments()
-    # Preserve compatibility: not all subcommands define --verbose
-    setup_logging(getattr(args, 'verbose', False))
+def _submit_impl(ctx: typer.Context, request: TaskGenerationRequest, dryrun: bool, mode_name: str = "submit"):
+    """Shared implementation for all submission commands."""
+    app_ctx: AppContext = ctx.obj
 
     try:
-        cluster_config = get_cluster_config()
-    except (FileNotFoundError, ValueError) as e:
-        logger.error(f"Configuration error: {e}")
-        raise SystemExit(1) from e
+        # Generate tasks
+        task_list = generate_tasks(request)
 
-    # Available workloads
-    try:
-        workloads = get_workloads(cluster_config)
+        # Sort tasks by scale in descending order (largest first)
+        task_list.sort(key=lambda task: task.scale, reverse=True)
+
+        if not task_list:
+            _handle_no_tasks_error(app_ctx, request)
+            raise typer.Exit(code=EXIT_VALIDATION_ERROR)
+
+        # Validate tasks
+        validated_tasks, error_summary = validate_bulk_tasks(task_list, app_ctx.workloads, app_ctx.cluster_config)
+
+        # Report results
+        report_validation_results(validated_tasks, error_summary, task_list, app_ctx.cluster_config, mode_name)
+
+        # Print the concrete jobs we’re about to submit (kept concise; launcher output follows).
+        logger.info(f"Jobs ({len(validated_tasks)}):")
+        for task in validated_tasks:
+            logger.info(format_task_output(task, prefix="  - "))
+
+        if dryrun:
+            logger.info("Dry run enabled. Jobs will not be submitted.")
+        else:
+            run_tests(app_ctx.cluster_config, validated_tasks, app_ctx.workloads)
+
+    except ValueError as e:
+        logger.error(str(e))
+        raise typer.Exit(code=EXIT_VALIDATION_ERROR) from e
+    except typer.Exit:
+        raise
     except Exception as e:
-        logger.error(f"Failed to load workloads: {e}")
-        raise SystemExit(1) from e
+        logger.error(f"Submission error: {e}")
+        raise typer.Exit(code=EXIT_SYSTEM_ERROR) from e
 
-    if args.mode == 'bulk':
-        try:
-            # Use the wrapper to auto-select the parser based on file extension.
-            tasks_parsed = get_tasks_wrapper(workloads, args.input_file, cluster_config)
-            if args.input_file.endswith(('.yaml', '.yml')):
-                task_list = flatten_yaml_tasks(tasks_parsed)
-            else:
-                task_list = gen_tasks(tasks_parsed)
 
-            # Validate all tasks and get summary
-            validated_tasks, error_summary = validate_bulk_tasks(task_list, workloads, cluster_config)
+@app.command()
+def submit(
+    ctx: typer.Context,
+    workload: Annotated[
+        Optional[str],
+        typer.Option('-w', '--workload', help='Workload name (single or comma-separated for discovery).'),
+    ] = None,
+    model_size: Annotated[
+        Optional[str],
+        typer.Option(
+            '-s',
+            '--model-size',
+            help='Size of the model (e.g., 7b, 13b). Requires explicit single workload via -w.',
+        ),
+    ] = None,
+    dtype: Annotated[
+        Optional[str],
+        typer.Option('-d', '--dtype', help='Data type (e.g., fp16, bf16). Comma-separated list allowed.'),
+    ] = None,
+    scale: Annotated[
+        Optional[str],
+        typer.Option(
+            '--scale',
+            help='Scale parameter (number of GPUs). Comma-separated list allowed (e.g., "8,16"). Mutually exclusive with --max-scale.',
+        ),
+    ] = None,
+    max_scale: Annotated[
+        Optional[int], typer.Option('--max-scale', help='Maximum scale to test up to (discovery/mixed mode).')
+    ] = None,
+    min_scale: Annotated[
+        bool,
+        typer.Option('--min-scale', help='Only run the minimum supported scale (discovery/mixed mode).'),
+    ] = False,
+    file_path: Annotated[
+        Optional[str], typer.Option('-f', '--file', help='Path to workload specification file (.txt or .yaml).')
+    ] = None,
+    repeats: Annotated[int, typer.Option('-r', '--repeats', help='Number of repeats for each test configuration.')] = 1,
+    profile: Annotated[bool, typer.Option('-p', '--profile', help='Enable Profiling for jobs.')] = False,
+    dryrun: Annotated[
+        bool,
+        typer.Option('--dry-run', help='List jobs without submitting them.'),
+    ] = False,
+    nice: Annotated[
+        Optional[int], typer.Option('--nice', help='Lower the priority of the job using Slurm --nice feature.')
+    ] = None,
+):
+    """
+    Submit jobs using a unified interface. Supports explicit, discovery, and file-based modes.
+    """
+    app_ctx: AppContext = ctx.obj
 
-            # Report validation results
-            report_validation_results(validated_tasks, error_summary, task_list, cluster_config, "bulk")
+    extra_slurm_params = {}
+    if nice is not None:
+        extra_slurm_params['nice'] = nice
 
-            if args.dryrun:
-                print_tasks(validated_tasks)
-                logger.info("Dry run enabled. Jobs will not be submitted.")
-            else:
-                run_tests(cluster_config, validated_tasks, workloads)
-        except Exception as e:
-            logger.error(f"Bulk mode error: {e}")
-            raise SystemExit(1) from e
+    request = TaskGenerationRequest(
+        workloads=app_ctx.workloads,
+        cluster_config=app_ctx.cluster_config,
+        workload=workload,
+        model_size=model_size,
+        dtype=dtype,
+        scale=scale,
+        max_scale=max_scale,
+        min_scale=min_scale,
+        file_path=file_path,
+        repeats=repeats,
+        profile=profile,
+        extra_slurm_params=extra_slurm_params,
+    )
 
-    elif args.mode == 'single':
-        # Single Job Mode
-        workload_input = args.workload
-        model_size = args.model_size
-        dtype = args.dtype
-        scale = args.scale
+    _submit_impl(ctx, request, dryrun, mode_name="submit")
 
-        # Get cluster GPU type for validation
-        cluster_gpu_type = cluster_config.get('launcher', {}).get('gpu_type')
 
-        # Validate workload, model_size, dtype, and scale against metadata (unless --force is used)
-        if not args.force:
-            is_valid, error_type, error_msg, suggestions = validate_workload_with_details(
-                workloads,
-                workload_input,
-                model_size,
-                dtype=dtype,
-                scale=scale,
-                cluster_gpu_type=cluster_gpu_type,
-                cluster_config=cluster_config,
-            )
-            if not is_valid:
-                user_error = format_validation_error(
-                    workload_input, model_size, dtype, scale, cluster_gpu_type, error_type, error_msg, suggestions
-                )
-                logger.error(user_error)
-                raise SystemExit(1)
-        else:
-            logger.warning("Workload validation skipped due to --force flag. Use with caution.")
+@app.command(name="list")
+def list_workloads(
+    ctx: typer.Context,
+    workload: Annotated[
+        Optional[str], typer.Option('-w', '--workload', help='Show detailed information for a specific workload.')
+    ] = None,
+):
+    """
+    List available workloads and their configurations.
+    """
+    app_ctx: AppContext = ctx.obj
+    cluster_gpu_type = app_ctx.cluster_config.get('launcher', {}).get('gpu_type')
 
-        # Create a single WorkloadTask
-        single_task = WorkloadTask(
-            workload_key=workload_input, model_size=model_size, dtype=dtype, scale=scale, profile=args.profile
+    # Always use print_avail_workloads, with workload_filter if specified
+    result = print_avail_workloads(
+        app_ctx.workloads,
+        app_ctx.cluster_config,
+        cluster_gpu_type=cluster_gpu_type,
+        verbose=True,
+        workload_filter=workload,
+    )
+
+    if workload and not result:
+        raise typer.Exit(code=EXIT_VALIDATION_ERROR)
+
+
+@app.command()
+def single(
+    ctx: typer.Context,
+    workload: Annotated[
+        str, typer.Option('-w', '--workload', help='Name of the workload (e.g., "pretraining_nemotron").')
+    ],
+    model_size: Annotated[str, typer.Option('-s', '--model-size', help='Size of the model (e.g., 7b, 13b).')],
+    dtype: Annotated[str, typer.Option('--dtype', help='Data type (e.g., fp16, bf16).')],
+    scale: Annotated[str, typer.Option('--scale', help='Scale parameter indicating the number of GPUs.')],
+    profile: Annotated[bool, typer.Option('-p', '--profile', help='Enable Profiling for job.')] = False,
+    dryrun: Annotated[
+        bool, typer.Option('-d', '--dryrun', help='List the job to be submitted without actually submitting it.')
+    ] = False,
+    force: Annotated[
+        bool, typer.Option('-f', '--force', help='Skip workload validation (deprecated, validation always runs).')
+    ] = False,
+):
+    """
+    (DEPRECATED) Submit a single job. Use 'llmb-run submit' instead.
+    """
+    logger.warning("⚠️  'single' command is deprecated. Please use 'llmb-run submit' instead.")
+    logger.warning("   Use:")
+    logger.warning(f"     ↳ llmb-run submit -w {workload} -s {model_size} --dtype {dtype} --scale {scale}")
+
+    app_ctx: AppContext = ctx.obj
+
+    # Note: 'force' is ignored in this redirect as _submit_impl enforces bulk validation.
+    # However, validate_bulk_tasks validates against metadata, so it behaves similarly to standard validation.
+
+    request = TaskGenerationRequest(
+        workloads=app_ctx.workloads,
+        cluster_config=app_ctx.cluster_config,
+        workload=workload,
+        model_size=model_size,
+        dtype=dtype,
+        scale=scale,  # Passed as string, TaskGenerationRequest handles parsing
+        profile=profile,
+    )
+
+    _submit_impl(ctx, request, dryrun, mode_name="single")
+
+
+@app.command()
+def bulk(
+    ctx: typer.Context,
+    input_file: Annotated[
+        str, typer.Argument(help='Path to the workload specification file (simple .txt or advanced .yaml).')
+    ],
+    dryrun: Annotated[
+        bool, typer.Option('-d', '--dryrun', help='List all jobs to be submitted without actually submitting them.')
+    ] = False,
+):
+    """
+    (DEPRECATED) Submit multiple jobs from a specification file. Use 'llmb-run submit -f' instead.
+    """
+    logger.warning("⚠️  'bulk' command is deprecated. Please use 'llmb-run submit -f <file>' instead.")
+    logger.warning("   Use:")
+    logger.warning(f"     ↳ llmb-run submit -f {input_file}{' --dry-run' if dryrun else ''}")
+
+    app_ctx: AppContext = ctx.obj
+
+    request = TaskGenerationRequest(
+        workloads=app_ctx.workloads,
+        cluster_config=app_ctx.cluster_config,
+        file_path=input_file,
+    )
+
+    _submit_impl(ctx, request, dryrun, mode_name="bulk")
+
+
+@app.command()
+def submit_all(
+    ctx: typer.Context,
+    max_scale: Annotated[
+        Optional[int], typer.Option('--max-scale', help='Maximum scale (number of GPUs) to test up to.')
+    ] = None,
+    min_scale: Annotated[
+        bool,
+        typer.Option(
+            '--min-scale', help='When set, only run the minimum scale per the metadata for all installed workloads.'
+        ),
+    ] = False,
+    scales: Annotated[
+        Optional[str],
+        typer.Option(
+            '--scales',
+            help='Comma-separated list of specific scales to run (e.g., "8,16,32" or "16"). Mutually exclusive with --min-scale and --max-scale.',
+        ),
+    ] = None,
+    dtype: Annotated[
+        Optional[str],
+        typer.Option(
+            '--dtype',
+            help='Comma separated list of dtypes to run. If unset, run all available dtypes per metadata for a workload.',
+        ),
+    ] = None,
+    workloads: Annotated[
+        Optional[str],
+        typer.Option(
+            '-w',
+            '--workloads',
+            help='Comma separated list of workloads to run. Reduces scope to only the specified workloads.',
+        ),
+    ] = None,
+    repeats: Annotated[int, typer.Option('--repeats', help='Number of repeats for each test configuration.')] = 1,
+    profile: Annotated[bool, typer.Option('-p', '--profile', help='Enable profiling for all jobs.')] = False,
+    dryrun: Annotated[
+        bool, typer.Option('-d', '--dryrun', help='List all jobs to be submitted without actually submitting them.')
+    ] = False,
+    nice: Annotated[
+        Optional[int], typer.Option('--nice', help='Lower the priority of the job using Slurm --nice feature.')
+    ] = None,
+):
+    """
+    (DEPRECATED) Submit jobs for all installed recipes. Use 'llmb-run submit' instead.
+    """
+    logger.warning("⚠️  'submit-all' command is deprecated. Please use 'llmb-run submit' instead.")
+    logger.warning("   Use:")
+    submit_all_cmd = "llmb-run submit"
+    if workloads:
+        submit_all_cmd += f" -w {workloads}"
+    if dtype:
+        submit_all_cmd += f" --dtype {dtype}"
+    if scales:
+        submit_all_cmd += f" --scale {scales}"
+    if max_scale is not None:
+        submit_all_cmd += f" --max-scale {max_scale}"
+    if min_scale:
+        submit_all_cmd += " --min-scale"
+    if repeats != 1:
+        submit_all_cmd += f" -r {repeats}"
+    if profile:
+        submit_all_cmd += " -p"
+    if nice is not None:
+        submit_all_cmd += f" --nice {nice}"
+    if dryrun:
+        submit_all_cmd += " --dry-run"
+    logger.warning(f"     ↳ {submit_all_cmd}")
+
+    app_ctx: AppContext = ctx.obj
+
+    extra_slurm_params = {}
+    if nice is not None:
+        extra_slurm_params['nice'] = nice
+
+    request = TaskGenerationRequest(
+        workloads=app_ctx.workloads,
+        cluster_config=app_ctx.cluster_config,
+        workload=workloads,
+        dtype=dtype,
+        scale=scales,
+        max_scale=max_scale,
+        min_scale=min_scale,
+        repeats=repeats,
+        profile=profile,
+        extra_slurm_params=extra_slurm_params,
+    )
+
+    _submit_impl(ctx, request, dryrun, mode_name="submit-all")
+
+
+@app.command()
+def exemplar(
+    ctx: typer.Context,
+    dry_run: Annotated[
+        bool,
+        typer.Option('--dry-run', help='Print jobs without submitting them.'),
+    ] = False,
+    repeats: Annotated[
+        Optional[int],
+        typer.Option(
+            '-r',
+            '--repeats',
+            help='Number of repeats for each test configuration. If not provided, uses value from exemplar.yaml config.repeats (default: 3).',
+        ),
+    ] = None,
+):
+    """
+    Submit exemplar certification jobs from $LLMB_INSTALL/llmb_repo/exemplar.yaml.
+
+    Runs workloads listed in exemplar.yaml for your cluster's GPU type.
+    All workloads must be installed.
+
+    Defaults: scale=512, profile=true, repeats=3 (override with -r)
+    """
+    app_ctx: AppContext = ctx.obj
+
+    try:
+        # Generate exemplar tasks (includes preflight checks and strict install gating)
+        # Pass CLI repeats (None if not provided); generate_exemplar_tasks will use YAML value if None
+        task_list = generate_exemplar_tasks(app_ctx.workloads, app_ctx.cluster_config, repeats=repeats)
+
+        if not task_list:
+            logger.error("No exemplar tasks generated. Check your configuration and installed workloads.")
+            raise typer.Exit(code=EXIT_VALIDATION_ERROR)
+
+        # Validate tasks
+        validated_tasks, error_summary = validate_bulk_tasks(task_list, app_ctx.workloads, app_ctx.cluster_config)
+
+        # Report results
+        report_validation_results(
+            validated_tasks, error_summary, task_list, app_ctx.cluster_config, mode_name="exemplar"
         )
 
-        if args.dryrun:
-            print_tasks([single_task])
-            logger.info("Dry run enabled. Job will not be submitted.")
+        # Print the concrete jobs we're about to submit
+        logger.info(f"Exemplar Certification Jobs ({len(validated_tasks)}):")
+        for task in validated_tasks:
+            logger.info(format_task_output(task, prefix="  - "))
+
+        if dry_run:
+            logger.info("Dry run enabled. Jobs will not be submitted.")
         else:
-            try:
-                run_tests(cluster_config, [single_task], workloads)
-            except Exception as e:
-                logger.error(f"Single job launch error: {e}")
-                raise SystemExit(1) from e
+            run_tests(app_ctx.cluster_config, validated_tasks, app_ctx.workloads)
 
-    elif args.mode == 'submit-all':
-        # Submit All Mode
-        try:
-            # Validate mutual exclusivity and required arguments
-            if args.scales is not None:
-                # --scales is mutually exclusive with --max-scale and --min-scale
-                if args.max_scale or args.min_scale:
-                    logger.error(
-                        "--scales is mutually exclusive with --max-scale and --min-scale. Please specify only --scales or the other options."
-                    )
-                    raise SystemExit(1)
-            else:
-                # Original validation: either max-scale or min-scale (or both) must be provided when not using --scales
-                if not args.max_scale and not args.min_scale:
-                    logger.error(
-                        "Either --max-scale or --min-scale (or both) must be provided when not using --scales."
-                    )
-                    raise SystemExit(1)
+    except ValidationError as e:
+        logger.error(str(e))
+        raise typer.Exit(code=EXIT_VALIDATION_ERROR) from e
+    except typer.Exit:
+        raise
+    except Exception as e:
+        logger.error(f"Exemplar submission error: {e}")
+        raise typer.Exit(code=EXIT_SYSTEM_ERROR) from e
 
-            # Parse filtering options
-            min_scale = args.min_scale
-            max_scale = args.max_scale if args.max_scale else None  # None means no max limit when using min-scale only
 
-            # Parse specific scales if provided
-            specific_scales = None
-            if args.scales:
-                try:
-                    specific_scales = [int(s.strip()) for s in args.scales.split(',')]
-                    if not specific_scales:
-                        logger.error("--scales cannot be empty.")
-                        raise SystemExit(1)
-                    # Validate that all scales are positive integers
-                    if any(scale <= 0 for scale in specific_scales):
-                        logger.error("All scales must be positive integers.")
-                        raise SystemExit(1) from None
-                except ValueError as e:
-                    logger.error("--scales must be a comma-separated list of integers (e.g., '8,16,32' or '16').")
-                    raise SystemExit(1) from e
-
-            dtype_filter = [d.strip() for d in args.dtype.split(',')] if args.dtype else None
-            workload_filter = [w.strip() for w in args.workloads.split(',')] if args.workloads else None
-
-            # Generate tasks for all installed workloads
-            extra_slurm_params = {}
-            if args.nice is not None:
-                extra_slurm_params['nice'] = args.nice
-
-            task_list = generate_submit_all_tasks(
-                workloads,
-                cluster_config,
-                max_scale,
-                args.repeats,
-                args.profile,
-                min_scale=min_scale,
-                dtype_filter=dtype_filter,
-                workload_filter=workload_filter,
-                specific_scales=specific_scales,
-                extra_slurm_params=extra_slurm_params,
-            )
-
-            # Sort tasks by scale in descending order (largest first)
-            task_list.sort(key=lambda task: task.scale, reverse=True)
-
-            if not task_list:
-                logger.error("No tasks generated. Check that workloads are installed and compatible with your cluster.")
-                raise SystemExit(1)
-
-            # Validate all tasks using existing bulk validation logic
-            validated_tasks, error_summary = validate_bulk_tasks(task_list, workloads, cluster_config)
-
-            # Report validation results
-            report_validation_results(validated_tasks, error_summary, task_list, cluster_config, "submit-all")
-
-            if args.dryrun:
-                print_tasks(validated_tasks)
-                logger.info("Dry run enabled. Jobs will not be submitted.")
-            else:
-                run_tests(cluster_config, validated_tasks, workloads)
-        except Exception as e:
-            logger.error(f"Submit-all mode error: {e}")
-            raise SystemExit(1) from e
-
-    elif args.mode == 'list':
-        # List Mode
-        cluster_gpu_type = cluster_config.get('launcher', {}).get('gpu_type')
-        workload = args.workload
-        if workload:
-            show_workload_details(workloads, workload, cluster_gpu_type, cluster_config)
-        else:
-            print_avail_workloads(workloads, cluster_gpu_type, True, cluster_config)
+def cli():
+    """Main entry point for the llmb-run CLI."""
+    app()
 
 
 if __name__ == '__main__':
-    main()
+    cli()

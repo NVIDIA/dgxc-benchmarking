@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
@@ -20,21 +18,58 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-"""
-llmb-run: A lightweight tool for automating submission of single jobs and batches of workloads.
 
-This is a simple wrapper script that imports and runs the main function from the llmb_run package.
-"""
+# Setup
+general:
+  workload: gpt-oss-dynamo
+  workload_type: inference
+  framework: dynamo
 
-import sys
-import os
+container:
+  images:
+    by_gpu:
+      gb200:
+        - 'nvcr.io#nvidia/ai-dynamo/tensorrtllm-runtime:0.5.1-rc0.pre3'
+      b200:
+        - 'nvcr.io#nvidia/ai-dynamo/tensorrtllm-runtime:0.6.1'
 
-# Add the src directory to the Python path so we can import llmb_run
-script_dir = os.path.dirname(os.path.abspath(__file__))
-src_dir = os.path.join(script_dir, 'src')
-sys.path.insert(0, src_dir)
+repositories:
+  dynamo:
+    url: "https://github.com/ai-dynamo/dynamo.git"
+    commit: "v0.6.0"
 
-from llmb_run import main
+setup:
+  venv_req: true
+  dependencies:
+    git:
+      dynamo: 
+        repo_key: dynamo
+        install_method:
+          type: clone
+    pip:
+      - 'huggingface_hub[cli]'
+  tasks:
+    - name: weights_download
+      cmd: './download_weights.sh'
+      job_type: local
+      requires_gpus: false
 
-if __name__ == '__main__':
-    main()
+# Run
+run:
+  launcher_type: 'sbatch'
+  launch_script: 'launch.sh'
+
+  gpu_configs:
+    gb200:
+      model_configs:
+        - model_size: '120b'
+          dtypes: ['mxfp4']
+          scales: [4]
+          exact_scales: true
+    b200:
+      model_configs:
+        - model_size: '120b'
+          dtypes: ['mxfp4']
+          scales: [4]
+          exact_scales: true
+

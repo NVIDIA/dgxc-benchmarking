@@ -23,6 +23,6 @@
 llmb-run: A lightweight tool for automating submission of single jobs and batches of workloads.
 """
 
-from .main import main
+from .main import cli
 
-__all__ = ["main"]
+__all__ = ["cli"]

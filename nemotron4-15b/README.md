@@ -2,9 +2,24 @@
 
 This recipe contains information and scripts to produce performance results for the Nemotron 4 15b pre-training workloads. The scripts help perform environment setup and launch benchmark jobs.
 
+## H100
 
+15 billion parameter variant (FP8/BF16)
 
-## GB300
+- At least 16 GPUs with at least 80GB memory each.
+
+| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
+|------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
+| 15b   | BF16/FP8 | 16   | 4096  | 32     | 2   | 1   | 1   | NA  | 8   | NA  | 2   | 64   | 4 |
+| 15b   | BF16/FP8 | 32   | 4096  | 32     | 2   | 1   | 1   | NA  | 16   | NA  | 2   | 128   | 4 |
+| 15b   | BF16/FP8 | 64   | 4096  | 32     | 2   | 1   | 1   | NA  | 32   | NA  | 2   | 256   | 4 |
+| 15b   | BF16/FP8 | 128   | 4096  | 32     | 2   | 1   | 1   | NA  | 64   | NA  | 2   | 512   | 4 |
+| 15b   | BF16/FP8 | 256   | 4096  | 32     | 2   | 1   | 1   | NA  | 128   | NA  | 2   | 1024   | 4 |
+| 15b   | BF16/FP8 | 512   | 4096  | 32     | 2   | 1   | 1   | NA  | 256  | NA  | 2   | 2048   | 4 |
+| 15b   | BF16/FP8 | 1024   | 4096  | 32     | 2   | 1   | 1   | NA  | 512   | NA  | 2   | 4096   | 4 |
+| 15b   | BF16/FP8 | 2048   | 4096  | 32     | 2   | 1   | 1   | NA  | 1024   | NA  | 2   | 8192   | 4 |
+
+## GB200
 
 
 15 billion parameter variant (FP8/BF16)
@@ -20,8 +35,7 @@ This recipe contains information and scripts to produce performance results for 
 | 15b   | BF16/FP8 | 256   | 4096  | 32     | 1   | 1   | 1   | NA  |256   | NA  | 2   | 1024   | 2 |
 | 15b   | BF16/FP8 | 512   | 4096  | 32     | 1   | 1   | 1   | NA  | 512   | NA  | 2   | 2048   | 2 |
 
-
-## GB200
+## GB300
 
 
 15 billion parameter variant (FP8/BF16)
@@ -53,24 +67,6 @@ This recipe contains information and scripts to produce performance results for 
 | 15b   | BF16/FP8 | 512   | 4096  | 32     | 1   | 1   | 1   | NA  | 512   | NA  | 2   | 2048   | 2 |
 | 15b   | BF16/FP8 | 1024   | 4096  | 32     | 1   | 1   | 1   | NA  | 1024   | NA  | 2   | 4096   | 2 |
 
-
-## H100
-
-15 billion parameter variant (FP8/BF16)
-
-- At least 16 GPUs with at least 80GB memory each.
-
-| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
-|------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
-| 15b   | BF16/FP8 | 16   | 4096  | 32     | 2   | 1   | 1   | NA  | 8   | NA  | 2   | 64   | 4 |
-| 15b   | BF16/FP8 | 32   | 4096  | 32     | 2   | 1   | 1   | NA  | 16   | NA  | 2   | 128   | 4 |
-| 15b   | BF16/FP8 | 64   | 4096  | 32     | 2   | 1   | 1   | NA  | 32   | NA  | 2   | 256   | 4 |
-| 15b   | BF16/FP8 | 128   | 4096  | 32     | 2   | 1   | 1   | NA  | 64   | NA  | 2   | 512   | 4 |
-| 15b   | BF16/FP8 | 256   | 4096  | 32     | 2   | 1   | 1   | NA  | 128   | NA  | 2   | 1024   | 4 |
-| 15b   | BF16/FP8 | 512   | 4096  | 32     | 2   | 1   | 1   | NA  | 256  | NA  | 2   | 2048   | 4 |
-| 15b   | BF16/FP8 | 1024   | 4096  | 32     | 2   | 1   | 1   | NA  | 512   | NA  | 2   | 4096   | 4 |
-| 15b   | BF16/FP8 | 2048   | 4096  | 32     | 2   | 1   | 1   | NA  | 1024   | NA  | 2   | 8192   | 4 |
-
 # Performance Measurement and Analysis
 
 Performance for Nemotron4 training is measured by seconds per iteration, or in other words seconds per training step. This metric is logged for every training step in the main training log file [see Output Locations](#output-locations).
@@ -81,23 +77,23 @@ Since the early training steps typically take much longer time (with input prefe
 
 ### Running the parse_train_timing.sh script
 
-To analyze training timing from your experiment results, run the script from the workload directory. Note, that `LLMB_REPO` is the directory containing the clone of the recipe repository.
+To analyze training timing from your experiment results, run the script from the workload directory. In an installed environment, recipe files are available under `$LLMB_INSTALL/llmb_repo` (a copy created by the installer).
 
 ```bash
 # Basic usage - parses results in the directory named 'experiments' in the current folder
-$LLMB_REPO/common/parse_train_timing.sh
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing.sh
 
 # Specify a different experiments directory
-$LLMB_REPO/common/parse_train_timing.sh /path/to/experiments
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing.sh /path/to/experiments
 
 # Output in CSV format
-$LLMB_REPO/common/parse_train_timing.sh --format=csv
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing.sh --format=csv
 
 # Output in JSON format
-$LLMB_REPO/common/parse_train_timing.sh --format=json
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing.sh --format=json
 
 # Show full filenames instead of shortened versions
-$LLMB_REPO/common/parse_train_timing.sh --full-names
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing.sh --full-names
 ```
 
 Example output:
@@ -125,25 +121,25 @@ E.g. 1e12 / 389371 / 86400 = 29.7 days
 
 To calculate the model flops utilization (MFU):
 ```shell
-MFU = (achieved TFLOPS_per_GPU Mean) / (peak GPU FLOPS)
+MFU = (global batch size) * (model flops) / (training step time) / (number of GPUs) / (peak GPU FLOPS)
 ```
-The peak theoretical throughput for GB200 BF16 is 2.45 PFLOPS.
+The model flops for Nemotron4 15b for GBS=1 is 3.85e14. Calculation shown [here](#mfu-formula).
 
-E.g. NeMotron4 15b BF16 on 16x GB200 GPUs (GBS=64)
+E.g. NeMotron4 15b BF16 on 64x H100 GPUs (GBS=256)
 ```shell
-peak FLOPS for GB200 BF16 = 2.45 PFLOPS
-achieved TFLOPS_per_GPU = 1,304.2 TFLOPS
-  
-MFU =  1,304.2e+12 / 2.45e+15 = 53.23%
+peak FLOPS for H100 BF16 = 989 TFLOPS
+training step time = 2.693 s
+model flops = 3.85e14
+
+MFU = 256 * 3.85e14 / 2.693 / 64 / 989e+12 = 57.82%
 ```
 
 **Peak theoretical throughput across GPUs and Data Types (in TFLOPS)**
 
-| Data Type | GB300 | GB200 | B200  | H100 |
-| --------  | :---: | :---: | :---:| :---: |
-| BF16      | 2450  | 2450  | 2250 | 989   |
-| FP8       | 4900  | 4900  | 4500 | 1979  |
-
+| Data Type | GB300 | GB200 | B200 | H100 |
+| --------  | :---: | :---: | :---:| :---:|
+| BF16      | 2450  | 2450  | 2250 | 989  |
+| FP8       | 4900  | 4900  | 4500 | 1979 | 
 
 # Prerequisites
 
@@ -300,7 +296,7 @@ The easiest way to run benchmarks is using the llmb-run launcher tool. This meth
 cd $LLMB_INSTALL
 
 # Run a benchmark with llmb-run
-llmb-run single -w pretrain_nemotron4-15b -s 15b --dtype fp8 --scale 128
+llmb-run submit -w pretrain_nemotron4-15b -s 15b --dtype fp8 --scale 128
 ```
 
 For more details on llmb-run usage, see the [llmb-run documentation](../cli/llmb-run/README.md).
@@ -314,7 +310,7 @@ The training will run for the first 50 steps and will stop afterwards. Log files
 
 **Important**: 
 - Ensure your virtual environment is activated before running the training commands below. If you used the installer with conda, run `conda activate $LLMB_INSTALL/venvs/<env_name>`. If you used the installer with python venv, run `source $LLMB_INSTALL/venvs/<env_name>/bin/activate`.
-- Run the launch script from the recipe directory: `cd $LLMB_REPO/nemotron4-15b/`
+- Run the launch script from the installed recipe directory: `cd $LLMB_INSTALL/llmb_repo/nemotron4-15b/`
 
 ### Command Template
 
@@ -445,7 +441,7 @@ ENABLE_PROFILE=true JOB_TOTAL_GPUS=128 DTYPE=fp8 GPU_TYPE=gb200 ./launch.sh
 	* `PROFILE_STOP_STEP`: stop profiling on this job step.
 	- Default: 50
 * Enable GPU metrics collection:
-	* `ENABLE_GPU_METRICS`: Enable GPU metrics collection during NSight profiling (default: false)
+	* `ENABLE_GPU_METRICS`: Enable GPU metrics collection during Nsight profiling (default: false)
 	- When set to `true` along with `ENABLE_PROFILE=true`, captures detailed GPU performance metrics
 	- Provides additional GPU utilization, memory usage, and compute efficiency data
 	- May require additional system configuration for GPU device metrics to work properly
@@ -545,7 +541,7 @@ For GB200 you may see the following error message
 
 To fix, try running with TP_COMM_OVERLAP disabled like so:  
 ```bash
-TP_COMM_OVERLAP=False llmb-run single -w pretrain_nemotron4-15b -s 15b --dtype bf16 --scale 16
+TP_COMM_OVERLAP=False llmb-run submit -w pretrain_nemotron4-15b -s 15b --dtype bf16 --scale 16
 ```
 
 # MFU formula

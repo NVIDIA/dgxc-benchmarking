@@ -4,7 +4,7 @@ This recipe contains information and scripts to produce performance results for 
 
 The recipes listed below progressively increase GPU count, with configurations weak-scaled to match.
 
-## GB300
+## GB300 and GB200
 
 | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
 |------|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
@@ -14,15 +14,14 @@ The recipes listed below progressively increase GPU count, with configurations w
 | FP8 | 256 | 8192 | 118 | 2 | 1 | 1 | 1 | 128 | 1 | 1 | 768 | 6 |
 | FP8 | 512 | 8192 | 118 | 2 | 1 | 1 | 1 | 256 | 1 | 1 | 1536 | 6 |
 
-## B200 and GB200
+## B200
 
 | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
 |------|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
-| FP8 | 32 | 8192 | 118 | 4 | 1 | 1 | 1 | 8 | 1 | 2 | 96 | 6 |
-| FP8 | 64 | 8192 | 118 | 4 | 1 | 1 | 1 | 16 | 1 | 2 | 192 | 6 |
-| FP8 | 128 | 8192 | 118 | 4 | 1 | 1 | 1 | 32 | 1 | 2 | 384 | 6 |
-| FP8 | 256 | 8192 | 118 | 4 | 1 | 1 | 1 | 64 | 1 | 2 | 768 | 6 |
-| FP8 | 512 | 8192 | 118 | 4 | 1 | 1 | 1 | 128 | 1 | 2 | 1536 | 6 |
+| FP8 | 64 | 8192 | 118 | 2 | 1 | 1 | 1 | 32 | 1 | 1 | 192 | 6 |
+| FP8 | 128 | 8192 | 118 | 2 | 1 | 1 | 1 | 64 | 1 | 1 | 384 | 6 |
+| FP8 | 256 | 8192 | 118 | 2 | 1 | 1 | 1 | 128 | 1 | 1 | 768 | 6 |
+| FP8 | 512 | 8192 | 118 | 2 | 1 | 1 | 1 | 256 | 1 | 1 | 1536 | 6 |
 
 ## H100
 
@@ -42,46 +41,23 @@ Since the early training steps typically take much longer time (with input prefe
 
 ### Running the parse_train_timing.sh script
 
-To analyze training timing from your experiment results, run the script from the workload directory. Note, that `LLMB_REPO` is the directory containing the clone of the recipe repository.
+To analyze training timing from your experiment results, run the script from the workload directory. In an installed environment, recipe files are available under `$LLMB_INSTALL/llmb_repo` (a copy created by the installer).
 
 ```bash
 # Basic usage - parses results in the directory named 'experiments' in the current folder
-$LLMB_REPO/common/parse_train_timing.sh
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh
 
 # Specify a different experiments directory
-$LLMB_REPO/common/parse_train_timing.sh /path/to/experiments
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh /path/to/experiments
 
 # Output in CSV format
-$LLMB_REPO/common/parse_train_timing.sh --format=csv
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh --format=csv
 
 # Output in JSON format
-$LLMB_REPO/common/parse_train_timing.sh --format=json
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh --format=json
 
 # Show full filenames instead of shortened versions
-$LLMB_REPO/common/parse_train_timing.sh --full-names
-```
-
-```shell
-# Run the parse_train_timing script to analyze all experiments
-common/parse_train_timing.sh $LLMB_WORKLOAD/experiments
-
-To analyze training timing from your experiment results, run the script from the workload directory. Note, that `LLMB_REPO` is the directory containing the clone of the recipe repository.
-
-```bash
-# Basic usage - parses results in the directory named 'experiments' in the current folder
-$LLMB_REPO/common/parse_train_timing.sh
-
-# Specify a different experiments directory
-$LLMB_REPO/common/parse_train_timing.sh /path/to/experiments
-
-# Output in CSV format
-$LLMB_REPO/common/parse_train_timing.sh --format=csv
-
-# Output in JSON format
-$LLMB_REPO/common/parse_train_timing.sh --format=json
-
-# Show full filenames instead of shortened versions
-$LLMB_REPO/common/parse_train_timing.sh --full-names
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh --full-names
 ```
 
 Example output:
@@ -126,7 +102,6 @@ MFU =  1961.50e+12 / 4.9e+15 = 40.03%
 | Data Type | GB300 | GB200 | B200 | H100 |
 | --------  | :---: | :---: | :---:| :---:|
 | FP8       | 4900  | 4900  | 4500 | 1979 |  
-
 
 # Prerequisites
 
@@ -176,10 +151,10 @@ The easiest way to run benchmarks is using the llmb-run launcher tool. This meth
 cd $LLMB_INSTALL
 
 # Run a benchmark with llmb-run
-llmb-run single -w pretrain_nemotron-h -s 56b --dtype fp8 --scale 128
+llmb-run submit -w pretrain_nemotron-h -s 56b --dtype fp8 --scale 128
 
 # Example with different scale
-llmb-run single -w pretrain_nemotron-h -s 56b --dtype fp8 --scale 1024
+llmb-run submit -w pretrain_nemotron-h -s 56b --dtype fp8 --scale 1024
 ```
 
 For more details on llmb-run usage, see the [llmb-run documentation](../cli/llmb-run/README.md).
@@ -190,7 +165,7 @@ Alternatively, you can run training directly using the launch script. This metho
 
 **Important**: 
 - Ensure your virtual environment is activated before running the training commands below. If you used the installer with conda, run `conda activate $LLMB_INSTALL/venvs/<env_name>`. If you used the installer with python venv, run `source $LLMB_INSTALL/venvs/<env_name>/bin/activate`.
-- Run the launch script from the recipe directory: `cd $LLMB_REPO/nemotron-h/`
+- Run the launch script from the installed recipe directory: `cd $LLMB_INSTALL/llmb_repo/nemotron-h/`
 
 ### Command Template
 
@@ -210,7 +185,7 @@ JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] 
 
 **Optional:**
 - `DTYPE`: Precision format (fixed: `fp8`)
-  - `fp8` - FP8 precision (only supported precision)
+- `FP8_RECIPE`: FP8 recipe (fixed: `cs`)
 - `MODEL_SIZE`: Model variant (fixed: `56b`)
   - `56b` - 56 billion parameter model (only supported size)
 
@@ -306,7 +281,7 @@ ENABLE_PROFILE=true JOB_TOTAL_GPUS=128 GPU_TYPE=gb200 ./launch.sh
   * `PROFILE_STOP_STEP`: stop profiling on this job step.
     - Default: 50
 * Enable GPU metrics collection:
-  * `ENABLE_GPU_METRICS`: Enable GPU metrics collection during NSight profiling (default: false)
+  * `ENABLE_GPU_METRICS`: Enable GPU metrics collection during Nsight profiling (default: false)
   - When set to `true` along with `ENABLE_PROFILE=true`, captures detailed GPU performance metrics
   - Provides additional GPU utilization, memory usage, and compute efficiency data
   - May require additional system configuration for GPU device metrics to work properly

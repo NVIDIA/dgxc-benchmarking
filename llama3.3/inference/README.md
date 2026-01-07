@@ -1,5 +1,5 @@
 # Overview
-This recipe provides instructions and scripts for benchmarking the performance of the Llama3.3-70B model with Nvidia TRT-LLM (TensorRT-LLM) benchmark suite.
+This recipe provides instructions and scripts for benchmarking the performance of the Llama3.3-70B model with NVIDIA TRT-LLM (TensorRT-LLM) benchmark suite.
 
 We consider two benchmarking scenarios:
 - **Maximum throughput**: the system is configured to generate as many tokens per second as possible. This typically involves large batch sizes, long generation lengths, and aggressive request packing to fully utilize GPU compute. While this approach increases overall efficiency and hardware utilization, it also results in higher latency for individual requests. It's ideal for offline processing, batch jobs, or queued summarization tasks.
@@ -115,42 +115,42 @@ cd $LLMB_INSTALL
 
 # GB200 
 # Reasoning
-MODE="max_throughput" MAX_NUM_TOKENS=16384 MAX_BATCH_SIZE=256 NUM_REQUESTS=4096 CONCURRENCY=256 USE_CASES=reasoning:1000/1000 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
+MODE="max_throughput" MAX_NUM_TOKENS=16384 MAX_BATCH_SIZE=256 NUM_REQUESTS=4096 CONCURRENCY=256 USE_CASES=reasoning:1000/1000 llmb-run submit -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
 
 # Chat
-MODE="max_throughput" MAX_NUM_TOKENS=8192 MAX_BATCH_SIZE=2048 NUM_REQUESTS=4096 CONCURRENCY=2048 USE_CASES=chat:128/128 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
+MODE="max_throughput" MAX_NUM_TOKENS=8192 MAX_BATCH_SIZE=2048 NUM_REQUESTS=4096 CONCURRENCY=2048 USE_CASES=chat:128/128 llmb-run submit -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
 
 # Summarization
-SBATCH_TIMELIMIT=50:00 MODE="max_throughput" MAX_NUM_TOKENS=8128 MAX_BATCH_SIZE=128 NUM_REQUESTS=1024 CONCURRENCY=128 USE_CASES=summarization:8000/512 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
+SBATCH_TIMELIMIT=50:00 MODE="max_throughput" MAX_NUM_TOKENS=8128 MAX_BATCH_SIZE=128 NUM_REQUESTS=1024 CONCURRENCY=128 USE_CASES=summarization:8000/512 llmb-run submit -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
 
 # Generation
-SBATCH_TIMELIMIT=50:00 MODE="max_throughput" MAX_NUM_TOKENS=2048 MAX_BATCH_SIZE=128 NUM_REQUESTS=1000 CONCURRENCY=128 USE_CASES=generation:512/8000 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
+SBATCH_TIMELIMIT=50:00 MODE="max_throughput" MAX_NUM_TOKENS=2048 MAX_BATCH_SIZE=128 NUM_REQUESTS=1000 CONCURRENCY=128 USE_CASES=generation:512/8000 llmb-run submit -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
 
 # B200 
 # Reasoning
-MODE="max_throughput" MAX_NUM_TOKENS=8192 MAX_BATCH_SIZE=256 NUM_REQUESTS=4096 CONCURRENCY=256 USE_CASES=reasoning:1000/1000 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
+MODE="max_throughput" MAX_NUM_TOKENS=8192 MAX_BATCH_SIZE=256 NUM_REQUESTS=4096 CONCURRENCY=256 USE_CASES=reasoning:1000/1000 llmb-run submit -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
 
 # Chat
-MODE="max_throughput" MAX_NUM_TOKENS=8192 MAX_BATCH_SIZE=2048 NUM_REQUESTS=4096 CONCURRENCY=2048 USE_CASES=chat:128/128 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
+MODE="max_throughput" MAX_NUM_TOKENS=8192 MAX_BATCH_SIZE=2048 NUM_REQUESTS=4096 CONCURRENCY=2048 USE_CASES=chat:128/128 llmb-run submit -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
 
 # Summarization
-SBATCH_TIMELIMIT=50:00 MODE="max_throughput" MAX_NUM_TOKENS=8128 MAX_BATCH_SIZE=128 NUM_REQUESTS=1024 CONCURRENCY=128 USE_CASES=summarization:8000/512 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
+SBATCH_TIMELIMIT=50:00 MODE="max_throughput" MAX_NUM_TOKENS=8128 MAX_BATCH_SIZE=128 NUM_REQUESTS=1024 CONCURRENCY=128 USE_CASES=summarization:8000/512 llmb-run submit -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
 
 # Generation
-SBATCH_TIMELIMIT=50:00 MODE="max_throughput" MAX_NUM_TOKENS=2048 MAX_BATCH_SIZE=128 NUM_REQUESTS=1000 CONCURRENCY=128 USE_CASES=generation:512/8000 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
+SBATCH_TIMELIMIT=50:00 MODE="max_throughput" MAX_NUM_TOKENS=2048 MAX_BATCH_SIZE=128 NUM_REQUESTS=1000 CONCURRENCY=128 USE_CASES=generation:512/8000 llmb-run submit -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
 
 #H100
 # Reasoning
-MODE="max_throughput" MAX_NUM_TOKENS=8192 MAX_BATCH_SIZE=256 NUM_REQUESTS=4096 CONCURRENCY=256 USE_CASES=reasoning:1000/1000 llmb-run single -w inference_llama3.3 -s 70b --dtype fp8 --scale 2
+MODE="max_throughput" MAX_NUM_TOKENS=8192 MAX_BATCH_SIZE=256 NUM_REQUESTS=4096 CONCURRENCY=256 USE_CASES=reasoning:1000/1000 llmb-run submit -w inference_llama3.3 -s 70b --dtype fp8 --scale 2
 
 # Chat
-MODE="max_throughput" MAX_NUM_TOKENS=8192 MAX_BATCH_SIZE=768 NUM_REQUESTS=4096 CONCURRENCY=768 USE_CASES=chat:128/128 llmb-run single -w inference_llama3.3 -s 70b --dtype fp8 --scale 2
+MODE="max_throughput" MAX_NUM_TOKENS=8192 MAX_BATCH_SIZE=768 NUM_REQUESTS=4096 CONCURRENCY=768 USE_CASES=chat:128/128 llmb-run submit -w inference_llama3.3 -s 70b --dtype fp8 --scale 2
 
 # Summarization
-MODE="max_throughput" MAX_NUM_TOKENS=8512 MAX_BATCH_SIZE=64 NUM_REQUESTS=512 CONCURRENCY=64 USE_CASES=summarization:8000/512 llmb-run single -w inference_llama3.3 -s 70b --dtype fp8 --scale 2
+MODE="max_throughput" MAX_NUM_TOKENS=8512 MAX_BATCH_SIZE=64 NUM_REQUESTS=512 CONCURRENCY=64 USE_CASES=summarization:8000/512 llmb-run submit -w inference_llama3.3 -s 70b --dtype fp8 --scale 2
 
 # Generation
-MODE="max_throughput" MAX_NUM_TOKENS=8512 MAX_BATCH_SIZE=64 NUM_REQUESTS=256 CONCURRENCY=64 USE_CASES=generation:512/8000 llmb-run single -w inference_llama3.3 -s 70b --dtype fp8 --scale 2
+MODE="max_throughput" MAX_NUM_TOKENS=8512 MAX_BATCH_SIZE=64 NUM_REQUESTS=256 CONCURRENCY=64 USE_CASES=generation:512/8000 llmb-run submit -w inference_llama3.3 -s 70b --dtype fp8 --scale 2
 ```
 
 ### Minimum latency
@@ -162,19 +162,19 @@ cd $LLMB_INSTALL
 # Run a benchmark with llmb-run per use case (** Recommended **)
 
 # Reasoning
-MODE="min_latency" USE_CASES=reasoning:1000/1000 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 4
+MODE="min_latency" USE_CASES=reasoning:1000/1000 llmb-run submit -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 4
 
 # Chat
-MODE="min_latency" USE_CASES=chat:128/128 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 4
+MODE="min_latency" USE_CASES=chat:128/128 llmb-run submit -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 4
 
 # Summarization
-MODE="min_latency" USE_CASES=summarization:8000/512 MAX_NUM_TOKENS=8512 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 4 
+MODE="min_latency" USE_CASES=summarization:8000/512 MAX_NUM_TOKENS=8512 llmb-run submit -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 4 
 
 # Generation
-MODE="min_latency" USE_CASES=generation:512/8000 MAX_NUM_TOKENS=8512 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 4
+MODE="min_latency" USE_CASES=generation:512/8000 MAX_NUM_TOKENS=8512 llmb-run submit -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 4
 ```
 
-- Single use cases and their optimized parameters are listed above and work out of the box. Advanced users can add more use_cases in the `setup.sh` 
+- Single use cases and their optimized parameters are listed above and work out of the box. Advanced users can add more use cases in `setup.sh`.
 - Advanced users can learn more about: 
   - [Tuning Max Batch Size and Max Num Tokens](https://nvidia.github.io/TensorRT-LLM/performance/performance-tuning-guide/tuning-max-batch-size-and-max-num-tokens.html#tuning-max-batch-size-and-max-num-tokens) to adjust the inflight batching scheduler 
   -  [Max Tokens in Paged KV Cache and KV Cache Free GPU Memory Fraction](https://nvidia.github.io/TensorRT-LLM/performance/performance-tuning-guide/useful-runtime-flags.html#max-tokens-in-paged-kv-cache-and-kv-cache-free-gpu-memory-fraction) to control the maximum number of tokens handled by the KV cache manager
@@ -186,23 +186,23 @@ MODE="min_latency" USE_CASES=generation:512/8000 MAX_NUM_TOKENS=8512 llmb-run si
 
 ```bash
 # GB200 and B200 Multi USE_CASE example (** NOT RECOMMENDED **)
- USE_CASES="reasoning:1000/1000 chat:128/128" llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
+ USE_CASES="reasoning:1000/1000 chat:128/128" llmb-run submit -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
 
  # H100 Multi USE_CASE example
-  USE_CASES="reasoning:1000/1000 chat:128/128" llmb-run single -w inference_llama3.3 -s 70b --dtype fp8 --scale 2
+  USE_CASES="reasoning:1000/1000 chat:128/128" llmb-run submit -w inference_llama3.3 -s 70b --dtype fp8 --scale 2
 ```
 
 **Streaming:**
-- You can toggle streaming on and off. When off, users recieve the entire response (all output tokens) back at once instead of receiving output tokens as they are generated
+- You can toggle streaming on and off. When off, users receive the entire response (all output tokens) back at once instead of receiving output tokens as they are generated.
   - **By default, streaming is turned on in this workload**
   -  If turned off -- TTFT (Time to First Token) and TPOT (Time per Output Token) metrics are not applicable, since individual token delivery is bypassed.
 
 ```bash
 # GB200 and B200 Example of turning streaming off
-STREAMING=false USE_CASES=reasoning:1000/1000 llmb-run single -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
+STREAMING=false USE_CASES=reasoning:1000/1000 llmb-run submit -w inference_llama3.3 -s 70b --dtype nvfp4 --scale 1
 
 # H100 Example of turning streaming off
-STREAMING=false USE_CASES=reasoning:1000/1000 llmb-run single -w inference_llama3.3 -s 70b --dtype fp8 --scale 2
+STREAMING=false USE_CASES=reasoning:1000/1000 llmb-run submit -w inference_llama3.3 -s 70b --dtype fp8 --scale 2
 ```
 
 For more details on llmb-run usage, see the [llmb-run documentation](../../cli/llmb-run/README.md).
@@ -213,7 +213,7 @@ Alternatively, you can run inference scripts directly using the launch script. T
 
 **Important**: 
 - Ensure your virtual environment is activated before running the training commands below. If you used the installer with conda, run `conda activate $LLMB_INSTALL/venvs/<env_name>`. If you used the installer with python venv, run `source $LLMB_INSTALL/venvs/<env_name>/bin/activate`.
-- Run the launch script from the recipe directory: `cd $LLMB_REPO/llama3.3-70b/inference`
+- Run the launch script from the installed recipe directory: `cd $LLMB_INSTALL/llmb_repo/llama3.3/inference/`
 
 ### Command Template
 

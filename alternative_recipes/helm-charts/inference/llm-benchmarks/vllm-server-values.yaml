@@ -23,7 +23,7 @@ environment:
   # Server Configuration
   SERVER_TYPE: "vLLM"  # Can be "vLLM" or "NIM"
   SERVER_IMAGE: "vllm/vllm-openai:v0.8.5"  # Path to server image
-  SERVER_ARGS: ""
+  SERVER_ARGS:
   HEALTH_CHECK_ENDPOINT: "health"
   
   # Model Configuration
