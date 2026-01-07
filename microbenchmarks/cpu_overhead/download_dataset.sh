@@ -41,7 +41,6 @@ fi
 export WORKLOAD_TYPE=microbenchmark
 export WORKLOAD=cpu_overhead
 export FW_VERSION=1.1.0rc5
-export GSW_VERSION=25.10
 
 cp -f pytorch_kernel_launch_latency.py $LLMB_WORKLOAD/.
 

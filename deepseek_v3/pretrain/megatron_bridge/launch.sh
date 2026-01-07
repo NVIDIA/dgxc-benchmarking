@@ -30,31 +30,49 @@ set -eu -o pipefail
 
 export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=deepseek-v3
-export FW_VERSION=25.09.00
-
 export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 
 export LLMB_WORKLOAD=$LLMB_INSTALL/workloads/${WORKLOAD_TYPE}_${MODEL_NAME}
+export NEMORUN_HOME=$LLMB_WORKLOAD
 export LLMB_REPO=$PWD
+
+GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
+GPU_TYPE=${GPU_TYPE,,}
+DTYPE=${DTYPE:-bf16}
+DTYPE=${DTYPE,,}
+
+if [[ $GPU_TYPE == "h100" ]]; then
+    FW_VERSION=25.09.00
+else
+    FW_VERSION=25.11.01
+fi
+
+if [[ $DTYPE == "fp8" ]]; then
+    if [[ $GPU_TYPE != "h100" ]]; then
+        FP8_RECIPE="mx"
+        COMPUTE_TYPE=${DTYPE}_${FP8_RECIPE}
+    else
+        FP8_RECIPE="cs"
+        COMPUTE_TYPE=${DTYPE}
+    fi
+else
+    COMPUTE_TYPE=${DTYPE}
+fi
 
 export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh}
 
-export NEMORUN_HOME=$LLMB_WORKLOAD
-export NEMO_HOME=${NEMO_HOME:-$LLMB_WORKLOAD}
-
-export DTYPE=${DTYPE:-bf16}
-export DTYPE=${DTYPE,,}
-export GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
-export GPU_TYPE=${GPU_TYPE,,}
-export JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
-export TIME_LIMIT=${TIME_LIMIT:-"00:40:00"}
+JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
 
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 PROFILE_ENABLED=${PROFILE_ENABLED,,}
+PROFILE_START_STEP=${PROFILE_START_STEP:-45}
+PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
 GPU_METRICS_ENABLED=${ENABLE_GPU_METRICS:-false}
 GPU_METRICS_ENABLED=${GPU_METRICS_ENABLED,,}
 ENABLE_VBOOST=${ENABLE_VBOOST:-false}
 ENABLE_VBOOST=${ENABLE_VBOOST,,}
+TIME_LIMIT=${TIME_LIMIT:-"00:40:00"}
+MAX_STEPS=${MAX_STEPS:-50}
 
 # Handle additional SLURM parameters from environment variable
 ADDITIONAL_SLURM_PARAMS=${ADDITIONAL_SLURM_PARAMS:-""}
@@ -80,48 +98,68 @@ fi
 
 if [[ $PROFILE_ENABLED == "true" ]]; then
     CONFIG_OVERRIDES+=" --enable_nsys "
+    CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
+    CONFIG_OVERRIDES+=" --profiling_stop_step=$PROFILE_STOP_STEP "
     if [[ $GPU_METRICS_ENABLED == true ]]; then
-        CONFIG_OVERRIDES+=" -pgm "
+        CONFIG_OVERRIDES+=" --profiling_gpu_metrics "
     fi
-fi
-
-if [[ $DTYPE == "fp8" ]]; then
-    export FP8_RECIPE=${FP8_RECIPE:-cs}
-    export FP8_RECIPE=${FP8_RECIPE,,}
-    CONFIG_OVERRIDES+=" --fp8_recipe $FP8_RECIPE "
 fi
 
 if [[ $ENABLE_VBOOST == true ]]; then
     CONFIG_OVERRIDES+=" --enable_vboost true "
 fi
 
-if [[ $GPU_TYPE == "gb200" ]] || [[ $GPU_TYPE == "gb300" ]]; then
+if [[ $GPU_TYPE == "gb300" ]]; then
+    if [[ $JOB_TOTAL_GPUS -eq 128 ]]; then
+        EP=32
+    else
+        EP=64
+    fi
+    PP=4
+    VP=4
+    TP=1
     GPUS_PER_NODE=4
-else
+elif [[ $GPU_TYPE == "gb200" ]]; then
+    EP=64
+    PP=4
+    VP=4
+    TP=1
+    GPUS_PER_NODE=4
+elif [[ $GPU_TYPE == "b200" ]]; then
+    EP=8
+    VP="None"
+    TP=1
+    PP=16
+    GPUS_PER_NODE=8
+elif [[ $GPU_TYPE == "h100" ]]; then
+    EP=64
+    PP=8
+    VP=4
+    TP=2
     GPUS_PER_NODE=8
 fi
 
-if [[ $GPU_TYPE == "h100" ]] && [[ $JOB_TOTAL_GPUS -eq 512 ]] && [[ $DTYPE == "fp8" ]] && [[ $FP8_RECIPE == "ss" ]]; then
-    echo "FP8-SS requires a minimum of 1024 GPUs on H100."
-    exit 1
+MBS=1
+GBS=$((JOB_TOTAL_GPUS * 8))
+
+CONFIG_OVERRIDES+=" -tp $TP \
+  -ep $EP \
+  -pp $PP \
+  -vp $VP \
+  -mb $MBS \
+  -gb $GBS \
+"
+
+if [[ $GPU_TYPE == "h100" ]] && [[ $DTYPE == "fp8" ]]; then
+    CONFIG_OVERRIDES+=" --fp8_recipe cs "
 fi
 
-if [[ $DTYPE == "fp8" ]]; then
-    if [[ $FP8_RECIPE == "ss" && $GPU_TYPE != "h100" ]]; then
-        echo "FP8-SS is only supported on H100."
-        exit 1
-    elif [[ $FP8_RECIPE == "mx" && $GPU_TYPE == "h100" ]]; then
-        echo "FP8-MX is only supported for B200, GB200 and GB300 and not supported on H100."
-        exit 1
-    fi
-fi
-
-#run command
+# run command
 pushd $LLMB_WORKLOAD/Megatron-Bridge
 
-python3 -m scripts.performance.setup_experiment \
+python3 scripts/performance/setup_experiment.py \
     --container_image $IMAGE \
-    --compute_dtype $DTYPE \
+    --compute_dtype $COMPUTE_TYPE \
     --gpu $GPU_TYPE \
     --num_gpus $JOB_TOTAL_GPUS \
     --gpus_per_node $GPUS_PER_NODE \
@@ -132,6 +170,7 @@ python3 -m scripts.performance.setup_experiment \
     --partition $SBATCH_PARTITION \
     --log_dir $NEMORUN_HOME \
     --time_limit $TIME_LIMIT \
+    --max_steps $MAX_STEPS \
     $SLURM_ARGS
 
 popd

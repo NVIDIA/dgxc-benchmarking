@@ -66,13 +66,13 @@ cd $LLMB_INSTALL
 # Run a benchmark with llmb-run per use case (** Recommended **)
 
 # Run both CPU overhead tests
-llmb-run single -w microbenchmark_cpu_overhead -s 120b --dtype mxfp4 --scale 1
+llmb-run submit -w microbenchmark_cpu_overhead -s 120b --dtype mxfp4 --scale 1
  
 # Run the pytorch kernel launch test
-USE_CASES="kernel_launch" llmb-run single -w microbenchmark_cpu_overhead -s 120b --dtype mxfp4 --scale 1
+USE_CASES="kernel_launch" llmb-run submit -w microbenchmark_cpu_overhead -s 120b --dtype mxfp4 --scale 1
 
 # Run the tokenization throughput test
-USE_CASES="tokenization" llmb-run single -w microbenchmark_cpu_overhead -s 120b --dtype mxfp4 --scale 1
+USE_CASES="tokenization" llmb-run submit -w microbenchmark_cpu_overhead -s 120b --dtype mxfp4 --scale 1
 ```
 
 

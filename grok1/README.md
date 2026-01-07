@@ -61,23 +61,23 @@ Since the early training steps typically take much longer time (with input prefe
 
 ### Running the parse_train_timing.sh script
 
-To analyze training timing from your experiment results, run the script from the workload directory. Note, that `LLMB_REPO` is the directory containing the clone of the recipe repository.
+To analyze training timing from your experiment results, run the script from the workload directory. In an installed environment, recipe files are available under `$LLMB_INSTALL/llmb_repo` (a copy created by the installer).
 
 ```bash
 # Basic usage - parses results in the directory named 'experiments' in the current folder
-$LLMB_REPO/common/parse_train_timing.sh
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing.sh
 
 # Specify a different experiments directory
-$LLMB_REPO/common/parse_train_timing.sh /path/to/experiments
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing.sh /path/to/experiments
 
 # Output in CSV format
-$LLMB_REPO/common/parse_train_timing.sh --format=csv
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing.sh --format=csv
 
 # Output in JSON format
-$LLMB_REPO/common/parse_train_timing.sh --format=json
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing.sh --format=json
 
 # Show full filenames instead of shortened versions
-$LLMB_REPO/common/parse_train_timing.sh --full-names
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing.sh --full-names
 ```
 
 Example output:
@@ -103,26 +103,30 @@ To calculate time to train with 1T tokens estimate:
 E.g. 1e12 / 1398101 / 86400 = 8.28 days 
 
 
-To calculate the model flops utilization (MFU):
+To calculate the model flops utilization (MFU). Calculation shown [here](#mfu-formula).
 ```shell
-MFU = (achieved TFLOPS_per_GPU Mean) / (peak GPU FLOPS)
+MFU = (global batch size) * (model flops) / (training step time) / (number of GPUs) /peak GPU FLOPS)
 ```
-The peak theoretical throughput for GB200 BF16 is 2.45 PFLOPS.
 
-E.g. Grok 1 BF16 on 128x GB200 GPUs (GBS=256)
+For GB200 GPUs, peak theoretical throughput for FP8 is 4.9 PFLOPS and for BF16 is 2.45 PFLOPS.
+
+The model flops for Grok 1 for GBS=1 per GPU is 4.27E+15
+
+E.g. Grok 1 FP8 on 128x GB200 GPUs (GBS=256)
 ```shell
-peak FLOPS for GB200 BF16 = 2.45 PFLOPS
-achieved TFLOPS_per_GPU = 1,112.5 TFLOPS
+peak FLOPS for GB200 = 49 TFLOPS
+training step time = 6.631
+model flops = 4.27E+15
 
-MFU = 1,112.5e+12 / 2.45e+15 = 45.41%
+MFU = 256 * 4.27E+15 / 6.631 / 128 / 4.9E+15 = 26.3%
 ```
 
 **Peak theoretical throughput across GPUs and Data Types (in TFLOPS)**
 
-| Data Type | GB300  | GB200 | B200 | H100 |
-| --------  | :---: | :---: | :---:| :---: |
-| BF16      | 2450  | 2450  | 2250 | 989   |
-| FP8       | 4900  | 4900  | 4500 | 1979  |
+| Data Type | GB300 | GB200 | B200 | H100 |
+| --------  | :---: | :---: | :---:| :---:|
+| BF16      | 2450  | 2450  | 2250 | 989  |
+| FP8       | 4900  | 4900  | 4500 | 1979 |  
 
 
 # Prerequisites
@@ -174,10 +178,10 @@ The easiest way to run benchmarks is using the llmb-run launcher tool. This meth
 cd $LLMB_INSTALL
 
 # Run a benchmark with llmb-run
-llmb-run single -w pretrain_grok1 -s 314b --dtype fp8 --scale 128
+llmb-run submit -w pretrain_grok1 -s 314b --dtype fp8 --scale 128
 
 # Example with BF16 precision
-llmb-run single -w pretrain_grok1 -s 314b --dtype bf16 --scale 256
+llmb-run submit -w pretrain_grok1 -s 314b --dtype bf16 --scale 256
 ```
 
 For more details on llmb-run usage, see the [llmb-run documentation](../cli/llmb-run/README.md).
@@ -188,7 +192,7 @@ Alternatively, you can run training directly using the launch script. This metho
 
 **Important**: 
 - Ensure your virtual environment is activated before running the training commands below. If you used the installer with conda, run `conda activate $LLMB_INSTALL/venvs/<env_name>`. If you used the installer with python venv, run `source $LLMB_INSTALL/venvs/<env_name>/bin/activate`.
-- Run the launch script from the recipe directory: `cd $LLMB_REPO/grok1/`
+- Run the launch script from the installed recipe directory: `cd $LLMB_INSTALL/llmb_repo/grok1/`
 
 ### Command Template
 
@@ -293,7 +297,7 @@ ENABLE_PROFILE=true JOB_TOTAL_GPUS=256 GPU_TYPE=gb200 DTYPE=fp8 ./launch.sh
   * `RUN_CONF_PROFILE_STOP_STEP`: stop profiling before this job step.
     Default: 50
 * Enable GPU metrics collection:
-  * `ENABLE_GPU_METRICS`: Enable GPU metrics collection during NSight profiling (default: false)
+  * `ENABLE_GPU_METRICS`: Enable GPU metrics collection during Nsight profiling (default: false)
   - When set to `true` along with `ENABLE_PROFILE=true`, captures detailed GPU performance metrics
   - Provides additional GPU utilization, memory usage, and compute efficiency data
   - May require additional system configuration for GPU device metrics to work properly
@@ -337,7 +341,7 @@ For GB200 you may see the following error message
 
 To fix, try running with TP_COMM_OVERLAP disabled like so:
 ```bash
-TP_COMM_OVERLAP=False llmb-run single -w pretrain_grok1 -s 314b --dtype bf16 --scale 256
+TP_COMM_OVERLAP=False llmb-run submit -w pretrain_grok1 -s 314b --dtype bf16 --scale 256
 ```
 
 # MFU formula

@@ -1,54 +1,87 @@
 # Overview
 
 This recipe contains information and scripts to produce performance results for the Llama3.1 8B, 70B, and 405B training workloads. The scripts help perform environment setup and launch benchmark jobs.
+
+Weak scaling methodology is used in the configurations below.
+
+This recipe supports the following precisions: FP8, BF16, NVFP4.
+
+This variant of the workload supports the following precisions across the 4 gpu types: GB300, GB200, B200, H100:
+
+| GPU Type | 8B Precisions | 70B Precisions | 405B Precisions |
+|----------|---------------|----------------|-----------------|
+| GB300    | FP8, NVFP4 | FP8, NVFP4 | FP8 |
+| GB200    | FP8, NVFP4 | FP8, NVFP4 | FP8 |
+| B200     | FP8, NVFP4 | FP8, NVFP4 | FP8, NVFP4 |
+| H100     | BF16, FP8 | BF16, FP8 | BF16, FP8 |
+
 This variant of the workload is best-suited for clusters with GPUs below:
 
 ## GB300
 * At least (8, 64, 128) GPUs for model sizes (8B, 70B, 405B) with at least 288 GB memory each.
 * The GB300 recipes listed below progressively increase GPU count, with configurations weak-scaled to match.
-* This workload runs with FP8 precision.
 
-  | Llama3.1 Model Size | GPUs     | Datatype  | SeqLen | Layers | FSDP  | TP | PP | CP | EP | ETP | DP      | VP | MBS | GBS     | GA  | CG    | RL | OL |
-  |---------------------|:--------:|:---------:|:------:|:------:|:-----:|:--:|:--:|:--:|:--:|:---:|:-------:|:--:|:---:|:-------:|:---:|:-----:|:--:|:--:|
-  | 405b                | 128-1024 | FP8       | 8192   | 126    | True  |  2 | 1  | 1  | NA | NA  | GPUs/2  | NA |  1  | GPUs/2  | 1   | False | 0  | 80 |
-  | 70b                 | 64-1024  | FP8       | 8192   | 80     | True  |  1 | 1  | 1  | NA | NA  | GPUs    | NA |  2  | GPUs*2  | 1   | False | 0  | 40 |
-  | 8b                  | 8-128    | FP8 | 8192   | 32     | False |  1 | 1  | 1  | NA | NA  | GPUs    | NA |  2  | GPUs*16 | 8   | True  | 0  | 0  |
+  | Llama3.1 Model Size | GPUs     | Datatype  | SeqLen | Layers | FSDP  | TP | PP | CP | EP | ETP | DP      | VP | MBS | GBS     | GA  | CG    |
+  |---------------------|:--------:|:---------:|:------:|:------:|:-----:|:--:|:--:|:--:|:--:|:---:|:-------:|:--:|:---:|:-------:|:---:|:-----:|
+  | 405b                | 128-512  | FP8       | 8192   | 126    | True  |  2 | 1  | 1  | 1  | 2   | GPUs/2  | NA |  1  | GPUs/2  | 1   | False |
+  | 70b                 | 64-512   | FP8       | 8192   | 80     | False |  1 | 1  | 1  | 1  | 1   | GPUs    | NA |  2  | GPUs*2  | 1   | False |
+  | 8b                  | 8-128    | FP8       | 8192   | 32     | False |  1 | 1  | 1  | 1  | 1   | GPUs    | NA |  4  | GPUs*16 | 4   | False |
+
+  | Llama3.1 Model Size | GPUs     | Datatype  | SeqLen | Layers | FSDP  | TP | PP | CP | EP | ETP | DP      | VP | MBS | GBS     | GA  | CG    |
+  |---------------------|:--------:|:---------:|:------:|:------:|:-----:|:--:|:--:|:--:|:--:|:---:|:-------:|:--:|:---:|:-------:|:---:|:-----:|
+  | 70b                 | 64-512   | NVFP4       | 8192   | 80     | False |  1 | 4  | 1  | 1  | 1   | GPUs/4  | 5  |  1  | GPUs*2  | 8   | False |
+  | 8b                  | 8-128    | NVFP4       | 8192   | 32     | False |  1 | 1  | 1  | 1  | 1   | GPUs    | NA |  4  | GPUs*16 | 4   | False |
+
 
 ## GB200
 * At least (8, 64, 128) GPUs for model sizes (8B, 70B, 405B) with at least 186 GB memory each.
 * The GB200 recipes listed below progressively increase GPU count, with configurations weak-scaled to match.
-* This workload runs with FP8 precision.
 
-  | Llama3.1 Model Size | GPUs    | Datatype  | SeqLen | Layers | FSDP  | TP | PP | CP | EP | ETP | DP      | VP | MBS | GBS     | GA  | CG    | RL | OL |
-  |---------------------|:-------:|:---------:|:------:|:------:|:-----:|:--:|:--:|:--:|:--:|:---:|:-------:|:--:|:---:|:-------:|:---:|:-----:|:--:|:--:|
-  | 405b                | 128-512 | FP8       | 8192   | 126    | True  |  2 | 1  | 1  | NA | NA  | GPUs/2  | NA |  1  | GPUs/2  | 1   | False | 0  | 80 |
-  | 70b                 | 64-512  | FP8       | 8192   | 80     | True  |  1 | 1  | 1  | NA | NA  | GPUs    | NA |  2  | GPUs*2  | 1   | False | 0  | 40 |
-  | 8b                  | 8-128   | FP8 | 8192   | 32     | False |  1 | 1  | 1  | NA | NA  | GPUs    | NA |  2  | GPUs*16 | 8   | True  | 0  | 0  |
+  | Llama3.1 Model Size | GPUs     | Datatype  | SeqLen | Layers | FSDP  | TP | PP | CP | EP | ETP | DP      | VP | MBS | GBS     | GA  | CG    | 
+  |---------------------|:--------:|:---------:|:------:|:------:|:-----:|:--:|:--:|:--:|:--:|:---:|:-------:|:--:|:---:|:-------:|:---:|:-----:|
+  | 405b                | 128-512  | FP8       | 8192   | 126    | True  |  2 | 1  | 1  | 1  | 2   | GPUs/2  | NA |  2  | GPUs/2  | 1   | False | 
+  | 70b                 | 64-512   | FP8       | 8192   | 80     | True  |  1 | 1  | 1  | 1  | 1   | GPUs    | NA |  2  | GPUs*2  | 1   | False | 
+  | 8b                  | 8-128    | FP8       | 8192   | 32     | False |  1 | 1  | 1  | 1  | 1   | GPUs    | NA |  2  | GPUs*16 | 8   | False |
 
+  | Llama3.1 Model Size | GPUs     | Datatype  | SeqLen | Layers | FSDP  | TP | PP | CP | EP | ETP | DP      | VP | MBS | GBS     | GA  | CG    | 
+  |---------------------|:--------:|:---------:|:------:|:------:|:-----:|:--:|:--:|:--:|:--:|:---:|:-------:|:--:|:---:|:-------:|:---:|:-----:|
+  | 70b                 | 64-512   |  NVFP4    | 8192   | 80     | False |  2 | 4  | 1  | 1  | 2   | GPUs/8  | 5  |  1  | GPUs*2  | 16  | False | 
+  | 8b                  | 8-128    |  NVFP4    | 8192   | 32     | False |  1 | 1  | 1  | 1  | 1   | GPUs    | NA |  4  | GPUs*16 | 4   | False |
+  
 
 ## B200
 * At least (8, 64, 128) GPUs for model sizes (8B, 70B, 405B) with at least 180 GB memory each.
 * The B200 recipes listed below progressively increase GPU count, with configurations weak-scaled to match.
-* This workload runs with FP8 precision.
 
-  | Llama3.1 Model Size | GPUs     | Datatype  | SeqLen | Layers | FSDP  | TP | PP | CP | EP | ETP | DP      | VP | MBS | GBS     | GA  | CG    | RL | OL |
-  |---------------------|:--------:|:---------:|:------:|:------:|:-----:|:--:|:--:|:--:|:--:|:---:|:-------:|:--:|:---:|:-------:|:---:|:-----:|:--:|:--:|
-  | 405b                | 128-1024 | FP8       | 8192   | 126    | False |  4 | 8  | 2  | NA | NA  | GPUs/64 | 8  |  1  | GPUs/2  | 32  | False | 0  | 0  |
-  | 70b                 | 64-1024  | FP8       | 8192   | 80     | True  |  1 | 1  | 1  | NA | NA  | GPUs    | NA |  1  | GPUs*2  | 2   | False | 5  | 0  |
-  | 8b                  | 8-128    | FP8 | 8192   | 32     | False |  1 | 1  | 1  | NA | NA  | GPUs    | NA |  2  | GPUs*16 | 8   | True  | 0  | 0  |
+  | Llama3.1 Model Size | GPUs     | Datatype  | SeqLen | Layers | FSDP  | TP | PP | CP | EP | ETP | DP      | VP | MBS | GBS     | GA  | CG    | 
+  |---------------------|:--------:|:---------:|:------:|:------:|:-----:|:--:|:--:|:--:|:--:|:---:|:-------:|:--:|:---:|:-------:|:---:|:-----:|
+  | 405b                | 128-1024 | FP8       | 8192   | 126    | False |  4 | 8  | 2  | 1  | 4   | GPUs/64 | 8  |  1  | GPUs/2  | 32  | False | 
+  | 70b                 | 64-1024  | FP8       | 8192   | 80     | True  |  1 | 1  | 1  | 1  | 1   | GPUs    | NA |  1  | GPUs*2  | 2   | False | 
+  | 8b                  | 8-128    | FP8       | 8192   | 32     | False |  1 | 1  | 1  | 1  | 1   | GPUs    | NA |  2  | GPUs*16 | 8   | False |
+
+  | Llama3.1 Model Size | GPUs     | Datatype  | SeqLen | Layers | FSDP  | TP | PP | CP | EP | ETP | DP      | VP | MBS | GBS     | GA  | CG    | 
+  |---------------------|:--------:|:---------:|:------:|:------:|:-----:|:--:|:--:|:--:|:--:|:---:|:-------:|:--:|:---:|:-------:|:---:|:-----:|
+  | 405b                | 128-1024 |  NVFP4    | 8192   | 126    | False |  4 | 8  | 2  | 1  |  4  | GPUs/64 | 4  |  1  | GPUs/2  | 32  | False |
+  | 70b                 | 64-1024  |  NVFP4    | 8192   | 80     | False |  2 | 4  | 1  | 1  | 2   | GPUs/8  | 5  |  1  | GPUs*2  | 16  | False | 
+  | 8b                  | 8-128    |  NVFP4    | 8192   | 32     | False |  1 | 1  | 1  | 1  | 1   | GPUs    | NA |  4  | GPUs*16 | 4   | False |
 
 
 ## H100
 * At least (8, 64, 1024) GPUs for model sizes (8B, 70B, 405B) with at least 80 GB memory each.
 * The H100 recipes listed below progressively increase GPU count, with configurations weak-scaled to match.
-* This workload runs with FP8 precision.
 
-  | Llama3.1 Model Size | GPUs      | Datatype  | SeqLen | Layers | FSDP  | TP | PP | CP | EP | ETP | DP       | VP | MBS | GBS     | GA  | CG    | RL | OL | 
-  |---------------------|:---------:|:---------:|:------:|:------:|:-----:|:--:|:--:|:--:|:--:|:---:|:--------:|:--:|:---:|:-------:|:---:|:-----:|:--:|:--:|
-  | 405b                | 1024 | FP8       | 8192   | 126    | False |  8 | 8  | 2  | NA | NA  | GPUs/128 | 8  |  1  | GPUs/2  | 64  | False | 0  | 0  |
-  | 70b                 | 64-1024   | FP8       | 8192   | 80     | False |  4 | 8  | 1  | NA | NA  | GPUs/32  | 5  |  1  | GPUs*2  | 64  | False | 5  | 0  |
-  | 8b                  | 8-128     | FP8       | 8192   | 32     | True  |  1 | 1  | 1  | NA | NA  | GPUs     | NA |  1  | GPUs*16 | 16  | True  | 0  | 0  |
 
+| Llama3.1 Model Size | GPUs     | Datatype  | SeqLen | Layers | FSDP  | TP | PP | CP | EP | ETP | DP      | VP | MBS | GBS     | GA  | CG    | 
+  |---------------------|:--------:|:---------:|:------:|:------:|:-----:|:--:|:--:|:--:|:--:|:---:|:-------:|:--:|:---:|:-------:|:---:|:-----:|
+  | 405b                | 1024     | BF16      | 8192   | 126    | False |  8 | 8  | 2  | 1  | 2   | GPUs/32 | 5  |  1  | GPUs*2  | 64  | False |
+  | 70b                 | 8-128    | BF16      | 8192   | 80     | False |  4 | 4  | 2  | 1  | 1   | GPUs/32 | 5  |  1  | GPUs*2  | 64  | False | 
+  | 8b                  | 8-128    | BF16      | 8192   | 32     | False |  1 | 1  | 2  | 1  | 1   | GPUs/2  | NA |  1  | GPUs*16 | 32  | False | 
+
+  | Llama3.1 Model Size | GPUs     | Datatype  | SeqLen | Layers | FSDP  | TP | PP | CP | EP | ETP | DP      | VP | MBS | GBS     | GA  | CG    | 
+  |---------------------|:--------:|:---------:|:------:|:------:|:-----:|:--:|:--:|:--:|:--:|:---:|:-------:|:--:|:---:|:-------:|:---:|:-----:|
+  | 405b                | 128-1024 | FP8       | 8192   | 126    | False |  4 | 8  | 2  | 1  | 2   | GPUs/16 | 8  |  1  | GPUs*4  | 64  | False | 
+  | 70b                 | 64-1024  | FP8       | 8192   | 80     | True  |  1 | 1  | 1  | 1  | 1   | GPUs    | NA |  1  | GPUs*2  | 2   | False | 
+  | 8b                  | 8-128    | FP8       | 8192   | 32     | False |  1 | 1  | 1  | 1  | 1   | GPUs    | NA |  2  | GPUs*16 | 8   | False |
 
 # Performance Measurement and Analysis
 
@@ -58,23 +91,23 @@ Since the early training steps typically take much longer time (with input prefe
 
 ### Running the parse_train_timing_mbridge.sh script
 
-To analyze training timing from your experiment results, run the script from the workload directory. Note, that `LLMB_REPO` is the directory containing the clone of the recipe repository.
+To analyze training timing from your experiment results, run the script from the workload directory. In an installed environment, recipe files are available under `$LLMB_INSTALL/llmb_repo` (a copy created by the installer).
 
 ```bash
 # Basic usage - parses results in the directory named 'experiments' in the current folder
-$LLMB_REPO/common/parse_train_timing_mbridge.sh
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh
 
 # Specify a different experiments directory
-$LLMB_REPO/common/parse_train_timing_mbridge.sh /path/to/experiments
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh /path/to/experiments
 
 # Output in CSV format
-$LLMB_REPO/common/parse_train_timing_mbridge.sh --format=csv
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh --format=csv
 
 # Output in JSON format
-$LLMB_REPO/common/parse_train_timing_mbridge.sh --format=json
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh --format=json
 
 # Show full filenames instead of shortened versions
-$LLMB_REPO/common/parse_train_timing_mbridge.sh --full-names
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh --full-names
 ```
 
 Example output:
@@ -117,7 +150,6 @@ peak FLOPS for GB200 = 4900 TFLOPS
 avg(TFLOPS_GPU) = 1636.8
 MFU =  1636.8 / 4900 = 33.40%
 ```
-
 
 # Prerequisites
 
@@ -169,13 +201,13 @@ The easiest way to run benchmarks is using the llmb-run launcher tool. This meth
 cd $LLMB_INSTALL
 
 # Run a benchmark with llmb-run
-llmb-run single -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128
+llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128
 
 #Example with Llama3.1 70B
-llmb-run single -w pretrain_llama3.1 -s 70b --dtype fp8 --scale 64
+llmb-run submit -w pretrain_llama3.1 -s 70b --dtype fp8 --scale 64
 
 #Example with Llama3.1 8B at a higher scale
-llmb-run single -w pretrain_llama3.1 -s 8b --dtype fp8 --scale 16
+llmb-run submit -w pretrain_llama3.1 -s 8b --dtype fp8 --scale 16
 ```
 
 For more details on llmb-run usage, see the [llmb-run documentation](../cli/llmb-run/README.md).
@@ -186,12 +218,12 @@ Alternatively, you can run training directly using the launch script. This metho
 
 **Important**: 
 - Ensure your virtual environment is activated before running the training commands below. If you used the installer with conda, run `conda activate $LLMB_INSTALL/venvs/<env_name>`. If you used the installer with python venv, run `source $LLMB_INSTALL/venvs/<env_name>/bin/activate`.
-- Run the launch script from the recipe directory: `cd $LLMB_REPO/llama3.1/`
+- Run the launch script from the installed recipe directory: `cd $LLMB_INSTALL/llmb_repo/llama3.1/`
 
 ### Command Template
 
 ```shell
-JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [ADDITIONAL_SLURM_PARAMS=<params>] ./launch.sh
+JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [ADDITIONAL_SLURM_PARAMS=<params>] ./launch.sh
 ```
 
 ### Environment Variables
@@ -205,6 +237,9 @@ JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [ADDITIONAL_SLURM_PARAMS=<params>] ./lau
   - `h100` - NVIDIA H100 GPUs
 
 **Optional:**
+- `DTYPE`: Precision to run (default: `fp8`)
+  - Supported values depend on `GPU_TYPE` and `MODEL_SIZE`. See the tables at the top of this README (and `metadata.yaml`) for supported combinations.
+  - Common values: `fp8`, `bf16`, `nvfp4`
 - `MODEL_SIZE`: Model variant (default: `405b`)
   - `405b` - 405 billion parameter model
   - `70b` - 70 billion parameter model
@@ -218,6 +253,11 @@ JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [ADDITIONAL_SLURM_PARAMS=<params>] ./lau
 Train Llama3.1 405B with FP8 precision on 128 GB200 GPUs:
 ```shell
 JOB_TOTAL_GPUS=128 GPU_TYPE=gb200 ./launch.sh
+```
+
+Train Llama3.1 70B with NVFP4 precision on 64 GB200 GPUs:
+```shell
+MODEL_SIZE=70b DTYPE=nvfp4 JOB_TOTAL_GPUS=64 GPU_TYPE=gb200 ./launch.sh
 ```
 
 Train with FP8 precision on 256 GB200 GPUs:
@@ -268,7 +308,9 @@ experiments/
 │       └── [batch scripts and other files]
 ```
 
-The `<experiment_name>` typically follows the pattern: `pretrain_llama3.1_<model_size>_fp8_cs_<config>`
+The `<experiment_name>` typically follows these patterns:
+- For Llama3 8B/70B: `pretrain_llama3_<model_size>_<dtype>_<config>`
+- For Llama3.1 405B: `pretrain_llama3.1_405b_<dtype>_<config>`
 
 **Key files:**
 - `log-<experiment_name>.out` - Contains training step timing and performance metrics analyzed by `parse_train_timing_mbridge.sh`
@@ -291,7 +333,7 @@ In order to view the resulting profiles, ensure you have the latest version of N
 
 **Example command:**
 ```shell
-llmb-run single -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128 -p
+llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128 -p
 ```
 ### Customizing profiling behavior:
 * Specify job steps to profile:
@@ -300,14 +342,14 @@ llmb-run single -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128 -p
   * `RUN_CONF_PROFILE_STOP_STEP`: stop profiling on this job step.
     Default: 50
 * Enable GPU metrics collection:
-  * `ENABLE_GPU_METRICS`: Enable GPU metrics collection during NSight profiling (default: false)
+  * `ENABLE_GPU_METRICS`: Enable GPU metrics collection during Nsight profiling (default: false)
   - When set to `true` along with `ENABLE_PROFILE=true`, captures detailed GPU performance metrics
   - Provides additional GPU utilization, memory usage, and compute efficiency data
   - May require additional system configuration for GPU device metrics to work properly
 
 **Example command with GPU metrics:**
 ```shell
-ENABLE_GPU_METRICS=true llmb-run single -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128 -p
+ENABLE_GPU_METRICS=true llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128 -p
 ```
 
 ### Viewing results
@@ -322,4 +364,90 @@ Since most of the benchmarking jobs run on multiple GPUs, there will be multiple
 
 **See** these [tutorials](https://developer.nvidia.com/nsight-systems/get-started#tutorials) to get a quick start if you are new to Nsight profiling.
 
+# Run With Checkpoints
+
+Checkpoint save and load can be enabled for this workload in order to measure the impact of storage on checkpointing operations. The additional collected metrics are: time to save a checkpoint and time to load a checkpoint. 
+
+## Save Checkpoint
+
+Save checkpoint feature works for llama3.1 8b, 70b and 405b sizes with either FP8, BF16, or NVFP4 precisions. Make sure your file system has sufficient disk space to accommodate checkpoint sizes below:
+
+| Model | Checkpoint Size | Minimum Tested  Scale GB300 | Minimum Tested Scale GB200 | Minimum Tested Scale B200 | Minimum Tested Scale H100
+| :---: | :---:   |  :---: | :---: | :---: | :---: |
+| 8b    | ~105 GB | 8      | 8     | 8     |   8   |
+| 70b   | ~747 GB | 64     | 64    | 64    |   64  |
+| 405b  | ~5.5 TB | 128    | 128   | 128   |   1024|
+
+### How to enable
+To save the checkpoints after pretraining llama3.1 model for `max_steps`, you need to set environment variable `ENABLE_CHECKPOINT=true`. At the end of the pretraining the checkpoints will be saved in the  `${LLMB_WORKLOAD}/experiments` folder. There is an option to specify the folder where you want to save the checkpoints. This can be enabled by setting environment variable `CHECKPOINT_DIR=/path/to/checkpoints`. 
+
+```shell
+experiment_name = pretrain_llama3_${MODEL_SIZE}_${DTYPE}_gpus${JOB_TOTAL_GPUS}_tp${tp}_pp${pp}_cp${cp}_vp${vp}_ep${ep}_mbs${mbs}_gbs${gbs}
+timestamp = date '+%s'
+Example directory where checkpoints are saved is ${LLMB_WORKLOAD}/experiments/$experiment_name/${experiment_name}_${timestamp}/$experiment_name/code/nemo_experiments/default/checkpoints/
+```
+Command to run llama3.1 with checkpoint save enabled
+```shell
+ENABLE_CHECKPOINT=true DTYPE=<precision> MODEL_SIZE=<size> JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> ./launch.sh
+```
+
+### How to validate
+- Check `${LLMB_WORKLOAD}/experiments/$experiment_name/${experiment_name}_${timestamp}/$experiment_name/code/nemo_experiments/default/checkpoints/iter_0000050` folder that it contains *.distcp files
+- Check job output log-*.out file (see Training section for reference) for entries like
+  ```shell
+    successfully saved checkpoint from iteration      50 to /nemo_run/code/nemo_experiments/default/checkpoints [ t 1/1, p 1/1 ] (min, max) time across ranks (ms): save-checkpoint ................................: (24895.07, 24895.13)
+  ```
+
+## Load Checkpoint
+
+Load checkpoint feature works successfully at the following scales:
+
+| Model | Checkpoint Size | Minimum Tested  Scale GB300 | Minimum Tested Scale GB200 | Minimum Tested Scale B200 | Minimum Tested Scale H100
+| :---: | :---:   |  :---: | :---: | :---: | :---: |
+| 8b    | ~105 GB | 8      | 8     | 8     |   8   |
+| 70b   | ~747 GB | 64     | 64    | 64    |   64  |
+| 405b  | ~5.5 TB | 128    | 128   | 128   |   1024|
+
+**Note**:
+- Running load checkpointing feature at other scales may run into CUDA OOM errors. 
+
+### How to enable
+To resume training from saved checkpoints, you need to set `LOAD_CHECKPOINT_PATH=<path_to_checkpoint_directory>` environment variable. Make sure the checkpoint files are under the `${LLMB_WORKLOAD}/experiments` directory and `LOAD_CHECKPOINT_PATH` variable is set to: `iter_0000050` directory containing distributed checkpoint files with extension `*.distcp`.
+
+E.g., if the checkpoint was saved under `experiments/pretrain_llama3_8b_bf16_gpus8_tp1_pp1_cp1_vpNone_ep1_mbs4_gbs128/pretrain_llama3_8b_bf16_gpus8_tp1_pp1_cp1_vpNone_ep1_mbs4_gbs128_1766132151/pretrain_llama3_8b_bf16_gpus8_tp1_pp1_cp1_vpNone_ep1_mbs4_gbs128/code/nemo_experiments/default/checkpoints/iter_0000050/*` then set the environment variable to a directory one level higher: 
+
+`LOAD_CHECKPOINT_PATH=${LLMB_WORKLOAD}/experiments/pretrain_llama3_8b_bf16_gpus8_tp1_pp1_cp1_vpNone_ep1_mbs4_gbs128/pretrain_llama3_8b_bf16_gpus8_tp1_pp1_cp1_vpNone_ep1_mbs4_gbs128_1766132151/pretrain_llama3_8b_bf16_gpus8_tp1_pp1_cp1_vpNone_ep1_mbs4_gbs128/code/nemo_experiments/default/checkpoints/iter_0000050`
+
+The scripts will restore configuration from the checkpoint and resume training process. Training will run for 1 step after checkpoint has been loaded.
+
+```shell
+LOAD_CHECKPOINT_PATH=<your_path_to_checkpoint_directory> JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> DTYPE=<precision> MODEL_SIZE=<size> ./launch.sh
+```
+
+### How to validate
+
+To validate that checkpoint was loaded successfully look for the entry like below in the main job log-*.out file and make sure there is only 1 iteration of training (see Training section for reference):
+
+```shell
+checkpoint:
+...
+...
+...
+  load:.../.../experiments/pretrain_llama3_8b_bf16_gpus8_tp1_pp1_cp1_vpNone_ep1_mbs4_gbs128/pretrain_llama3_8b_bf16_gpus8_tp1_pp1_cp1_vpNone_ep1_mbs4_gbs128_1766132151/pretrain_llama3_8b_bf16_gpus8_tp1_pp1_cp1_vpNone_ep1_mbs4_gbs128/code/nemo_experiments/default/checkpoints/iter_0000050
+...
+...
+...
+[2025-12-19 10:49:15] iteration        1/       1 | consumed samples:          128 | elapsed time per iteration (ms): 20289.1 | learning rate: 3.000000E-05 | global batch size:   128 | lm loss: 1.258695E+01 | loss scale: 1.0 | grad norm: 10.275 | number of skipped iterations:   0 | number of nan iterations:   0 |Number of parameters in transformer layers in billions:  6.98
+
+Number of parameters in embedding layers in billions: 1.05
+Total number of parameters in billions: 8.03
+Number of parameters in most loaded shard in billions: 8.0305
+Theoretical memory footprints: weight and optimizer=57438.81 MB
+[Rank 0] (after 1 iterations) memory (GB) | mem-allocated-gigabytes: 51.072 | mem-active-gigabytes: 51.072 | mem-inactive-gigabytes: 10.971 | mem-reserved-gigabytes: 216.89 | mem-max-allocated-gigabytes: 194.41 | mem-max-active-gigabytes: 195.46 | mem-max-inactive-gigabytes: 14.369 | mem-max-reserved-gigabytes: 216.89 | mem-alloc-retires: 0 | mem-allocated-count: 571
+Deleting CUDA graphs
+[after training is done] datetime: 2025-12-19 10:49:16
+```
+
+
 <!-- NCCL trace support removed. Documentation section deleted intentionally. -->
+

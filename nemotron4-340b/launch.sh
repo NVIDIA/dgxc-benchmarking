@@ -149,7 +149,6 @@ fi
 
 if [[ $ENABLE_CHECKPOINT == true ]]; then
     CONFIG_OVERRIDES+=" --checkpoint_save=True "
-    CONFIG_OVERRIDES+=" --hf_token ${HF_TOKEN:?HF_TOKEN is required when ENABLE_CHECKPOINT=true} "
 else
     CONFIG_OVERRIDES+=" --checkpoint_save=False "
 fi
@@ -165,7 +164,6 @@ if [[ -n ${LOAD_CHECKPOINT_PATH-} ]]; then
         CONTAINER_MOUNTS+=","
     fi
     CONTAINER_MOUNTS+="${LOAD_CHECKPOINT_PATH}"
-    CONFIG_OVERRIDES+=" --hf_token ${HF_TOKEN:?HF_TOKEN is required when loading checkpoints} "
 fi
 
 if [[ -n ${CONTAINER_MOUNTS} ]]; then

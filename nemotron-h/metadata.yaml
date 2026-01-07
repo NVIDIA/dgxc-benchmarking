@@ -1,45 +1,58 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: MIT
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+
 # Setup
 general:
   workload: nemotron-h
   workload_type: pretrain
-  framework: nemo2
+  framework: megatron_bridge
 
 container:
   images: 
-    - 'nvcr.io#nvidia/nemo:25.09.00'
+    - 'nvcr.io#nvidia/nemo:25.11.01'
 
 repositories:
-  nemo:
-    url: "https://github.com/NVIDIA-NeMo/NeMo.git"
-    commit: "d08a1425475bd706bd48960df1770c7d24108616"
-  megatron_core:
-    url: "https://github.com/NVIDIA/Megatron-LM.git"
-    commit: "20d73fe76eb03672c02f637e9b47e562b9010d4c"
+  megatron_bridge:
+    url: "https://github.com/NVIDIA-NeMo/Megatron-Bridge.git"
+    commit: "15927667edd2ff6f37b0b06f485f9d812775124b"
+
   nemo_run:
     url: "https://github.com/NVIDIA-NeMo/Run.git"
-    commit: "04f900a9c1cde79ce6beca6a175b4c62b99d7982"
+    commit: "01a9a8ba360f7b2908728ad0516e0ad9d936966d"
 
 setup:
   venv_req: true
   dependencies:
+    git:
+      megatron_bridge:
+        repo_key: megatron_bridge
+        install_method:
+          type: clone
     pip:
-      - package: nemo
-        repo_key: nemo
-        install_target: '.[nlp]'
-      - 'scipy<1.13.0'
-      - 'bitsandbytes==0.46.0'
-      - 'nvidia-modelopt==0.35.1'
-      - package: megatron-core
-        repo_key: megatron_core
       - package: nemo_run
         repo_key: nemo_run
 
-tools:
-  cuda_cupti_lib: "13.0.85"
-
 # Run
 run:
-  launcher_type: 'nemo'
+  launcher_type: 'megatron_bridge'
   launch_script: 'launch.sh'
 
   gpu_configs:
@@ -59,10 +72,10 @@ run:
       model_configs:
         - model_size: '56b'
           dtypes: 'fp8'
-          scales: [32, 64, 128, 256, 512]
+          scales: [64, 128, 256, 512]
 
     h100:
       model_configs:
         - model_size: '56b'
           dtypes: 'fp8'
-          scales: [64, 128, 256, 512, 1024, 2048]
+          scales: [64, 128, 256, 512, 1024]

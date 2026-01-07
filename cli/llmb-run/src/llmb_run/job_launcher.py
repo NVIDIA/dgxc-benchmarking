@@ -39,7 +39,7 @@ from llmb_run.constants import (
 from llmb_run.nsys_mount_handler import get_tool_mounts
 from llmb_run.run_config import create_llmb_config
 from llmb_run.slurm_utils import SlurmJob, get_cluster_name
-from llmb_run.task_manager import format_task_output
+from llmb_run.tasks import format_task_output
 
 logger = logging.getLogger('llmb_run.job_launcher')
 console = Console()
@@ -466,7 +466,7 @@ class Nemo2Launcher(JobLauncher):
                     logger.info(f"JobID: {job_id}, Workdir: {local_dir}")
 
                     # Apply scontrol nice if specified
-                    if nice_value := task.extra_slurm_params.get('nice'):
+                    if nice_value := (task.extra_slurm_params or {}).get('nice'):
                         scontrol_cmd = ["scontrol", "update", f"jobid={job_id}", f"nice={nice_value}"]
                         try:
                             scontrol_result = subprocess.run(
@@ -527,6 +527,7 @@ def create_launcher(launcher_type, config, workloads):
 def run_tests(config, task_list, workloads):
     """Run tests using the appropriate launcher for each task."""
     launchers = {}
+    failed_tasks = []
 
     for task in task_list:
         # Get launcher type from workload metadata
@@ -534,6 +535,7 @@ def run_tests(config, task_list, workloads):
         launcher_type = metadata.get('run', {}).get('launcher_type')
         if not launcher_type:
             logger.error(f"Missing required 'run.launcher_type' field in metadata for workload {task.workload_key}")
+            failed_tasks.append(task)
             continue
 
         # Create launcher if not already created
@@ -542,10 +544,15 @@ def run_tests(config, task_list, workloads):
                 launchers[launcher_type] = create_launcher(launcher_type, config, workloads)
             except ValueError as e:
                 logger.error(f"Failed to create launcher for {task.workload_key}: {e}")
+                failed_tasks.append(task)
                 continue
 
         # Launch the task
         slurm_job = launchers[launcher_type].launch(task)
+
+        if not slurm_job.job_id:
+            failed_tasks.append(task)
+            continue
 
         # Run post-processing pipeline (resparse, upload, workload inspector)
         if slurm_job.job_id and slurm_job.job_workdir:
@@ -570,3 +577,6 @@ def run_tests(config, task_list, workloads):
                 pass
             except Exception as e:
                 logger.warning(f"Post-processing pipeline failed: {e}")
+
+    if failed_tasks:
+        raise RuntimeError(f"Failed to launch {len(failed_tasks)} out of {len(task_list)} tasks.")

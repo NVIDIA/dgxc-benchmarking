@@ -178,6 +178,69 @@ EOF
 fi
 popd
 
+# --------------------------------------------------------------------------
+#
+# Sets up environment variables for profiling with Nsight Systems (nsys).
+#
+# This function checks if profiling is enabled. If so, it constructs the
+# `NSYS_PREFIX_CMD` string, conditionally adding GPU metrics collection.
+# If profiling is disabled, it ensures the command string is empty.
+#
+# @param {string} results_dir - The base directory to store nsys output files.
+#
+# Assumes the following environment variables are set:
+#   - PROFILE_ENABLED
+#   - GPU_METRICS_ENABLED (optional)
+#   - PROFILE_START, PROFILE_END
+#   - log_prefix, slurm_procid, SLURM_LOCALID, slurm_jobid
+#
+# Exports:
+#   - NSYS_PREFIX_CMD
+#   - TLLM_* profiling variables
+#
+# --------------------------------------------------------------------------
+
+export PROFILE_ENABLED=${ENABLE_PROFILE:-false}
+export GPU_METRICS_ENABLED=${ENABLE_GPU_METRICS:-false}
+export PROFILE_START=${PROFILE_START:-0}
+export PROFILE_END=${PROFILE_END:-1}
+
+function setup_nsys_profiling() {
+    local results_dir="$1"
+
+    if [[ -z $results_dir ]]; then
+        echo "Error: setup_nsys_profiling requires a results directory." >&2
+        return 1
+    fi
+
+    if [[ ${PROFILE_ENABLED} == "true" ]]; then
+        # Enable TensorRT-LLM profiling hooks
+        export TLLM_PROFILE_RECORD_GC=1
+        export TLLM_LLMAPI_ENABLE_NVTX=1
+        export TLLM_PROFILE_START_STOP=${PROFILE_START}-${PROFILE_END}
+
+        # Prepare directory and filename for nsys output
+        mkdir -p "${results_dir}/nsys_profile"
+        local nsys_file="${results_dir}/nsys_profile/profile_${SLURM_JOB_ID}_${SLURM_PROCID}_${SLURM_LOCALID}"
+
+        # Build the nsys command string
+        local nsys_cmd="nsys profile -s none -t cuda,nvtx -f true -c cudaProfilerApi --capture-range-end=\"repeat[]\" \
+        --cuda-graph-trace=node --cuda-event-trace=false --cpuctxsw=none --cuda-flush-interval=10000"
+
+        # Conditionally add GPU metrics flag
+        if [[ ${GPU_METRICS_ENABLED} == "true" ]]; then
+            nsys_cmd+=" --gpu-metrics-devices all"
+        fi
+
+        # Add the output file argument and export the final command
+        nsys_cmd+=" -o ${nsys_file}"
+        export NSYS_PREFIX_CMD="${nsys_cmd}"
+    fi
+}
+
+# Export the function so srun's subshells can find it
+export -f setup_nsys_profiling
+
 # Setting environment variables
 export CONFIG_FILE=$LLMB_WORKLOAD/config_${EPOCH_MS}.yml
 use_case=$(echo "$USE_CASE" | cut -d':' -f1)
@@ -192,7 +255,7 @@ export DATASET_FILE=$LLMB_WORKLOAD/dataset_${use_case}_${ISL}_${OSL}.txt
 echo "Now Benchmarking: $use_case : $ISL / $OSL using $DATASET_FILE"
 
 #launch trt-llm benchmark
-CMD="trtllm-llmapi-launch trtllm-bench -m ${MODEL_CARD} \
+export CMD="trtllm-llmapi-launch trtllm-bench -m ${MODEL_CARD} \
     --model_path ${MODEL_PATH} throughput \
     --tp $TP \
     --ep $EP \
@@ -207,17 +270,23 @@ CMD="trtllm-llmapi-launch trtllm-bench -m ${MODEL_CARD} \
     --concurrency ${CONCURRENCY} \
     $streaming_flag"
 
-echo "Launching srun command with:"
-echo "$CMD"
-
 export SLURM_MPI_TYPE="pmix"
 export SRUN_OUTPUT=${RESULT_DIR}/${RESULT_FILES_NAME}_%j.out
 export SRUN_ERROR=${RESULT_DIR}/${RESULT_FILES_NAME}_%j.err
 
-srun --container-image "$IMAGE" \
+srun --export=ALL \
+    --container-image "$IMAGE" \
     --container-mounts "$MOUNT_DIR" \
     --container-writable \
-    --no-container-mount-home bash -c "$CMD"
+    --no-container-mount-home \
+    bash -c "
+    NSYS_PREFIX_CMD=\"\"
+    setup_nsys_profiling \"${RESULT_DIR}\"
+
+    echo 'Launching srun command with:'
+    echo \"\${NSYS_PREFIX_CMD} ${CMD}\"
+    eval \"\${NSYS_PREFIX_CMD} ${CMD}\"
+  "
 
 echo "Results Log: $SRUN_OUTPUT"
 echo "Error Log: $SRUN_ERROR"

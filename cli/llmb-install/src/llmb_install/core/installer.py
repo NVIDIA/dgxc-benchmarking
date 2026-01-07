@@ -53,6 +53,7 @@ from llmb_install.core.dependency import (
     install_dependencies,
     print_dependency_group_summary,
 )
+from llmb_install.core.exemplar import get_exemplar_workloads, validate_exemplar_workloads
 from llmb_install.core.workload import (
     build_workload_dict,
     filter_tools_from_workload_list,
@@ -1287,6 +1288,8 @@ class Installer:
             filtered_workloads,
             show_exemplar_option=not dev_mode,
             default_mode=defaults.get('workload_selection_mode', 'custom'),
+            llmb_repo=self.root_dir,
+            gpu_type=gpu_type,
         )
         if not selected:
             print("\nInstallation cancelled.")
@@ -1890,30 +1893,26 @@ class Installer:
                 selected = [w.strip() for w in args.workloads.split(',') if w.strip()]
                 ui.log(f"Installing specified workloads: {', '.join(selected)}")
         elif getattr(args, 'exemplar', False):
-            # Exemplar mode: Select all 'pretrain' recipes
+            # Exemplar mode: Use exemplar.yaml to select workloads
             workload_selection_mode = 'exemplar'
             filtered_workloads = filter_workloads_by_gpu_type(self.workloads, system_config.gpu_type)
             if not filtered_workloads:
                 print(f"Error: No workloads available for GPU type: {system_config.gpu_type}")
                 raise SystemExit(1)
 
-            # Add tools
+            # Add tools and resolve GPU overrides
             tools = filter_tools_from_workload_list(self.workloads)
             filtered_workloads.update(tools)
-
-            # Resolve GPU overrides
             filtered_workloads = resolve_gpu_overrides(filtered_workloads, system_config.gpu_type)
 
-            selected = []
-            for key, data in filtered_workloads.items():
-                if data.get('general', {}).get('workload_type') == 'pretrain':
-                    selected.append(key)
-
-            if not selected:
-                print(f"Error: No 'pretrain' workloads found for GPU type: {system_config.gpu_type}")
-                raise SystemExit(1)
-
-            ui.log(f"Installing Exemplar Cloud (pretrain) workloads: {', '.join(selected)}")
+            # Get and validate workloads from exemplar.yaml
+            try:
+                base_keys = get_exemplar_workloads(Path(self.root_dir), system_config.gpu_type)
+                selected = validate_exemplar_workloads(base_keys, filtered_workloads, system_config.gpu_type)
+                ui.log(f"Installing Exemplar Cloud workloads from exemplar.yaml: {', '.join(selected)}")
+            except ValueError as e:
+                print(f"Error: {e}")
+                raise SystemExit(1) from e
         else:
             # Prompt for workload selection
             filtered_workloads = filter_workloads_by_gpu_type(self.workloads, system_config.gpu_type)

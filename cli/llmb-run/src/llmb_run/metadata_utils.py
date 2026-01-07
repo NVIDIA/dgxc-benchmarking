@@ -26,11 +26,33 @@
 
 Centralizes normalization for dtype/scales configuration so all call sites
 behave consistently.
+
+Scale Validation Modes:
+-----------------------
+The 'exact_scales' field controls how scale validation works:
+
+- exact_scales=False (default): Flexible scale validation
+  * Allows scales explicitly listed in metadata
+  * Allows scales ABOVE the maximum tested scale (with warning)
+  * Use case: Workloads that can scale beyond tested configurations
+  * Example: If metadata has scales=[128, 256], user can run scale=512
+
+- exact_scales=True: Strict scale validation
+  * ONLY allows scales explicitly listed in metadata
+  * Rejects any scale not in the list
+  * Use case: Workloads with specific hardware requirements or tested configs only
+  * Example: If metadata has scales=[128, 256], scale=512 is rejected
+
+This distinction is important for:
+1. Preventing users from running untested configurations on strict workloads
+2. Allowing exploration of larger scales on flexible workloads
+3. Providing clear validation errors when scales are not supported
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from typing import Dict, List
 
 logger = logging.getLogger("llmb_run.metadata_utils")
@@ -110,3 +132,37 @@ def normalize_model_dtype_config(model_config: dict) -> Dict[str, Dict[str, obje
         }
 
     return normalized
+
+
+def parse_workload_name(workload_name: str) -> tuple[str, str | None]:
+    """Parse workload name into base workload_key and optional model_size suffix.
+
+    The model_size suffix pattern is: _<digits>[.<digits>]b at end of string
+
+    Args:
+        workload_name: Full workload name (e.g., 'pretrain_llama3.1_70b')
+
+    Returns:
+        Tuple of (workload_key, model_size) or (workload_name, None) if no valid suffix
+
+    Examples:
+        >>> parse_workload_name('pretrain_foo_7b')
+        ('pretrain_foo', '7b')
+        >>> parse_workload_name('pretrain_bar_340b')
+        ('pretrain_bar', '340b')
+        >>> parse_workload_name('pretrain_baz')
+        ('pretrain_baz', None)
+        >>> parse_workload_name('pretrain_invalid_7x')
+        ('pretrain_invalid_7x', None)
+    """
+    if '_' not in workload_name:
+        return workload_name, None
+
+    parts = workload_name.rsplit('_', 1)
+    potential_size = parts[1]
+
+    # Check if last segment matches model size pattern
+    if re.match(r'^\d+(\.\d+)?b$', potential_size):
+        return parts[0], potential_size
+
+    return workload_name, None

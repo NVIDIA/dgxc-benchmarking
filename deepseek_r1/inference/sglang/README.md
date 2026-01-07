@@ -1,7 +1,7 @@
- Overview
+# Overview
 This recipe provides instructions and scripts for benchmarking the performance of the DeepSeek-R1-FP4 model with the sglang benchmark suite.
 
-The script uses sglang release containers to benchmark the [DeepSeek-R1-FP4](https://huggingface.co/nvidia/DeepSeek-R1-FP4) inference workload. In this recipe, we are benchmarking Max throughput usecase only.
+The script uses sglang release containers to benchmark the [DeepSeek-R1-FP4](https://huggingface.co/nvidia/DeepSeek-R1-FP4) inference workload. In this recipe, we benchmark the max-throughput use case only.
 - **Maximum throughput**: The system is configured to generate as many tokens per second as possible. This typically involves large batch sizes, long generation lengths, and aggressive request packing to fully utilize GPU compute. While this approach increases overall efficiency and hardware utilization, it also results in higher latency for individual requests. It's ideal for offline processing, batch jobs, or queued summarization tasks.
 
 <div style="background-color: #ffeeba; padding: 10px; border-left: 6px solid #f0ad4e;">
@@ -31,7 +31,6 @@ Below, we list the inference configuration and benchmarking performance of max t
 | summarization |    8 | 8,000 | 512   |  4,096 | 2,048   | 32,768 | 10,000    |   0.8    | NVFP4    |    8 |    1 |    8 |     Yes         |
 | generation    |    8 | 512   | 8,000 |  4,096 | 2,048   | 32,768 | 10,000    |   0.8    | NVFP4    |    8 |    1 |    8 |     Yes         |
 
-
 **Note**
 - mem-fraction-static: fraction of memory allocated to store the kv cache values after loading the model weights.
 - enable-dp-attention: This flag in the config.yml dictates whether `Data parallelism` is enabled or disabled for the attention layers.
@@ -39,12 +38,6 @@ Below, we list the inference configuration and benchmarking performance of max t
 
 More details about the inference terms can be found here [Appendix](../../../APPENDIX.md)
 
-**Note** Below are the metrics measured for this inference workload
-- TPS/GPU: Throughput per second per GPU
-- TPS/User: Throughput per second per user
-- Average Latency: Average time for a a request to get served
-- TTFT: Time for first token
-- TPOT: Time between output tokens
 
 # Prepare Environment
 
@@ -79,32 +72,32 @@ cd $LLMB_INSTALL
 
 # Run a benchmark on GB200 with llmb-run per use case for the maximum throughput scenario (** Recommended **)
 # Reasoning
-USE_CASES="reasoning:1000/1000" llmb-run single -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 4
+MAX_BATCH_SIZE=1024 CONCURRENCY=4096 CHUNKED_PREFILL_SIZE=16384 NUM_PROMPTS=20000 MEM_FRACTION_STATIC=0.8 USE_CASES="reasoning:1000/1000" llmb-run submit -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 4
 
 # Chat
-USE_CASES="chat:128/128" llmb-run single -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 4
+MAX_BATCH_SIZE=1024 CONCURRENCY=12000 CHUNKED_PREFILL_SIZE=32768 NUM_PROMPTS=60000 MEM_FRACTION_STATIC=0.8 USE_CASES="chat:128/128" llmb-run submit -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 4
 
 # Summarization
-USE_CASES="summarization:8000/512" llmb-run single -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 4
+MAX_BATCH_SIZE=1024 CONCURRENCY=4096 CHUNKED_PREFILL_SIZE=32768 NUM_PROMPTS=20000 MEM_FRACTION_STATIC=0.8 USE_CASES="summarization:8000/512" llmb-run submit -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 4
 
 # Generation
-USE_CASES="generation:512/8000" llmb-run single -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 4
+MAX_BATCH_SIZE=1024 CONCURRENCY=1024 CHUNKED_PREFILL_SIZE=32768 NUM_PROMPTS=5000 MEM_FRACTION_STATIC=0.8 USE_CASES="generation:512/8000" llmb-run submit -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 4
 
 # Run a benchmark on B200 with llmb-run per use case for the maximum throughput scenario (** Recommended **)
 # Reasoning
-USE_CASES="reasoning:1000/1000" llmb-run single -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 8
+MAX_BATCH_SIZE=4096 CONCURRENCY=4096 CHUNKED_PREFILL_SIZE=32768 NUM_PROMPTS=20000 MEM_FRACTION_STATIC=0.7 USE_CASES="reasoning:1000/1000" llmb-run submit -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 8
 
 # Chat
-USE_CASES="chat:128/128" llmb-run single -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 8
+MAX_BATCH_SIZE=4096 CONCURRENCY=4096 CHUNKED_PREFILL_SIZE=16384 NUM_PROMPTS=20000 MEM_FRACTION_STATIC=0.7 USE_CASES="chat:128/128" llmb-run submit -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 8
 
 # Summarization
-USE_CASES="summarization:8000/512" llmb-run single -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 8
+MAX_BATCH_SIZE=4096 CONCURRENCY=2048 CHUNKED_PREFILL_SIZE=32768 NUM_PROMPTS=10000 MEM_FRACTION_STATIC=0.8 USE_CASES="summarization:8000/512" llmb-run submit -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 8
 
 # Generation
-USE_CASES="generation:512/8000" llmb-run single -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 8
+MAX_BATCH_SIZE=4096 CONCURRENCY=2048 CHUNKED_PREFILL_SIZE=32768 NUM_PROMPTS=10000 MEM_FRACTION_STATIC=0.8 USE_CASES="generation:512/8000" llmb-run submit -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 8
 ```
 
-- Single use cases and their optimized parameters are listed above and work out of the box. Advanced users can add more use_cases and configurations in the `launch_server.sh and launch.sh`
+- Single use cases and their optimized parameters are listed above and work out of the box. Advanced users can add more use cases and configurations in `launch_server.sh` and `launch.sh`.
 - Use cases such as summarization and generation do not work well with large prompts, so the total prompts are decreased for these usescase.
 
 
@@ -115,10 +108,10 @@ USE_CASES="generation:512/8000" llmb-run single -w inference_deepseek-r1-sglang 
 ```bash
 # Multi USE_CASE example on GB200
 # Note that running multiple use cases at once may take longer time and it is advised to adjust the SBATCH time limits accordingly.
- USE_CASES="reasoning:1000/1000 chat:128/128" llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
+ USE_CASES="reasoning:1000/1000 chat:128/128" llmb-run submit -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 4
 
 # Multi USE_CASE example on B200
- USE_CASES="reasoning:1000/1000 chat:128/128" llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 8
+ USE_CASES="reasoning:1000/1000 chat:128/128" llmb-run submit -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 8
 ```
 
 For more details on llmb-run usage, see the [llmb-run documentation](../../../cli/llmb-run/README.md).
@@ -128,8 +121,8 @@ For more details on llmb-run usage, see the [llmb-run documentation](../../../cl
 Alternatively, you can run inference scripts directly using the launch script. This method provides more control over individual parameters and environment variables.
 
 **Important**:
-- Ensure your virtual environment is activated before running the training commands below. If you used the installer with conda, run `conda activate $LLMB_INSTALL/venvs/<env_name>`. If you used the installer with python venv, run `source $LLMB_INSTALL/venvs/<env_name>/bin/activate`.
-- Run the launch script from the recipe directory: `cd $LLMB_REPO/deepseek-r1/inference/sglang`
+- Ensure your virtual environment is activated before running the benchmark commands below. If you used the installer with conda, run `conda activate $LLMB_INSTALL/venvs/<env_name>`. If you used the installer with python venv, run `source $LLMB_INSTALL/venvs/<env_name>/bin/activate`.
+- Run the launch script from the installed recipe directory: `cd $LLMB_INSTALL/llmb_repo/deepseek_r1/inference/sglang/`
 
 ### Command Template
 

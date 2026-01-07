@@ -81,11 +81,11 @@ The installer will:
 **Example workflow**:
 ```bash
 # Initial installation
-llmb-install  # Install nemotron and llama3.1
+llmb-install  # Install one workload
 
 # Later, add more workloads
 cd /work/llmb  # Navigate to your LLMB_INSTALL directory
-llmb-install   # Select mixtral and grok1 when prompted
+llmb-install   # Select additional workloads when prompted.
 ```
 
 **Note**: You only select the new workloads you want to add. The installer automatically preserves existing workloads and their configurations.
@@ -99,7 +99,7 @@ After your first successful installation, the installer saves system configurati
 llmb-install express /work/llmb --workloads all
 
 # Express mode with specific workloads
-llmb-install express /work/llmb --workloads nemotron,llama3.1
+llmb-install express /work/llmb --workloads pretrain_nemotron-h,pretrain_llama3.1
 
 # Express mode with prompts for missing values
 llmb-install express
@@ -312,7 +312,6 @@ llmb-install --play config.yaml
 
 # Help and version
 llmb-install --help
-llmb-install --version
 llmb-install express --help
 ```
 
@@ -338,13 +337,15 @@ llmb-install express --help
 | Flag | Purpose | Example |
 |------|---------|---------|
 | `install_path` (positional) | Installation directory | `llmb-install express /work/llmb` |
-| `-w, --workloads` | Workloads to install | `--workloads all` or `--workloads nemotron,llama3.1` |
+| `-w, --workloads` | Workloads to install | `--workloads all` or `--workloads pretrain_nemotron-h,pretrain_llama3.1` |
 | `--exemplar` | Install all 'pretrain' reference workloads (Exemplar Cloud) | `llmb-install express --exemplar` |
 | `--list-workloads` | Show available workloads and exit | `llmb-install express --list-workloads` |
 
+**Note on flag order**: `-v/--verbose`, `-i/--image-folder`, and `-d/--dev-mode` are **global flags** and must be provided **before** the `express` subcommand (e.g. `llmb-install -v express ...`).
+
 **Combined example**:
 ```bash
-llmb-install express -v -i /shared/containers /work/llmb --workloads all
+llmb-install -v -i /shared/containers express /work/llmb --workloads all
 ```
 
 ## Advanced Usage
@@ -354,7 +355,7 @@ llmb-install express -v -i /shared/containers /work/llmb --workloads all
 When developing or testing recipes, use `--dev-mode` to work directly with the original repository:
 
 ```bash
-llmb-install express -d /work/llmb --workloads test_workload
+llmb-install -d express /work/llmb --workloads test_workload
 # OR for interactive mode with streamlined selection:
 llmb-install -d
 ```

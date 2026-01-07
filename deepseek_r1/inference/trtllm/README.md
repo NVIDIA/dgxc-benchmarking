@@ -1,5 +1,5 @@
 # Overview
-This recipe provides instructions and scripts for benchmarking the performance of the DeepSeek-R1 model with Nvidia TRT-LLM (TensorRT-LLM) benchmark suite.
+This recipe provides instructions and scripts for benchmarking the performance of the DeepSeek-R1 model with NVIDIA TRT-LLM (TensorRT-LLM) benchmark suite.
 
 The script uses TRT-LLM release containers to benchmark inference workloads [DeepSeek-R1-FP4](https://huggingface.co/nvidia/DeepSeek-R1-FP4) on GB200/ B200 and [DeepSeek-R1-FP8](https://huggingface.co/deepseek-ai/DeepSeek-R1) on H100 platform. 
 
@@ -50,12 +50,6 @@ Below, we list the inference configuration and benchmarking performance DeepSeek
 
 More details about the inference terms can be found here [Appendix](../../../APPENDIX.md)
 
-**Note** Below are the metrics measured for this inference workload
-- TPS/GPU: Throughput per second per GPU
-- TPS/User: Throughput per second per user
-- Average Latency: Average time for a a request to get served
-- TTFT: Time for first token
-- TPOT: Time between output tokens
 
 ## Minimum latency
 
@@ -105,37 +99,37 @@ cd $LLMB_INSTALL
 ### GB200 and B200
 ```bash
 # Reasoning
-MODE="max_throughput" MAX_NUM_TOKENS=6000 MAX_BATCH_SIZE=768 USE_CASE=reasoning:1000/1000 ENABLE_CHUNKED_PREFILL=false llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
+MODE="max_throughput" MAX_NUM_TOKENS=6000 MAX_BATCH_SIZE=768 USE_CASE=reasoning:1000/1000 ENABLE_CHUNKED_PREFILL=false llmb-run submit -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
 ```
 ```bash
 # Chat
-MODE="max_throughput" MAX_NUM_TOKENS=16000 MAX_BATCH_SIZE=2884 KV_CACHE_FRACTION=0.5 ENABLE_CHUNKED_PREFILL=false USE_CASE=chat:128/128 llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
+MODE="max_throughput" MAX_NUM_TOKENS=16000 MAX_BATCH_SIZE=2884 KV_CACHE_FRACTION=0.5 ENABLE_CHUNKED_PREFILL=false USE_CASE=chat:128/128 llmb-run submit -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
 ```
 ```bash
 # Summarization
-MODE="max_throughput" MAX_NUM_TOKENS=9000 MAX_BATCH_SIZE=160 KV_CACHE_FRACTION=0.69 USE_CASE=summarization:8000/512 llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
+MODE="max_throughput" MAX_NUM_TOKENS=9000 MAX_BATCH_SIZE=160 KV_CACHE_FRACTION=0.69 USE_CASE=summarization:8000/512 llmb-run submit -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
 ```
 ```bash
 # Generation
-MODE="max_throughput" SBATCH_TIMELIMIT=1:40:00 MAX_BATCH_SIZE=224 KV_CACHE_FRACTION=0.97 USE_CASE=generation:512/8000 llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
+MODE="max_throughput" SBATCH_TIMELIMIT=1:40:00 MAX_BATCH_SIZE=224 KV_CACHE_FRACTION=0.97 USE_CASE=generation:512/8000 llmb-run submit -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
 ```
 
 ### H100
 ```bash
 # Reasoning
-MODE="max_throughput" MAX_BATCH_SIZE=384 CONCURRENCY=3072 MAX_NUM_TOKENS=3000 NUM_REQUESTS=30720 USE_CASE=reasoning:1000/1000 llmb-run single -w inference_deepseek-r1 -s 671b --dtype fp8 --scale 16
+MODE="max_throughput" MAX_BATCH_SIZE=384 CONCURRENCY=3072 MAX_NUM_TOKENS=3000 NUM_REQUESTS=30720 USE_CASE=reasoning:1000/1000 llmb-run submit -w inference_deepseek-r1 -s 671b --dtype fp8 --scale 16
 ```
 ```bash
 # Chat
-MODE="max_throughput"  MAX_BATCH_SIZE=384 CONCURRENCY=3072 MAX_NUM_TOKENS=2000 NUM_REQUESTS=3000 USE_CASE=chat:128/128 llmb-run single -w inference_deepseek-r1 -s 671b --dtype fp8 --scale 16
+MODE="max_throughput"  MAX_BATCH_SIZE=384 CONCURRENCY=3072 MAX_NUM_TOKENS=2000 NUM_REQUESTS=3000 USE_CASE=chat:128/128 llmb-run submit -w inference_deepseek-r1 -s 671b --dtype fp8 --scale 16
 ```
 ```bash
 # Summarization
-MODE="max_throughput" MAX_BATCH_SIZE=128 CONCURRENCY=1024 MAX_NUM_TOKENS=2000 NUM_REQUESTS=10000 USE_CASE=summarization:8000/512 llmb-run single -w inference_deepseek-r1 -s 671b --dtype fp8 --scale 16
+MODE="max_throughput" MAX_BATCH_SIZE=128 CONCURRENCY=1024 MAX_NUM_TOKENS=2000 NUM_REQUESTS=10000 USE_CASE=summarization:8000/512 llmb-run submit -w inference_deepseek-r1 -s 671b --dtype fp8 --scale 16
 ```
 ```bash
 # Generation
-MODE="max_throughput" SBATCH_TIMELIMIT=1:40:00 MAX_BATCH_SIZE=450 CONCURRENCY=450 MAX_NUM_TOKENS=1000 NUM_REQUESTS=4500 USE_CASE=generation:512/8000 llmb-run single -w inference_deepseek-r1 -s 671b --dtype fp8 --scale 16
+MODE="max_throughput" SBATCH_TIMELIMIT=1:40:00 MAX_BATCH_SIZE=450 CONCURRENCY=450 MAX_NUM_TOKENS=1000 NUM_REQUESTS=4500 USE_CASE=generation:512/8000 llmb-run submit -w inference_deepseek-r1 -s 671b --dtype fp8 --scale 16
 ```
 
 ## Minimum latency scenario
@@ -143,38 +137,38 @@ MODE="max_throughput" SBATCH_TIMELIMIT=1:40:00 MAX_BATCH_SIZE=450 CONCURRENCY=45
 ### GB200
 ```bash
 # Reasoning
-MODE="min_latency" MAX_NUM_TOKENS=1000 USE_CASE=reasoning:1000/1000 llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
+MODE="min_latency" MAX_NUM_TOKENS=1000 USE_CASE=reasoning:1000/1000 llmb-run submit -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
 ```
 ```bash
 # Chat
-MODE="min_latency" MAX_NUM_TOKENS=128 USE_CASE=chat:128/128 llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
+MODE="min_latency" MAX_NUM_TOKENS=128 USE_CASE=chat:128/128 llmb-run submit -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
 ```
 ```bash
 # Summarization
-MODE="min_latency" MAX_NUM_TOKENS=8000 USE_CASE=summarization:8000/512 llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
+MODE="min_latency" MAX_NUM_TOKENS=8000 USE_CASE=summarization:8000/512 llmb-run submit -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
 ```
 ```bash
 # Generation
-MODE="min_latency" MAX_NUM_TOKENS=512 USE_CASE=generation:512/8000 llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
+MODE="min_latency" MAX_NUM_TOKENS=512 USE_CASE=generation:512/8000 llmb-run submit -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
 ```
 
-- Single use cases and their optimized parameters are listed above and work out of the box. Advanced users can add more use_cases in the `setup.sh` 
+- Single use cases and their optimized parameters are listed above and work out of the box. Advanced users can add more use cases in `setup.sh`.
 - Advanced users can learn more about: 
   - [Tuning Max Batch Size and Max Num Tokens](https://nvidia.github.io/TensorRT-LLM/performance/performance-tuning-guide/tuning-max-batch-size-and-max-num-tokens.html#tuning-max-batch-size-and-max-num-tokens) to adjust the inflight batching scheduler 
   -  [Max Tokens in Paged KV Cache and KV Cache Free GPU Memory Fraction](https://nvidia.github.io/TensorRT-LLM/performance/performance-tuning-guide/useful-runtime-flags.html#max-tokens-in-paged-kv-cache-and-kv-cache-free-gpu-memory-fraction) to control the maximum number of tokens handled by the KV cache manager
 - Use cases such as summarization and generation take significantly more time so the time limits are increased accordingly.
 
 **Streaming:**
-- You can toggle streaming on and off. When off, users recieve the entire response (all output tokens) back at once instead of receiving output tokens as they are generated
+- You can toggle streaming on and off. When off, users receive the entire response (all output tokens) back at once instead of receiving output tokens as they are generated.
   - **By default, streaming is turned on in this workload**
   -  If turned off -- TTFT (Time to First Token) and TPOT (Time per Output Token) metrics are not applicable, since individual token delivery is bypassed.
 
 ```bash
 # Example of turning streaming off on GB200 or B200
-STREAMING=false USE_CASE=reasoning:1000/1000 llmb-run single -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
+STREAMING=false USE_CASE=reasoning:1000/1000 llmb-run submit -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
 
 # Example of turning streaming off on H100
-STREAMING=false USE_CASE=reasoning:1000/1000 llmb-run single -w inference_deepseek-r1 -s 671b --dtype fp8 --scale 16
+STREAMING=false USE_CASE=reasoning:1000/1000 llmb-run submit -w inference_deepseek-r1 -s 671b --dtype fp8 --scale 16
 ```
 
 For more details on llmb-run usage, see the [llmb-run documentation](../../../cli/llmb-run/README.md).
@@ -184,8 +178,8 @@ For more details on llmb-run usage, see the [llmb-run documentation](../../../cl
 Alternatively, you can run inference scripts directly using the launch script. This method provides more control over individual parameters and environment variables.
 
 **Important**: 
-- Ensure your virtual environment is activated before running the training commands below. If you used the installer with conda, run `conda activate $LLMB_INSTALL/venvs/<env_name>`. If you used the installer with python venv, run `source $LLMB_INSTALL/venvs/<env_name>/bin/activate`.
-- Run the launch script from the recipe directory: `cd $LLMB_REPO/deepseek-r1/inference`
+- Ensure your virtual environment is activated before running the benchmark commands below. If you used the installer with conda, run `conda activate $LLMB_INSTALL/venvs/<env_name>`. If you used the installer with python venv, run `source $LLMB_INSTALL/venvs/<env_name>/bin/activate`.
+- Run the launch script from the installed recipe directory: `cd $LLMB_INSTALL/llmb_repo/deepseek_r1/inference/trtllm/`
 
 ### Command Template
 
@@ -544,3 +538,39 @@ If the size of the weights directory is not same as mentioned above or you suspe
 If you encounter an Out of Memory issue during the runs, try to decrease the KV_CACHE_FRACTION to lower value and/or lower the max_batch_size.
 Ex: Initial KV_CACHE_FRACTION=0.85 and max_batch_size=420 for 1000/1000 (Reasoning) use case resulted in OOM
 Solution is to change KV_CACHE_FRACTION=0.8 in LLMB launch script and try rerunning the recipe.
+
+# Run Nsight Profiling
+To enable profiling with Nsight Systems set variable `ENABLE_PROFILE=true` when submitting your job. In addition, you will also need to set the `PROFILE_START` and `PROFILE_END` variables - steps PROFILE_START (inclusive) to PROFILE_END (exclusive) will be profiled.
+
+### Profiling job details:
+* **MPI Ranks:** all
+* **Job Steps:** PROFILE_START --> PROFILE_END
+* **Output Location:** $RESULT_DIR/nsys_profile
+* **Filename format:** `profile_${SLURM_JOB_ID}_${SLURM_PROCID}_${SLURM_LOCALID}.nsys-rep`
+
+### Customizing profiling behavior:
+* Specify job steps to profile:
+	* `PROFILE_START`: start profiling on this job step (Default: 0).
+	* `PROFILE_END`: stop profiling on this job step (Default: 1).
+* Enable GPU metrics collection:
+	* `ENABLE_GPU_METRICS`: Enable GPU metrics collection during Nsight profiling (default: false)
+	  - When set to `true` along with `ENABLE_PROFILE=true`, captures detailed GPU performance metrics
+	  - Provides additional GPU utilization, memory usage, and compute efficiency data
+	  - May require additional system configuration for GPU device metrics to work properly
+
+**Example command with GPU metrics enabled:**
+```shell
+ENABLE_PROFILE=true ENABLE_GPU_METRICS=true PROFILE_START=500 PROFILE_END=505 MODE="max_throughput" MAX_NUM_TOKENS=6000 MAX_BATCH_SIZE=768 USE_CASE=reasoning:1000/1000 ENABLE_CHUNKED_PREFILL=false llmb-run submit -w inference_deepseek-r1 -s 671b --dtype nvfp4 --scale 4
+```
+
+### Viewing results
+
+In order to view the profile traces (*.nsys-rep files) interactively:
+- Install the latest [Nsight Systems client](https://developer.nvidia.com/nsight-systems/get-started) on your preferred system
+- Copy the generated .nsys-rep files to a folder on your preferred system. E.g., /home/nsight-traces/
+- Open Nsight Systems client, then click "File | Open" and select one or more .nsys-rep files from /home/nsight-systems folder. For more details, see [Reading Your Report in GUI guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#opening-an-existing-report).
+- Once loaded you can analyze the workload behavior to learn about any performance bottlenecks associated with the model or the job run. 
+
+When the benchmarking jobs run on multiple GPUs, there will be multiple .nsys-rep files generated for each rank. [Multi-Report Analysis Guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#multi-report-analysis) will be very helpful to automate the analysis and get to results quicker by using Nsight recipes.
+
+**See** these [tutorials](https://developer.nvidia.com/nsight-systems/get-started#tutorials) to get a quick start if you are new to Nsight profiling.

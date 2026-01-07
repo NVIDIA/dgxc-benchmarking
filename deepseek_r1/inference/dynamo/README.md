@@ -42,7 +42,6 @@ For the prefill server, the `max_batch_size` is always 1 since there is enough p
 
 More details about the inference terms can be found here [Appendix](../../../APPENDIX.md)
 
-
 # Prepare Environment
 
 The recommended way to prepare your environment is to use the **installer** referenced in the [main README](../../../README.md):
@@ -50,7 +49,7 @@ The recommended way to prepare your environment is to use the **installer** refe
 The following directory layout and key variables are used in the recipe:
 
 - `LLMB_INSTALL`: Top-level directory for all benchmarking artifacts (images, datasets, venvs, workloads, etc).
-- `LLMB_WORKLOAD`: Workload-specific directory, e.g. `${LLMB_INSTALL}/workloads/deepseek-r1`.
+- `LLMB_WORKLOAD`: Workload-specific directory, e.g. `${LLMB_INSTALL}/workloads/inference_deepseek-r1-dynamo`.
 - Results, logs, and checkpoints are stored under subfolders of `LLMB_WORKLOAD` (see below).
 
 ## Slurm
@@ -77,33 +76,33 @@ cd $LLMB_INSTALL
 
 ## GB200 and B200
 ```bash
-llmb-run single -w inference_deepseek-r1-dynamo -s 671b --dtype nvfp4 --scale 32
+llmb-run submit -w inference_deepseek-r1-dynamo -s 671b --dtype nvfp4 --scale 32
 ```
 
 ## H100
 ```bash
-SBATCH_TIMELIMIT=2:00:00 llmb-run single -w inference_deepseek-r1-dynamo -s 671b --dtype fp8 --scale 48
+SBATCH_TIMELIMIT=2:00:00 llmb-run submit -w inference_deepseek-r1-dynamo -s 671b --dtype fp8 --scale 48
 ```
 
 **Streaming:**
-- You can toggle streaming on and off. When off, users recieve the entire response (all output tokens) back at once instead of receiving output tokens as they are generated
+- You can toggle streaming on and off. When off, users receive the entire response (all output tokens) back at once instead of receiving output tokens as they are generated.
   - **By default, streaming is turned on in this workload**
   -  If turned off -- TTFT (Time to First Token) and TPOT (Time per Output Token) metrics are not applicable, since individual token delivery is bypassed.
 
 ```bash
 # Example of turning streaming off on GB200 or B200
-STREAMING=false llmb-run single -w inference_deepseek-r1-dynamo -s 671b --dtype nvfp4 --scale 32
+STREAMING=false llmb-run submit -w inference_deepseek-r1-dynamo -s 671b --dtype nvfp4 --scale 32
 ```
 
 For more details on llmb-run usage, see the [llmb-run documentation](../../../cli/llmb-run/README.md).
 
 ## Run Benchmarks (Direct Method)
 
-The inference scripts below are setup to run the inference scripts using the max-throughput settings.
+The scripts below are set up to run inference using the max-throughput settings.
 
 **Important**: 
-- Ensure your virtual environment is activated before running the training commands below. If you used the installer with conda, run `conda activate $LLMB_INSTALL/venvs/<env_name>`. If you used the installer with python venv, run `source $LLMB_INSTALL/venvs/<env_name>/bin/activate`.
-- Run the launch script from the recipe directory: `cd $LLMB_REPO/deepseek_r1/inference/dynamo`
+- Ensure your virtual environment is activated before running the benchmark commands below. If you used the installer with conda, run `conda activate $LLMB_INSTALL/venvs/<env_name>`. If you used the installer with python venv, run `source $LLMB_INSTALL/venvs/<env_name>/bin/activate`.
+- Run the launch script from the installed recipe directory: `cd $LLMB_INSTALL/llmb_repo/deepseek_r1/inference/dynamo/`
 
 ## Commands
 
@@ -160,7 +159,7 @@ Average time per output token [TPOT] (ms)     : <value>
 ```
 
 More detailed measurements for throughput and latency are present in the following directory: `deepseek-r1-dynamo-openai-chat-concurrency<concurrency>`.
-- `profile_export_genai_perf.json` provides `min`, `max`, `p99`, `p95`, `p90`, `p75`, `p50`, `p25`, `p10`, `p5`, `p1` measurements for each thoughput/latency statistic. It also provides information about the GPU power usage, GPU temperature, and GPU memory temperature.
+- `profile_export_genai_perf.json` provides `min`, `max`, `p99`, `p95`, `p90`, `p75`, `p50`, `p25`, `p10`, `p5`, `p1` measurements for each throughput/latency statistic. It also provides information about GPU power usage, GPU temperature, and GPU memory temperature.
 - `profile_export_genai_perf.csv` file provides a comma-separated version of the measurements in `profile_export_genai_perf.json`.
 
 The configuration files are stored in the `configs` folder.
@@ -169,7 +168,7 @@ The configuration files are stored in the `configs` folder.
 - `decode.yaml` contains the corresponding information for each decode server.
 - `machines.txt` contains the list of machines on which the inference was run.
 
-The logs for the various jobs spawed are stored in the `logs` folder.
+The logs for the various jobs spawned are stored in the `logs` folder.
 - `output_prefill_<index>.log` contains the logs for each prefill server.
 - `output_decode_<index>.log` contains the logs for each decode server.
 - `output_server.log` contains the logs for the frontend servers.
@@ -179,7 +178,7 @@ The logs for the various jobs spawed are stored in the `logs` folder.
 
 ## FAQ
 
-- For each inference benchmarking run, the load generator (GenAI-Perf) first completes execution after it has received responses for all its requests. This triggers cancellations to all servers, including the frontend, prefill and decode servers. This is expected, and is a normal part of the benchmarking setup. Users should look for the `perf_summary.txt` file in the experiment directory to determine whetheher the benchmark has run successfully.
+- For each inference benchmarking run, the load generator (GenAI-Perf) first completes execution after it has received responses for all its requests. This triggers cancellations to all servers, including the frontend, prefill and decode servers. This is expected, and is a normal part of the benchmarking setup. Users should look for the `perf_summary.txt` file in the experiment directory to determine whether the benchmark ran successfully.
 
 ## Known Issues
 

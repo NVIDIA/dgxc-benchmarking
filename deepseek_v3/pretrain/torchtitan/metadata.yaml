@@ -1,0 +1,80 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: MIT
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+
+# Setup
+general:
+  workload: deepseek-v3-torchtitan
+  workload_type: pretrain
+  framework: torchtitan
+
+container:
+  images: 
+    - 'nvcr.io#nvidia/pytorch:25.10-py3'
+
+repositories:
+  torchtitan:
+    url: "https://github.com/elfiegg/torchtitan.git"
+    commit: "4517aeba999524ff8fa98c338c9758ed1651117a"
+
+setup:
+  venv_req: true
+  dependencies:
+    pip:
+      - package: torchtitan
+        repo_key: torchtitan
+        install_target: '.'
+      - 'huggingface_hub[cli]'
+  tasks:
+    - name: container_setup
+      cmd: './install_torchtitan_to_container.sh'
+      job_type: srun
+      requires_gpus: false
+    - name: tokenizer_download
+      cmd: './download_hf_assets.sh'
+      job_type: local
+      requires_gpus: false
+    - name: dataset_download
+      cmd: './download_dataset.sh'
+      job_type: local
+      requires_gpus: false
+
+# Run
+run:
+  launcher_type: 'sbatch'
+  launch_script: 'launch.sh'
+
+  gpu_configs:
+    b200:
+      model_configs:
+        - model_size: '671b'
+          dtypes:
+            bf16: [256]
+    h100:
+      model_configs:
+        - model_size: '671b'
+          dtypes:
+            bf16: [512]
+    
+    gb200:
+      model_configs:
+        - model_size: '671b'
+          dtypes:
+            bf16: [256]

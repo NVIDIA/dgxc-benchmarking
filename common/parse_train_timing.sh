@@ -23,7 +23,7 @@
 # Parse train_step_timing and TFLOPS_per_GPU from experiment log files and calculate mean and std dev for iterations 35-44
 # Usage: ./parse_train_timing.sh [options] [experiments_directory]
 
-set -e
+set -eu -o pipefail
 
 # Constants
 # Iterations are zero indexed

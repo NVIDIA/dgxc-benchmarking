@@ -269,6 +269,16 @@ def copy_repository_working_files(src_dir: str, dest_dir: str) -> None:
             except Exception as e:
                 raise Exception(f"Failed to copy release.yaml: {e}") from e
 
+        # Copy exemplar.yaml if it exists
+        exemplar_yaml_path = src_path / "exemplar.yaml"
+        if exemplar_yaml_path.exists():
+            print("  Copying exemplar.yaml...")
+            try:
+                shutil.copy(exemplar_yaml_path, dest_path)
+                copied_files += 1
+            except Exception as e:
+                raise Exception(f"Failed to copy exemplar.yaml: {e}") from e
+
         # Create sentinel file to mark successful completion - this is critical for validation
         sentinel_file = dest_path / '.llmb_repo_copy_complete'
         with open(sentinel_file, 'w') as f:

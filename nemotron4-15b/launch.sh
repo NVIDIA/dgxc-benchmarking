@@ -65,7 +65,14 @@ ADDITIONAL_SLURM_PARAMS=${ADDITIONAL_SLURM_PARAMS:-""}
 
 # Mount Hugging Face cache for tokenizers
 export HF_HOME="$LLMB_INSTALL/.cache/huggingface"
-CONTAINER_MOUNTS="$HF_HOME"
+
+# For Slurm, mount HF_HOME as a path; for Run:AI, use HF_TOKEN instead
+if [[ $CLUSTER_TYPE == "slurm" ]]; then
+    CONTAINER_MOUNTS="$HF_HOME"
+else
+    CONTAINER_MOUNTS=""
+fi
+
 if [[ -n ${RUN_CONF_MOUNTS:-""} ]]; then
     if [[ -n ${CONTAINER_MOUNTS} ]]; then
         CONTAINER_MOUNTS+=","
@@ -140,7 +147,6 @@ fi
 
 if [[ $ENABLE_CHECKPOINT == true ]]; then
     CONFIG_OVERRIDES+=" --checkpoint_save=True "
-    CONFIG_OVERRIDES+=" --hf_token ${HF_TOKEN:?HF_TOKEN is required when ENABLE_CHECKPOINT=true} "
 else
     CONFIG_OVERRIDES+=" --checkpoint_save=False "
 fi
@@ -156,9 +162,9 @@ if [[ -n ${LOAD_CHECKPOINT_PATH-} ]]; then
         CONTAINER_MOUNTS+=","
     fi
     CONTAINER_MOUNTS+="${LOAD_CHECKPOINT_PATH}"
-    CONFIG_OVERRIDES+=" --hf_token ${HF_TOKEN:?HF_TOKEN is required when loading checkpoints} "
 fi
 
+# Add custom mounts for both Slurm and Run:AI
 if [[ -n ${CONTAINER_MOUNTS} ]]; then
     CONFIG_OVERRIDES+=" --custom_mounts $CONTAINER_MOUNTS"
 fi

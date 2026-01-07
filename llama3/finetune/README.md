@@ -19,6 +19,14 @@ This recipe contains information and scripts to produce performance results for 
 | 70b | BF16/FP8  | 16    | 4096   | 80     | 1   | 4   | 1    | 4   | 20 | 1  | 64   | 16  |
 | 70b | BF16/FP8  | 32    | 4096   | 80     | 1   | 4   | 1    | 8   | 20 | 1  | 128   | 16  |
 
+## H100
+
+|Model Size|Precision | GPUs | SeqLen | Layers | TP  | PP  | CP    | DP  | VP  | MBS | GBS  | GA  |
+|:---------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|:---:|
+| 70b | BF16/FP8  | 8    | 4096   | 80     | 2   | 4   | 1    | 1   | 20 | 1  | 32   | 32  |
+| 70b | BF16/FP8  | 16    | 4096   | 80     | 2   | 4   | 1    | 2   | 20 | 1  | 64   | 32  |
+| 70b | BF16/FP8  | 32    | 4096   | 80     | 2   | 4   | 1    | 4   | 20 | 1  | 128   | 32  |
+
 
 # Performance Measurement and Analysis
 
@@ -28,23 +36,23 @@ Since the early finetuning steps typically take much longer time (with input pre
 
 ### Running the parse_train_timing.sh script
 
-To analyze training timing from your experiment results, run the script from the workload directory. Note, that `LLMB_REPO` is the directory containing the clone of the recipe repository.
+To analyze training timing from your experiment results, run the script from the workload directory. In an installed environment, recipe files are available under `$LLMB_INSTALL/llmb_repo` (a copy created by the installer).
 
 ```bash
 # Basic usage - parses results in the directory named 'experiments' in the current folder
-$LLMB_REPO/common/parse_train_timing.sh
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing.sh
 
 # Specify a different experiments directory
-$LLMB_REPO/common/parse_train_timing.sh /path/to/experiments
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing.sh /path/to/experiments
 
 # Output in CSV format
-$LLMB_REPO/common/parse_train_timing.sh --format=csv
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing.sh --format=csv
 
 # Output in JSON format
-$LLMB_REPO/common/parse_train_timing.sh --format=json
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing.sh --format=json
 
 # Show full filenames instead of shortened versions
-$LLMB_REPO/common/parse_train_timing.sh --full-names
+$LLMB_INSTALL/llmb_repo/common/parse_train_timing.sh --full-names
 ```
 
 Example output:
@@ -92,14 +100,6 @@ model flops = 5.8067e14
 
 MFU = 64 * 5.8067e14 / 4.229 / 8 / 2.45E+15 = 44.84%
 ```
-
-
-
-
-
-## H100
-
-
 
 # Prerequisites
 
@@ -160,10 +160,10 @@ The easiest way to run benchmarks is using the llmb-run launcher tool. This meth
 cd $LLMB_INSTALL
 
 # Run a benchmark with llmb-run
-llmb-run single -w finetune_llama3 -s 70b --dtype fp8 --scale 8
+llmb-run submit -w finetune_llama3 -s 70b --dtype fp8 --scale 8
 
 # Example with BF16 precision
-llmb-run single -w finetune_llama3 -s 70b --dtype bf16 --scale 8
+llmb-run submit -w finetune_llama3 -s 70b --dtype bf16 --scale 8
 ```
 
 For more details on llmb-run usage, see the [llmb-run documentation](../../cli/llmb-run/README.md).
@@ -174,7 +174,7 @@ Alternatively, you can run finetuning directly using the launch script. This met
 
 **Important**: 
 - Ensure your virtual environment is activated before running the finetuning commands below. If you used the installer with conda, run `conda activate $LLMB_INSTALL/venvs/<env_name>`. If you used the installer with python venv, run `source $LLMB_INSTALL/venvs/<env_name>/bin/activate`.
-- Run the launch script from the recipe directory: `cd $LLMB_REPO/llama3/finetune`
+- Run the launch script from the recipe directory: `cd $LLMB_INSTALL/llmb_repo/llama3/finetune`
 
 ### Command Template
 

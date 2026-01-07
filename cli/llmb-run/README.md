@@ -36,7 +36,7 @@ cd $LLMB_INSTALL
 llmb-run list
 
 # Run your first job (example)
-llmb-run single -w pretrain_nemotron4 -s 340b --dtype fp8 --scale 256
+llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 256
 ```
 
 **Note**: llmb-run requires access to `cluster_config.yaml` which is located in your installation directory. Always run llmb-run commands from this directory.
@@ -57,7 +57,8 @@ Configuration for the launcher system:
 
 ### environment
 Environment variables that will be appended to every job:
-- Common settings include `HF_TOKEN` and `RUN_CONF_*` settings
+- `HF_TOKEN`: Hugging Face token (required for some models)
+- Common settings include `RUN_CONF_*` settings
 
 ### slurm
 Slurm-specific configuration:
@@ -75,7 +76,113 @@ Workload configuration:
 
 ## Commands
 
-llmb-run supports four main commands: `list`, `single`, `bulk`, and `submit-all`.
+llmb-run's primary interface is the `submit` command, which handles all job submission modes. The `list` command is also available for discovery.
+
+### CLI Structure (Global vs Command Options)
+
+`llmb-run` has **global options** that must appear **before** the command name, and **command options** that appear after the command name.
+
+```bash
+llmb-run [GLOBAL OPTIONS] COMMAND [COMMAND OPTIONS]
+```
+
+Tip: use `llmb-run -h` to see global options, and `llmb-run <command> -h` (e.g. `llmb-run submit -h`) to see command-specific options.
+
+**Global options (apply to all commands):**
+- `-v, --verbose`: Enable verbose output including debug information.
+
+**Examples:**
+```bash
+# Correct: global option BEFORE the command
+llmb-run -v submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 256
+
+# Incorrect: global option AFTER the command (this will not work)
+llmb-run submit -v -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 256
+```
+
+### Submit Command
+
+The `submit` command is a unified interface for all job submissions. It supports three main workflows:
+
+#### Choose a Submit Workflow
+
+Pick the workflow that matches how you want to run:
+
+- **Explicit (single job)**: You provide `--workload`, `--model_size`, `--dtype`, and `--scale`.
+  - Pattern: `llmb-run submit -w <workload> -s <model_size> --dtype <dtype> --scale <scale>`
+- **Auto-discovery (submit all / many)**: You provide discovery constraints and llmb-run generates jobs from installed workload metadata.
+  - Pattern: `llmb-run submit --max-scale <num_gpus>`
+  - Example: `llmb-run submit --max-scale 512` (submits eligible installed workloads up to 512 GPUs; see the section below for additional limiting flags)
+- **File-based (batch; special cases)**: You provide an input file and llmb-run submits the jobs listed in it.
+  - Pattern: `llmb-run submit -f <file_path>`
+
+#### 1. Single Job Submission (Explicit)
+Submit a single workload with specific parameters.
+
+```bash
+llmb-run submit -w <workload> -s <model_size> --dtype <dtype> --scale <scale>
+```
+
+**Required Flags:**
+- `-w, --workload`: Name of the workload (e.g., `pretrain_llama3.1`)
+- `-s, --model_size`: Model size (e.g., `405b`, `70b`).
+- `--dtype`: Data type (e.g., `fp8`, `bf16`).
+- `--scale`: Number of GPUs. Accepts a single value or a comma-separated list.
+
+**Examples:**
+```bash
+# Run a single configuration
+llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 256
+
+# Run multiple scales for the same workload
+llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128,256,512
+```
+
+#### 2. File-Based Submission (Batch)
+Submit multiple jobs defined in a file. This replaces the old `bulk` command.
+
+```bash
+llmb-run submit -f <file_path>
+```
+
+**Supported Formats:**
+- **Simple (.txt)**: For basic configurations.
+- **Advanced (.yaml)**: For complex configurations with overrides and environment variables.
+
+See [Bulk_Examples.md](Bulk_Examples.md) for detailed file format specifications and examples.
+
+**Example:**
+```bash
+llmb-run submit -f my_experiment.yaml
+```
+
+#### 3. Auto-Discovery (Submit All)
+Automatically discover and submit jobs for installed workloads based on metadata. This replaces the old `submit-all` command.
+
+```bash
+llmb-run submit --max-scale <num_gpus>
+```
+
+**Flags:**
+- `--max-scale`: Run all workloads up to this scale.
+- `--min-scale`: Run only the minimum supported scale for each workload.
+- `-w, --workload`: Limit discovery to specific workloads (comma-separated).
+- `--scale`: specific scales to run (comma-separated).
+
+**Examples:**
+```bash
+# Run all installed workloads up to 512 GPUs
+llmb-run submit --max-scale 512
+
+# Run specific scales for all workloads
+llmb-run submit --scale 128,256
+```
+
+#### Submit Options (All Submit Modes)
+These flags apply to all `llmb-run submit` modes (explicit, file-based, and auto-discovery):
+- `-r, --repeats <N>`: Repeat each job N times (default: 1).
+- `-p, --profile`: Enable profiling for all submitted jobs.
+- `--dry-run`: Print the jobs that would be submitted without running them.
 
 ### List Command
 
@@ -101,169 +208,43 @@ llmb-run list
 llmb-run list -w pretrain_llama3.1
 ```
 
-### Single Job
+### Exemplar Command (Cloud Certification)
 
-The single job submission mode allows you to submit individual workload jobs with specific configurations.
-
-#### Basic Usage
-```bash
-llmb-run single -w <workload> -s <model_size> --dtype <fp8/bf16> --scale <num_gpus>
-```
-
-#### Required Flags
-- `-w, --workload`: Name of the workload to run (e.g., pretrain_llama3.1, pretrain_nemotron4)
-- `-s, --model_size`: Size of the model (e.g., 405b, 340b, 314b)
-- `--dtype`: Data type for the model (supported values: fp8, bf16)
-- `--scale`: Number of GPUs to use for the job
-
-#### Optional Flags
-- `-p, --profile`: Enable profiling for the job. When enabled:
-  - Sets `ENABLE_PROFILE=true`
-  - Useful for performance analysis and debugging
-- `-d, --dryrun`: Preview mode that lists the job parameters without submitting
-- `-v, --verbose`: Enable verbose output including debug information
-
-
-#### Examples
-
-1. Basic job submission:
-```bash
-llmb-run single -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 256
-```
-
-2. Job with profiling enabled:
-```bash
-# Enable profiling with GPU metrics
-ENABLE_GPU_METRICS=true llmb-run single -w pretrain_nemotron4 -s 340b --dtype fp8 --scale 256 -p
-
-# Enable profiling without GPU metrics (default)
-llmb-run single -w pretrain_nemotron4 -s 340b --dtype fp8 --scale 256 -p
-```
-
-3. Preview job parameters (dry run):
-```bash
-llmb-run single -w pretrain_grok1 -s 314b --dtype fp8 --scale 256 -d
-```
-
-4. Verbose output with profiling:
-```bash
-llmb-run single -w pretrain_grok1 -s 314b --dtype bf16 --scale 128 -p -v
-```
-
-**Note**: The script validates the workload and model size against available configurations and your cluster's GPU type. If the combination is invalid, it will show suggestions and error out before submission.
-
-### Bulk Submission
-
-There are two methods for bulk submission: basic and advanced. The basic method is intended for quickly submitting a variety of workloads that require minimal customization. The advanced method uses YAML format and provides more flexibility for complex configurations.
-
-Create a job script using one of the formats described below.
-
-```bash
-llmb-run bulk <job_script>
-```
-- `-d, --dryrun`: List all jobs to be submitted without actually submitting them
-- `-v, --verbose`: Enable verbose output including debug information
-
-It is recommended that you run with `-d` first to ensure your tasks match what you intended.
-
-### Job Script Basic
-
-For simple configurations, you can use a basic format:
-```
-<workloadname>_<model size>:
-(<precision>, [<list of scales in num gpus>], repeats, enable_profiling)
-([<precisions can be list>], ...)
-```
-`enable_profiling` is not a required parameter and is assumed False if missing.
-
-Example:
-```
-pretrain_nemotron4_340b:
-('bf16', [128, 256, 512], 3)
-('fp8', [128], 1)
-```
-This will run Nemotron 340b bf16 at 128, 256 and 512 GPUs 3x each. And fp8 128 GPUs 1x.
-
-You can also mix and match:
-```
-pretrain_nemotron4_340b:
-(['bf16','fp8'], [128, 256, 512], 3)
-('fp8', [1024], 1, True)
-```
-For more details and examples of the basic format, see the [Bulk_Examples.md](Bulk_Examples.md) file.
-
-### Job Script Advanced (YAML)
-
-The advanced YAML format provides more flexibility and control over job configurations. The structure is as follows:
-
-```yaml
-<workloadname>_<model_size>:
-  defaults:
-    env:
-      ENV_VAR: "value"
-  dtypes: ['fp8', 'bf16']  # Top level dtypes (optional)
-  scales: [128, 256]       # Top level scales (optional)
-  repeats: 3               # Top level repeats (optional)
-  tasks:
-    - dtypes: <precision>  # can also be a list ['fp8', 'bf16']
-      scales: [128, 256]
-      repeats: 3
-      profile: true        # Example of a profiling task
-      overrides:
-        env:
-          ENV_VAR: "different value"
-```
-
-#### Key Components:
-
-- `defaults`: Global settings that apply to all tasks under a workload
-  - `env`: Environment variables to be set for all jobs
-
-- `tasks`: Individual job configurations
-  - `dtypes`: Data types to use (fp8, bf16)
-  - `scales`: Number of GPUs to use
-  - `repeats`: Number of times to run each configuration
-  - `profile`: Set to true to enable profiling for this task (default: false)
-  - `overrides`: Task-specific overrides for `env`.
-
-For comprehensive examples of both simple and complex configurations, see the [Bulk_Examples.md](Bulk_Examples.md) file.
-
-### Submit All Jobs
-
-The `submit-all` command automatically discovers all installed pretrain and finetune workloads and generates jobs based on their metadata, up to a specified maximum scale.
+The exemplar command runs the cloud certification workload suite.
 
 #### Basic Usage
 ```bash
-llmb-run submit-all --max-scale <num_gpus>
+llmb-run exemplar
 ```
 
-#### Required Flags
-- `--max-scale`: Maximum scale (number of GPUs) to test up to. The tool will generate jobs for all supported scales up to this limit, automatically extending with power-of-2 scales if not explicitly defined in metadata (unless `exact_scales: true` is set).
+#### Options
+- `--dry-run`: Preview all jobs without submitting
+- `-r, --repeats INTEGER`: Number of times to run each job (default: 3).
+- Profiling: Always enabled for the exemplar suite (no flag required).
 
-#### Optional Flags
-- `--repeats <num>`: Number of repeats for each test configuration (default: 1).
-- `-p, --profile`: Enable profiling for all generated jobs.
-- `-d, --dryrun`: Preview mode that lists all jobs to be submitted without actually submitting them.
-- `-v, --verbose`: Enable verbose output including debug information.
 
-#### Examples
+#### Behavior
+- Runs all eligible `pretrain` workloads at **scale 512**, with profiling enabled.
+- Eligibility:
+  - Workload type is `pretrain`.
+  - The workload supports the cluster's GPU type (from `cluster_config.yaml`).
+  - The per‑dtype configuration explicitly lists `scale: 512` (implicit ranges are not used).
+  - The workload is listed under `workloads.installed` in `cluster_config.yaml`.
+- Enforces strict validation (install gating): if any workload that meets eligibility is not installed, the command fails.
+- Runs 3 profiled repetitions per job by default (required for certification). You can override the repeat count for debugging via `-r/--repeats`.
 
-1. Preview all jobs up to 256 GPUs:
+
+#### Troubleshooting Missing Workloads
+If `llmb-run exemplar` fails due to missing workloads, do **not** use `llmb-install express`.
+Instead, verify your installed workloads and add missing ones:
+
 ```bash
-llmb-run submit-all --max-scale 256 --dryrun
+cd $LLMB_INSTALL
+llmb-install
+# Select the missing workloads from the menu
 ```
 
-2. Submit all jobs up to 512 GPUs with 3 repeats each:
-```bash
-llmb-run submit-all --max-scale 512 --repeats 3
-```
-
-3. Submit all jobs with profiling enabled, up to 1024 GPUs:
-```bash
-llmb-run submit-all --max-scale 1024 --profile
-```
-
-## Job Configuration Files
+### Job Configuration Files
 
 When you launch a job using `llmb-run`, a `llmb-config_<JOBID>.yaml` file is automatically created in the experiment's folder. This file contains comprehensive information about the job configuration and can be useful for:
 
@@ -294,8 +275,8 @@ workload_info:
   synthetic_dataset: true              # Whether synthetic dataset is used
 
 model_info:
-  model_name: "nemotron4"               # Model name
-  model_size: "340b"                   # Model size
+  model_name: "llama3.1"               # Model name
+  model_size: "405b"                   # Model size
   dtype: "fp8"                         # Data type (fp8, bf16)
   scale: 256                           # Number of GPUs
   gpu_type: "h100"                     # GPU type
@@ -310,7 +291,7 @@ cluster_info:
 
 container_info:
   images:                              # Container images used
-    - "nvcr.io#nvidia/nemo:25.04.00"
+    - "nvcr.io#nvidia/nemo:25.11.01"
 
 job_config:
   profile_enabled: true                # Whether profiling was enabled
@@ -321,6 +302,14 @@ job_config:
 ```
 
 See [example_llmb_config.yaml](example_llmb_config.yaml) for a complete example.
+
+### Deprecated Commands
+
+The following commands are deprecated and will be removed in a future release. Please migrate to `llmb-run submit`.
+
+- `single`: Replaced by `llmb-run submit`
+- `bulk`: Replaced by `llmb-run submit -f <file>`
+- `submit-all`: Replaced by `llmb-run submit` (with discovery flags like `--max-scale`)
 
 ## Troubleshooting
 
@@ -358,7 +347,7 @@ See [example_llmb_config.yaml](example_llmb_config.yaml) for a complete example.
 5. **Job Submission Fails**
    - Check your Slurm account and partition settings in `cluster_config.yaml`
    - If your system does not support GRES, make sure `SBATCH_GPUS_PER_NODE` is not in your environment section
-   - Use `-v` flag for verbose output to see detailed error messages
+   - Re-run with verbose output to see detailed error messages, e.g. `llmb-run -v submit ...`
 
 ## Alternative Installation Methods
 
@@ -393,12 +382,12 @@ pip install .
 chmod +x llmb-run
 
 # Run directly (must be in directory with cluster_config.yaml)
-./llmb-run --help
+./llmb-run submit --help
 ```
 ### Option 4: Python Module
 ```bash
 # Run as a Python module (must be in directory with cluster_config.yaml)
-llmb-run --help
+llmb-run submit --help
 ```
 **Note**: These alternative methods require you to:
 1. Create your own `cluster_config.yaml`
@@ -451,3 +440,11 @@ This project uses `uv` for dependency management and `tox` for multi-environment
   uv tool install tox --with tox-uv
   tox
   ```
+
+## Exit Codes
+
+`llmb-run` uses the following exit codes for automation support:
+
+- **0**: Success. The operation completed successfully (e.g., jobs submitted, list displayed).
+- **1**: Validation Error. Invalid arguments, configuration errors (missing `cluster_config.yaml`), or validation failures. These are issues that typically require user intervention to fix.
+- **2**: System Error. Unexpected failures during job submission, SLURM environment issues, or other infrastructure-related failures beyond immediate user control.
