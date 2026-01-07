@@ -23,7 +23,7 @@ environment:
   # Server Configuration
   SERVER_TYPE: ""  # Can be "vLLM" or "NIM"
   SERVER_IMAGE: ""  # Path to server image
-  SERVER_ARGS:
+  SERVER_ARGS: ""
   SERVER_PORT: "8000"  # The port the server will listen on
   SERVER_HEALTH_CHECK_ENDPOINT: ""  # The endpoint to check if the server is ready
   SERVER_ENDPOINT: ""  # The endpoint for chat completions (e.g., "v1/chat/completions")
