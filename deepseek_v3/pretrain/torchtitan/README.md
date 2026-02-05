@@ -12,21 +12,21 @@ Only BF16 precision is supported by this recipe.
 
 ## GB200
 
-| Size | Precision | GPUs | SeqLen | Steps | GPUs/Node | DP Shard | EP | PP | MBS | GBS | GA | Dataset |
-|------|:---------:|:----:|:------:|:-----:|:---------:|:--------:|:--:|:--:|:---:|:---:|:--:|:------:|
-| 671B | BF16      | 256  | 4096   | 200   | 4         | 32       | 32 | 8  | 16  | 128 | 1  | C4     |
+| Size | Precision | GPUs | SeqLen | Steps | DP | TP | EP | PP | MBS | GBS | GA | Dataset |
+|------|:---------:|:----:|:------:|:-----:|:--:|:--:|:--:|:--:|:---:|:---:|:--:|:-------:|
+| 671B | BF16      | 256  | 4096   | 200   | 32 | 1  | 32 | 8  | 16  | 512 | 1  | C4      |
 
 ## B200
 
-| Size | Precision | GPUs | SeqLen | Steps | GPUs/Node | DP Shard | EP | PP | MBS | GBS | GA | Dataset |
-|------|:---------:|:----:|:------:|:-----:|:---------:|:--------:|:--:|:--:|:---:|:---:|:--:|:------:|
-| 671B | BF16      | 256  | 4096   | 200   | 8         | 32       | 32 | 8  | 16  | 128 | 1  | C4     |
+| Size | Precision | GPUs | SeqLen | Steps | DP | TP | EP | PP | MBS | GBS | GA | Dataset |
+|------|:---------:|:----:|:------:|:-----:|:--:|:--:|:--:|:--:|:---:|:---:|:--:|:-------:|
+| 671B | BF16      | 256  | 4096   | 200   | 32 | 1  | 32 | 8  | 16  | 512 | 1  | C4      |
 
 ## H100
 
-| Size | Precision | GPUs | SeqLen | Steps | GPUs/Node | DP Shard | EP | PP | MBS | GBS | GA | Dataset |
-|------|:---------:|:----:|:------:|:-----:|:---------:|:--------:|:--:|:--:|:---:|:---:|:--:|:------:|
-| 671B | BF16      | 512  | 4096   | 200   | 8         | 64       | 32 | 8  | 16  | 128 | 1  | C4     |
+| Size | Precision | GPUs | SeqLen | Steps | DP | TP | EP | PP | MBS | GBS  | GA | Dataset |
+|------|:---------:|:----:|:------:|:-----:|:--:|:--:|:--:|:--:|:---:|:----:|:--:|:-------:|
+| 671B | BF16      | 512  | 4096   | 200   | 64 | 1  | 32 | 8  | 16  | 1024 | 1  | C4      |
 
 # Prerequisites
 
@@ -95,7 +95,7 @@ sbatch download_dataset.sh
 
 # Run Training
 
-Once the environment has been prepared, it is time to train the model. The training runs for 200 steps by default (configurable). Log files and results are stored under the `${LLMB_WORKLOAD}/logs/` folder (see [Output Locations](#output-locations) for details).
+Once the environment has been prepared, it is time to train the model. The training runs for 200 steps by default (configurable). Log files and results are stored under `${LLMB_WORKLOAD}/experiments/` in per-job folders (see [Output Locations](#output-locations) for details).
 
 ## Using llmb-run (Recommended)
 
@@ -229,23 +229,37 @@ Command-line arguments passed to the launch script will override the settings in
 
 # Output Locations
 
-All training logs and outputs are saved under `$LLMB_WORKLOAD/logs/` with timestamped filenames:
+All job outputs are organized in a **two-level directory structure** under `$LLMB_WORKLOAD/experiments/`:
 
+```text
+$LLMB_WORKLOAD/experiments/<workload>_<size>_<dtype>_gpus<number>/
+└── <unix_timestamp>/
+    ├── llmb-config_<SLURM_JOB_ID>.yaml       # Job configuration (created by llmb-run)
+    ├── slurm-<SLURM_JOB_ID>.out              # Main Slurm job output
+    ├── log-torchtitan_*.out                  # Training stdout (per-rank logs)
+    ├── log-torchtitan_*.err                  # Training stderr
+    └── outputs/                              # Training outputs and dumps
+        └── profile_trace/                    # Profiling traces (if enabled)
 ```
-logs/
-├── torchtitan_deepseek-v3-torchtitan_<JOB_TOTAL_GPUS>gpus_<timestamp>.out
-└── torchtitan_deepseek-v3-torchtitan_<JOB_TOTAL_GPUS>gpus_<timestamp>.err
+
+**Note:** The `<unix_timestamp>` subdirectory name is the Unix epoch timestamp (in seconds) when the job was launched.
+
+**Example:** For a 671B BF16 model run on 512 GPUs, outputs are stored in:
 ```
+$LLMB_WORKLOAD/experiments/pretrain_deepseek-v3-torchtitan_671b_bf16_gpus512/1769818909/
+```
+where `1769818909` is the Unix timestamp of the job launch time.
 
 **Key files:**
-- `.out` file - Contains training step timing and performance metrics
-- `.err` file - Contains error messages and warnings
+- `llmb-config_*.yaml` - Job configuration including model, scale, and cluster info
+- `slurm-*.out` - Slurm job outputs (main job, parsing, uploader)
+- `log-torchtitan_*.out` - Training step timing and performance metrics
+- `log-torchtitan_*.err` - Training error messages and warnings
 
 Additional outputs (if enabled in the TOML config):
-- `$LLMB_WORKLOAD/outputs/` - Training outputs and dumps
-- `$TORCHTITAN_HOME/tb/` - TensorBoard logs (if enabled)
-- `$TORCHTITAN_HOME/checkpoint/` - Model checkpoints (if enabled)
-- `$LLMB_WORKLOAD/outputs/profile_trace/` - Profiling traces (if enabled)
+- `outputs/` - Training outputs, dumps, and profiling traces
+- `outputs/tb/` - TensorBoard logs (if enabled)
+- `outputs/checkpoint/` - Model checkpoints (if enabled)
 
 # Performance Measurement and Analysis
 
@@ -256,14 +270,24 @@ Performance for DeepSeek-V3 training is measured by seconds per iteration (train
 To extract performance metrics from the training logs:
 
 ```bash
-# Navigate to the logs directory
-cd $LLMB_WORKLOAD/logs
+# Navigate to the experiments directory and find your job folder
+cd $LLMB_WORKLOAD/experiments
+ls -lt  # List experiment configurations
 
-# View the latest training log
-tail -f torchtitan_deepseek-v3-torchtitan_*_*.out
+# Navigate to a specific experiment configuration (e.g., 671B BF16 on 512 GPUs)
+cd pretrain_deepseek-v3-torchtitan_671b_bf16_gpus512/
+
+# List runs by Unix timestamp (most recent first)
+ls -lt
+
+# Navigate to a specific run directory (using the Unix timestamp)
+cd <unix_timestamp>/
+
+# View the training log
+tail -f log-torchtitan_*.out
 
 # Extract timing information (after warmup)
-grep "step:" torchtitan_deepseek-v3-torchtitan_*_*.out | tail -20
+grep "step:" log-torchtitan_*.out | tail -20
 ```
 
 Look for log entries containing:
@@ -283,8 +307,8 @@ tps: 299
 To print the most recent TPS values:
 
 ```bash
-cd $LLMB_WORKLOAD/logs
-grep -h "tps:" torchtitan_deepseek-v3-torchtitan_*_*.out | tail -20
+# From within a specific run directory
+grep -h "tps:" log-torchtitan_*.out | tail -20
 ```
 
 ## Calculating Throughput
@@ -367,10 +391,7 @@ There are two ways to enable PyTorch/TorchTitan profiling:
 
 ### Option 1: Using the launch flag or environment variable
 
-Set `ENABLE_PROFILE=true` when launching (or use the `-p` flag). The launch script will pass the TorchTitan override `--profiling.enable_profiling` and write traces to:
-
-- `$LLMB_OUTPUT_DIR/torchtitan_${MODEL_NAME}_${JOB_TOTAL_GPUS}gpus_${RUN_TIMESTAMP}_profile_trace/`
-  - By default: `$LLMB_WORKLOAD/outputs/torchtitan_${MODEL_NAME}_${JOB_TOTAL_GPUS}gpus_${RUN_TIMESTAMP}_profile_trace/`
+Set `ENABLE_PROFILE=true` when launching (or use the `-p` flag). The launch script will pass the TorchTitan override `--profiling.enable_profiling` and write traces to the `outputs/` directory within your run folder.
 
 Example:
 
@@ -382,7 +403,7 @@ llmb-run submit -w pretrain_deepseek-v3-torchtitan -s 671b --dtype bf16 --scale 
 ENABLE_PROFILE=true llmb-run submit -w pretrain_deepseek-v3-torchtitan -s 671b --dtype bf16 --scale 256
 ```
 
-To view the generated traces, inspect the timestamped profile directory under `$LLMB_WORKLOAD/outputs/`.
+To view the generated traces, inspect the `outputs/` directory within your run folder.
 
 
 ### Option 2: Modifying the TOML configuration file
@@ -396,9 +417,7 @@ save_traces_folder = "profile_trace"  # customize as needed
 profile_freq = 10
 ```
 
-With this method, traces will be saved to:
-
-- `$LLMB_WORKLOAD/outputs/<save_traces_folder>/`
+With this method, traces will be saved to the `outputs/<save_traces_folder>/` directory within your run folder.
 
 
 ## TensorBoard and Weights & Biases
@@ -411,7 +430,7 @@ enable_tensorboard = true
 save_tb_folder = "tb"
 ```
 
-To view the generated logs, inspect `$LLMB_WORKLOAD/outputs/tb`.
+To view the generated logs, inspect the `outputs/tb/` directory within your run folder.
 
 To enable Weights & Biases logging:
 

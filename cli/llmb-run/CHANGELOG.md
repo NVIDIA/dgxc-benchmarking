@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-01-28
+
+### Added
+- `configured_sbatch` launcher type: creates experiment directories before job submission, enabling llmb-config.yaml and post-processing for sbatch workloads.
+- B300 support
+
+## [1.6.0] - 2026-01-20
+
+### Added
+- `llmb-run submit --exact-scales` flag: limit job generation to scales explicitly listed in workload metadata (no power-of-2 scale expansion beyond metadata).
+
+## [1.5.5] - 2026-01-15
+
+### Fixed
+- Allow `inference` and `microbenchmark` workloads to be run when explicitly selected via `llmb-run submit -w <workload>`, while keeping them excluded from discovery/bulk modes.
+
+## [1.5.4] - 2026-01-07
+
+### Fixed
+- Hardened post processing job submission edge cases.
+
 ## [1.5.3] - 2026-01-05
 
 ### Fixed

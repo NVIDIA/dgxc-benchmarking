@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -32,10 +32,19 @@ container:
 repositories: 
   megatron_bridge:
     url: "https://github.com/NVIDIA-NeMo/Megatron-Bridge.git"
-    commit: "15927667edd2ff6f37b0b06f485f9d812775124b"
+    commit: "4df8c97392bc9c3906739e658f203f6810008821"
   nemo_run:
     url: "https://github.com/NVIDIA-NeMo/Run.git"
     commit: "01a9a8ba360f7b2908728ad0516e0ad9d936966d"
+
+downloads:
+  huggingface:
+    - repo_id: 'meta-llama/Meta-Llama-3-8B'
+      assets: [config]
+    - repo_id: 'meta-llama/Meta-Llama-3-70B'
+      assets: [config]
+    - repo_id: 'meta-llama/Meta-Llama-3.1-405B'
+      assets: [config]
 
 setup:
   venv_req: true

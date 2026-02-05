@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -45,6 +45,7 @@ fi
 
 export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=deepseek-v3-torchtitan
+export MODEL_SIZE=671b
 export FW_VERSION=25.10-py3
 
 export LLMB_INSTALL=${LLMB_INSTALL:?Please set LLMB_INSTALL to the path of the installation directory for all workloads}
@@ -77,19 +78,28 @@ else
     exit 1
 fi
 
-export SLURM_LOG_DIR=$LLMB_WORKLOAD/logs
-mkdir -p $SLURM_LOG_DIR
+# Directory setup: Use launcher-provided directory if available, otherwise create our own
+if [[ -n ${LLMB_EXPERIMENT_DIR:-} ]]; then
+    # Managed mode (via llmb-run configured_sbatch): use pre-created directory
+    export LLMB_RUN_DIR=$LLMB_EXPERIMENT_DIR
+else
+    # Standalone mode: create two-level directory structure to match launcher pattern
+    # This keeps fan-out constrained by grouping runs under a descriptor directory
+    DESC="${MODEL_NAME}_${MODEL_SIZE}_${DTYPE}_gpus${JOB_TOTAL_GPUS}"
+    export LLMB_RUN_DIR=$LLMB_WORKLOAD/experiments/${DESC}/job_${SLURM_JOB_ID}
+    mkdir -p "$LLMB_RUN_DIR"
+fi
 
-RUN_TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+# All outputs go into the run directory
+export SLURM_LOG_DIR=$LLMB_RUN_DIR
+export LLMB_OUTPUT_DIR=$LLMB_RUN_DIR/outputs
+mkdir -p "$LLMB_OUTPUT_DIR"
 
 # Default training parameters - can be overridden via environment variables
 export DATASET_PATH=${DATASET_PATH:-$LLMB_INSTALL/datasets/c4}
 export SEQ_LEN=${SEQ_LEN:-4096}
 export TRAINING_STEPS=${TRAINING_STEPS:-60}
 export LOCAL_BATCH_SIZE=${LOCAL_BATCH_SIZE:-16}
-
-export LLMB_OUTPUT_DIR=${LLMB_OUTPUT_DIR:-$LLMB_WORKLOAD/outputs}
-mkdir -p "$LLMB_OUTPUT_DIR"
 
 # Handle additional SLURM parameters from environment variable
 ADDITIONAL_SLURM_PARAMS=${ADDITIONAL_SLURM_PARAMS:-""}
@@ -127,7 +137,7 @@ fi
 export ENABLE_PROFILE=${ENABLE_PROFILE:-false}
 PROFILE_ARGS=""
 if [[ ${ENABLE_PROFILE,,} == "true" ]]; then
-    PROFILE_TRACE_DIR="$LLMB_OUTPUT_DIR/torchtitan_${MODEL_NAME}_${JOB_TOTAL_GPUS}gpus_${RUN_TIMESTAMP}_profile_trace"
+    PROFILE_TRACE_DIR="$LLMB_OUTPUT_DIR/torchtitan_${MODEL_NAME}_${JOB_TOTAL_GPUS}gpus_${SLURM_JOB_ID}_profile_trace"
     mkdir -p "$PROFILE_TRACE_DIR"
     PROFILE_ARGS=" --profiling.enable_profiling --profiling.save_traces_folder=$PROFILE_TRACE_DIR"
 fi
@@ -154,9 +164,8 @@ python -m torchtitan.train \
 srun --container-image="$IMAGE" \
     --container-name=deepseek-v3-torchtitan \
     --container-mounts="$CONTAINER_MOUNTS" \
-    --container-env="LOG_RANK=${LOG_RANK}" \
-    --output $SLURM_LOG_DIR/torchtitan_${MODEL_NAME}_${JOB_TOTAL_GPUS}gpus_${RUN_TIMESTAMP}.out \
-    --error $SLURM_LOG_DIR/torchtitan_${MODEL_NAME}_${JOB_TOTAL_GPUS}gpus_${RUN_TIMESTAMP}.err \
+    --container-env="LOG_RANK" \
+    --output $SLURM_LOG_DIR/log-torchtitan_${MODEL_NAME}_${JOB_TOTAL_GPUS}gpus_%j_${SLURM_RESTART_COUNT:-0}.out \
     --no-container-mount-home \
     --container-writable \
     $ADDITIONAL_SRUN_ARGS \

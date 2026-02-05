@@ -1,3 +1,22 @@
+## [v25.12.01] - 2026-02-05
+
+### Changed
+  - For Megatron Bridge models, download model configs in addition to tokenizers.
+  - Add `--container-writable` flag to Megatron Bridge SLURM job scripts.
+  - Use the passthrough packager for Megatron Bridge recipes.
+  - Standardize Torchtitan log location and naming.
+  - DSV3 B200 scales to match tested configurations.
+
+### Fixed
+  - Inference and microbenchmark job submission.
+  - Headless installation.
+  - Ensure Qwen handles custom mounts correctly.
+  - Resolve `llmb-install` Transformers version issues.
+  - Llama3.1 70b scale documentation for H100.
+
+### Known Issues
+  - Qwen3 requires internet connectivity and may encounter Hugging Face Hub access or rate limit errors during benchmark runs.
+
 ## [v25.12] - 2026-01-07
 
 ### Added

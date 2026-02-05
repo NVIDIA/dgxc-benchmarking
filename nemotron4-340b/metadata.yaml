@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -37,8 +37,9 @@ container:
         - 'nvcr.io#nvidia/nemo:25.07.01'
 
 downloads:
-  hf_tokenizers:
-    - 'nvidia/Nemotron-4-340B-Base'
+  huggingface:
+    - repo_id: 'nvidia/Nemotron-4-340B-Base'
+      assets: [tokenizer]
 
 repositories:
   by_gpu:

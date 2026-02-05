@@ -45,10 +45,16 @@ Depending on your cluster's job scheduler, ensure the following are met:
    cd dgxc-benchmarking
    ```
 
-2. Obtain Model Access (if required):
-   Some workloads require special access or HuggingFace tokens. Please refer to the [Model Access Requirements](#model-access-requirements) table to determine if your chosen workloads need additional approvals or a HuggingFace token (HF_TOKEN in installer). If a token is required, generate one from [HuggingFace settings](https://huggingface.co/settings/tokens) as applicable.
+2. Set up Hugging Face access (required):
+   Most recipes fetch model metadata (for example: tokenizer and config) from the Hugging Face Hub during installation. Unauthenticated access is heavily rate limited and commonly causes installation failures.
+
+   - Create a Hugging Face account (if you don't have one)
+   - Create an access token in [Hugging Face settings](https://huggingface.co/settings/tokens)
+   - Keep the Hugging Face token handy. The installer will prompt for `HF_TOKEN` (if `HF_TOKEN` is already set in your environment, the installer will use it as the default)
+
+   **Gated model access (important):** Some recipes use gated Hugging Face model repositories (for example: Llama). Even with `HF_TOKEN`, you must request repo access separately. **Approvals are not instantaneous**—request access early.
    
-   **Note:** Approvals are not instantaneous, please plan accordingly.
+   See [Model Access Requirements](#model-access-requirements) for the list of recipes that require additional approval.
 
 3. (Optional) For NIM Inference workloads only:
    - Generate an NGC API key from the [NGC Registry](https://org.ngc.nvidia.com/setup)
@@ -253,7 +259,9 @@ Baseline performance metrics were collected using workloads on the NVIDIA DGX H1
 
 ## Model Access Requirements
 
-Some models require a HuggingFace account and HF_TOKEN, others require repo specific approvals. Please review the table below for specific access requirements for each recipe. 
+Most recipes require a Hugging Face account and `HF_TOKEN` to fetch model metadata (tokenizer/config) from the Hugging Face Hub without running into strict unauthenticated rate limits.
+
+Some recipes additionally require approval for gated model repositories. In those cases, the token is necessary but not sufficient — your Hugging Face account must also be granted access to the model repo.
 
 **Note:** approval processes are not immediate and may take some time.
 
@@ -263,8 +271,9 @@ Some models require a HuggingFace account and HF_TOKEN, others require repo spec
 | Pretrain       | DeepSeek V3      | Yes                      | No                           | N/A                                                                   |
 | Pretrain       | Grok1            | Yes                      | Yes                          | [HuggingFace Llama 3](https://huggingface.co/meta-llama/Meta-Llama-3-70B) |
 | Pretrain       | Nemotron4        | Yes                      | No                           | N/A                |
-| Pretrain       | Qwen3 235B        | Yes                      | No                           | [HuggingFace Qwen3 235B](https://huggingface.co/Qwen/Qwen3-235B-A22B)  |                               
+| Pretrain       | Qwen3 235B       | Yes                      | No                           | [HuggingFace Qwen3 235B](https://huggingface.co/Qwen/Qwen3-235B-A22B)  |
 | Pretrain       | Qwen3 30B        | Yes                      | No                           | [HuggingFace Qwen3 30B](https://huggingface.co/Qwen/Qwen3-30B-A3B) |
+| Pretrain       | Nemotron-H       | No                       | No                           | N/A                                                                   |
 | Inference      | Llama 3.3        | Yes                      | Yes                          | [HuggingFace Llama 3.3 70B Instruct](https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct) |
 | Inference      | DeepSeek R1      | Yes                      | No                           | N/A                                                                    |
 | Microbenchmark | CPU overhead     | Yes                      | No                           | [HuggingFace GPT-OSS-120B](https://huggingface.co/openai/gpt-oss-120b) |
@@ -522,6 +531,14 @@ Some workloads complete all timesteps but print errors during the cleanup phase.
 
 ### Workaround
 We now detect this case and convert the exit code so Slurm reports success when the run actually finished. Log files will still contain the cleanup errors. If the job completed all timesteps and Slurm shows COMPLETED, you can ignore cleanup errors in the logs. This will be fixed in a future release.
+
+## 3. Qwen3 recipes are ONLINE only
+
+### Issue
+Qwen3 requires internet access to fetch model configs, and may encounter Hugging Face Hub access or rate limit errors during benchmark runs.
+
+### Workaround
+Manually update the transformers version inside the container to >4.57.3. Expect this to be fixed in a future release.
 
 # Support
 

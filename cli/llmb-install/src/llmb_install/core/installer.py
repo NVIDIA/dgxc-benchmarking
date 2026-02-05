@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -61,8 +61,8 @@ from llmb_install.core.workload import (
     run_post_install_script,
     run_setup_tasks,
 )
+from llmb_install.downloads.huggingface import download_huggingface_files_for_workloads
 from llmb_install.downloads.image import fetch_container_images, get_required_images
-from llmb_install.downloads.tokenizer import fetch_hf_tokenizers_for_workloads
 from llmb_install.downloads.tools import fetch_and_install_tools, get_required_tools
 from llmb_install.environment.cache import setup_cache_directories
 from llmb_install.environment.venv_manager import (
@@ -886,30 +886,7 @@ class Installer:
         config = self._collect_configuration(ui_mode=args.ui_mode, record_mode=True, args=args)
 
         # Save configuration and exit
-        config_data = {
-            'venv_type': config.venv_type,
-            'install_path': config.install_path,
-            'slurm_info': {
-                'slurm': {
-                    'account': config.slurm.account,
-                    'gpu_partition': config.slurm.gpu_partition,
-                    'cpu_partition': config.slurm.cpu_partition,
-                    'gpu_partition_gres': config.slurm.gpu_partition_gres,
-                    'cpu_partition_gres': config.slurm.cpu_partition_gres,
-                    'node_architecture': config.node_architecture,
-                }
-            },
-            'gpu_type': config.gpu_type,
-            'node_architecture': config.node_architecture,
-            'install_method': config.install_method,
-            'selected_workloads': config.selected_workloads,
-            'workload_selection_mode': config.workload_selection_mode,
-            'env_vars': config.environment_vars,
-        }
-
-        # Only save image_folder if it was provided
-        if args.image_folder:
-            config_data['image_folder'] = args.image_folder
+        config_data = config.to_play_dict()
 
         save_installation_config(args.record, config_data)
         print("\nConfiguration recorded successfully!")
@@ -2214,9 +2191,9 @@ class Installer:
             effective_image_folder,
         )
 
-        # Download HuggingFace tokenizers
+        # Download HuggingFace assets
         hf_token = install_config.environment_vars.get('HF_TOKEN')
-        fetch_hf_tokenizers_for_workloads(
+        download_huggingface_files_for_workloads(
             filtered_workloads, install_config.selected_workloads, install_config.install_path, hf_token
         )
 

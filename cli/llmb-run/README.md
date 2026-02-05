@@ -166,6 +166,7 @@ llmb-run submit --max-scale <num_gpus>
 **Flags:**
 - `--max-scale`: Run all workloads up to this scale.
 - `--min-scale`: Run only the minimum supported scale for each workload.
+- `--exact-scales`: Only use scales explicitly listed in workload metadata (no power-of-2 expansion beyond metadata max).
 - `-w, --workload`: Limit discovery to specific workloads (comma-separated).
 - `--scale`: specific scales to run (comma-separated).
 
@@ -173,6 +174,9 @@ llmb-run submit --max-scale <num_gpus>
 ```bash
 # Run all installed workloads up to 512 GPUs
 llmb-run submit --max-scale 512
+
+# Run up to 512 GPUs but only at metadata-supported scales (avoid scale expansion)
+llmb-run submit --max-scale 512 --exact-scales
 
 # Run specific scales for all workloads
 llmb-run submit --scale 128,256

@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0.post1] - 2026-02-02
+Backport release for 25.12 support line (dependency constraint fix only).
+
+### Fixed
+- transformers dependency '>4.57.3,<5.0.0'
+
+## [1.6.0] - 2026-01-16
+
+### Added
+- HuggingFace downloads v2 via `downloads.huggingface` (tokenizer + `config.json`, supports remote-code tokenizers).
+
+### Changed
+- Enforce `transformers>4.57.3`.
+
+## [1.5.2] - 2026-01-20
+
+### Fixed
+- Headless playfiles now use top-level `slurm` and `environment_vars` (and fail fast on deprecated keys).
+
+## [1.5.1] - 2026-01-09
+
+### Added
+- B300 support
+- GPU ordering in GPU selection prompt
+
 ## [1.5.0] - 2025-12-24
 
 ### Changed

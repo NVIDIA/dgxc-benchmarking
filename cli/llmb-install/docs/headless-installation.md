@@ -17,11 +17,27 @@ The installer supports automated installations for deployment scenarios and repr
 
 ## Prerequisites
 
-Before using automated installation, ensure:
-- Installer dependencies installed: `cd cli/llmb-install && pip install .`
-- System prerequisites met (Python 3.12+, SLURM, enroot, network, disk space)
+Automated modes require the installer tools installed first.
 
-See [main README](../README.md#prerequisites) for detailed prerequisites.
+**Recommended**: Install into a dedicated virtual environment to avoid version conflicts:
+
+```bash
+# From the repository root
+
+# Create and activate a virtual environment
+python -m venv llmb-venv
+source llmb-venv/bin/activate
+
+# Install the tools with uv (recommended)
+uv pip install cli/llmb-run cli/llmb-install
+
+# Or with pip (requires Python 3.12)
+pip install cli/llmb-run cli/llmb-install
+```
+
+**Note**: Using `pip` requires Python 3.12 exactly. Using `uv` works with Python 3.10-3.13 and is recommended.
+
+For system requirements (SLURM, enroot, storage, etc.), see the [main README Prerequisites](../README.md#prerequisites).
 
 ## Play Mode (Fully Headless)
 
@@ -66,25 +82,45 @@ Complete configuration file structure:
 ```yaml
 venv_type: venv                    # 'venv', 'conda', or 'uv'
 install_path: /lustre/user/llmb    # Installation directory
-slurm_info:
-  slurm:
-    account: myaccount
-    gpu_partition: gpu
-    cpu_partition: cpu
-    gpu_partition_gres: 8          # GPUs per node in gpu_partition
-    cpu_partition_gres: null
-    node_architecture: x86_64      # 'x86_64' or 'aarch64'
+slurm:
+  account: myaccount
+  gpu_partition: gpu
+  cpu_partition: cpu
+  gpu_partition_gres: 8            # GPUs per node in gpu_partition
+  cpu_partition_gres: null
 gpu_type: h100                     # 'h100', 'b200', 'gb200', 'gb300'
 node_architecture: x86_64
 install_method: slurm              # 'local' or 'slurm'
 selected_workloads:
   - pretrain_nemotron-h
   - pretrain_llama3.1
-env_vars:                          # Optional environment variables
+environment_vars:                  # Optional environment variables
   HF_TOKEN: hf_xxxxx
 ```
 
 **After installation**: The installer creates `cluster_config.yaml` in `$LLMB_INSTALL/` which `llmb-run` uses for job submission.
+
+### Important: Fresh Installations Only
+
+Play and express modes **only work with new, empty directories**. They cannot add workloads to existing installations.
+
+If you try to use these modes where workloads are already installed, you'll get an error:
+
+```
+Error: Existing LLMB installation found at <path>
+Please choose a different installation path, or remove the existing installation.
+```
+
+**Why?** These modes are designed for reproducible, from-scratch deployments (CI/CD, multi-site rollouts).
+
+**To add workloads to an existing installation:**
+
+```bash
+cd $LLMB_INSTALL
+llmb-install  # Interactive mode recognizes existing workloads and lets you add more
+```
+
+See [Installing Additional Workloads](../README.md#installing-additional-workloads) for details.
 
 ## Express Mode (Minimal Prompts)
 
@@ -111,6 +147,8 @@ llmb-install express /work/llmb --exemplar
 - Previous successful installation (creates `~/.config/llmb/system_config.yaml`)
 - Reuses: SLURM settings, GPU type, environment type
 - Still prompts for: install path and workloads (if not specified)
+
+**Note**: Like play mode, express only works with new, empty directories. To add workloads to an existing installation, use interactive mode (see [Installing Additional Workloads](../README.md#installing-additional-workloads)).
 
 ### Workload Selection Options
 

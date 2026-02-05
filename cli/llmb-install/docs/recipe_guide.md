@@ -150,27 +150,90 @@ repositories:
 
 ## Downloads Section (Optional)
 
-Specifies offline assets to download during installation. Currently supports HuggingFace tokenizers.
+Specifies offline assets to download during installation. This section is used to ensure models and tokenizers are available in air-gapped or offline environments.
 
-### HuggingFace Tokenizers
+### HuggingFace Assets
 
-Download tokenizers for offline use (required when workloads need tokenizers in air-gapped environments):
+The recommended way to specify HuggingFace assets is using the `huggingface` list. This allows you to specify both tokenizers and model configurations.
+
+```yaml
+downloads:
+  huggingface:
+    - repo_id: Qwen/Qwen3-30B-A3B
+      assets: [tokenizer, config]   # Optional: defaults to both if omitted
+```
+
+#### Fields
+
+- **`repo_id`** (string, required): The HuggingFace repository ID.
+- **`assets`** (list of enums, optional): Which assets to download. Allowed values: `tokenizer`, `config`. 
+  - If omitted, it defaults to **both** `[tokenizer, config]`.
+
+#### Behavior and Rules
+
+- **No Weights**: This section does **NOT** download model weights (SafeTensors/Pickle). It only downloads metadata, tokenizers, and configuration files.
+- **Download vs. Verify**: Downloads run first, then a separate verification step checks that required assets load offline (`local_files_only=True`). This is an internal implementation split (two functions), not a separate lifecycle phase.
+- **Caching**: Assets are cached in `$LLMB_INSTALL/.cache/huggingface` and made available to workloads via the `HF_HOME` environment variable.
+
+### Legacy: hf_tokenizers
+
+The `hf_tokenizers` key is supported for backward compatibility but is restricted to tokenizers only. It does **not** download model configurations.
 
 ```yaml
 downloads:
   hf_tokenizers:
     - 'meta-llama/Meta-Llama-3-70B'
+```
+
+> [!IMPORTANT]
+> **Exclusivity Rule**: You cannot use both `hf_tokenizers` and `huggingface` within the same `metadata.yaml` file. Mixing them will result in a validation error.
+
+### Migration Guidance
+
+Existing recipes using `hf_tokenizers` should eventually migrate to the `huggingface` structure. Note that `hf_tokenizers` only downloads the tokenizer, while the new `huggingface` key defaults to both tokenizer and config.
+
+**Legacy (Tokenizer only):**
+```yaml
+downloads:
+  hf_tokenizers:
     - 'nvidia/Nemotron-4-340B-Base'
 ```
 
-Tokenizers are cached in `$LLMB_INSTALL/.cache/huggingface` and available offline to workload scripts via the `HF_HOME` environment variable.
+**Migrated (Tokenizer only):**
+```yaml
+downloads:
+  huggingface:
+    - repo_id: nvidia/Nemotron-4-340B-Base
+      assets: [tokenizer]
+```
 
-**When to use**:
-- Workload needs tokenizers at runtime
-- Running in offline/air-gapped environment
-- Want consistent tokenizer versions across runs
+### Examples
 
-**Note**: Requires `HF_TOKEN` environment variable for private/gated models.
+#### 1. Default (Tokenizer + Config)
+Omit the `assets` field to download both.
+```yaml
+downloads:
+  huggingface:
+    - repo_id: Qwen/Qwen3-30B-A3B
+```
+
+#### 2. Tokenizer-only (Nemotron Pattern)
+```yaml
+downloads:
+  huggingface:
+    - repo_id: nvidia/Nemotron-4-340B-Base
+      assets: [tokenizer]
+```
+
+#### 3. Config-only (Rare)
+```yaml
+downloads:
+  huggingface:
+    - repo_id: meta-llama/Llama-3.1-405B
+      assets: [config]
+```
+
+**Note**: Accessing private or gated models requires the `HF_TOKEN` environment variable to be set during the installation phase.
 
 ## Tools Section (Optional)
 
@@ -443,8 +506,9 @@ repositories:
     commit: "04f900a9c1cde79ce6beca6a175b4c62b99d7982"
 
 downloads:
-  hf_tokenizers:
-    - 'nvidia/Nemotron-4-340B-Base'
+  huggingface:
+    - repo_id: 'nvidia/Nemotron-4-340B-Base'
+      assets: [tokenizer]
 
 tools:
   nsys:

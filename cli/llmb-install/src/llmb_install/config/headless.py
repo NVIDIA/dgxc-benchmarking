@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -24,7 +24,7 @@
 
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Iterable
 
 import yaml
 
@@ -50,6 +50,20 @@ def save_installation_config(config_file: str, config_data: Dict[str, Any]) -> N
         raise SystemExit(1) from e
 
 
+def _missing_required_fields(data: Dict[str, Any], fields: Iterable[str]) -> list[str]:
+    return [field for field in fields if field not in data]
+
+
+def _validate_required_strings(data: Dict[str, Any], fields: Iterable[str]) -> None:
+    blank_fields = []
+    for field in fields:
+        value = data.get(field)
+        if not isinstance(value, str) or not value.strip():
+            blank_fields.append(field)
+    if blank_fields:
+        raise ValueError(f"Configuration fields cannot be blank: {blank_fields}")
+
+
 def load_installation_config(config_file: str) -> Dict[str, Any]:
     """Load installation configuration from a YAML file.
 
@@ -69,33 +83,56 @@ def load_installation_config(config_file: str) -> Dict[str, Any]:
         if not isinstance(config_data, dict):
             raise ValueError("Configuration file must contain a dictionary")
 
+        # TODO: Remove this deprecated-key check after next public release.
+        deprecated_keys = [key for key in ('slurm_info', 'env_vars') if key in config_data]
+        if deprecated_keys:
+            raise ValueError(
+                "Playfiles must use top-level slurm and environment_vars; "
+                "slurm_info/env_vars are no longer supported."
+            )
+
         # Validate required fields
         required_fields = [
-            'venv_type',
             'install_path',
-            'slurm_info',
+            'venv_type',
             'gpu_type',
             'node_architecture',
             'install_method',
             'selected_workloads',
-            'env_vars',
         ]
 
-        missing_fields = [field for field in required_fields if field not in config_data]
+        missing_fields = _missing_required_fields(config_data, required_fields)
         if missing_fields:
             raise ValueError(f"Configuration file is missing required fields: {missing_fields}")
 
-        # Validate SLURM partition configuration
-        slurm_info = config_data.get('slurm_info', {})
-        if 'slurm' in slurm_info:
-            slurm_config = slurm_info['slurm']
-            gpu_partition = slurm_config.get('gpu_partition', '').strip()
-            cpu_partition = slurm_config.get('cpu_partition', '').strip()
+        _validate_required_strings(config_data, ['install_path', 'venv_type', 'gpu_type', 'node_architecture'])
 
-            if not gpu_partition:
-                raise ValueError("GPU partition cannot be blank in headless configuration")
-            if not cpu_partition:
-                raise ValueError("CPU partition cannot be blank in headless configuration")
+        selected_workloads = config_data.get('selected_workloads')
+        if not isinstance(selected_workloads, list):
+            raise ValueError("selected_workloads must be a list")
+        if not selected_workloads:
+            raise ValueError("selected_workloads cannot be empty")
+        invalid_workloads = [w for w in selected_workloads if not isinstance(w, str) or not w.strip()]
+        if invalid_workloads:
+            raise ValueError("selected_workloads must be a list of non-empty strings")
+
+        env_vars = config_data.get('environment_vars')
+        if env_vars is not None and not isinstance(env_vars, dict):
+            raise ValueError("environment_vars must be a dictionary when provided")
+
+        # Validate SLURM configuration when provided or required.
+        slurm_config = config_data.get('slurm')
+        if slurm_config is not None:
+            if not isinstance(slurm_config, dict):
+                raise ValueError("slurm must be a dictionary when provided")
+
+            _validate_required_strings(
+                slurm_config,
+                ['account', 'gpu_partition', 'cpu_partition'],
+            )
+
+        if config_data.get('install_method') == 'slurm' and not slurm_config:
+            raise ValueError("slurm configuration is required when install_method is 'slurm'")
 
         print(f"✓ Configuration loaded from: {config_file}")
         return config_data

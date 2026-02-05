@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -42,6 +42,7 @@ GPU_TYPE_TO_NUM_GPUS = {
     "a100": 8,
     "h100": 8,
     "b200": 8,
+    "b300": 8,
     "gb200": 4,
     "gb300": 4,
 }

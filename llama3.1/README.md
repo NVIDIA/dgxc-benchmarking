@@ -74,7 +74,7 @@ This variant of the workload is best-suited for clusters with GPUs below:
 | Llama3.1 Model Size | GPUs     | Datatype  | SeqLen | Layers | FSDP  | TP | PP | CP | EP | ETP | DP      | VP | MBS | GBS     | GA  | CG    | 
   |---------------------|:--------:|:---------:|:------:|:------:|:-----:|:--:|:--:|:--:|:--:|:---:|:-------:|:--:|:---:|:-------:|:---:|:-----:|
   | 405b                | 1024     | BF16      | 8192   | 126    | False |  8 | 8  | 2  | 1  | 2   | GPUs/32 | 5  |  1  | GPUs*2  | 64  | False |
-  | 70b                 | 8-128    | BF16      | 8192   | 80     | False |  4 | 4  | 2  | 1  | 1   | GPUs/32 | 5  |  1  | GPUs*2  | 64  | False | 
+  | 70b                 | 64-1024  | BF16      | 8192   | 80     | False |  4 | 4  | 2  | 1  | 1   | GPUs/32 | 5  |  1  | GPUs*2  | 64  | False | 
   | 8b                  | 8-128    | BF16      | 8192   | 32     | False |  1 | 1  | 2  | 1  | 1   | GPUs/2  | NA |  1  | GPUs*16 | 32  | False | 
 
   | Llama3.1 Model Size | GPUs     | Datatype  | SeqLen | Layers | FSDP  | TP | PP | CP | EP | ETP | DP      | VP | MBS | GBS     | GA  | CG    | 

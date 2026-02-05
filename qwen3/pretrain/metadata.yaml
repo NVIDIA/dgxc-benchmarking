@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -30,14 +30,14 @@ container:
     - 'nvcr.io#nvidia/nemo:25.11.01'
 
 downloads:
-  hf_tokenizers:
-    - 'Qwen/Qwen3-30B-A3B'
-    - 'Qwen/Qwen3-235B-A22B'
+  huggingface:
+    - repo_id: 'Qwen/Qwen3-30B-A3B'
+    - repo_id: 'Qwen/Qwen3-235B-A22B'
 
 repositories:
   megatron_bridge:
     url: "https://github.com/NVIDIA-NeMo/Megatron-Bridge.git"
-    commit: "15927667edd2ff6f37b0b06f485f9d812775124b"
+    commit: "4df8c97392bc9c3906739e658f203f6810008821"
   nemo_run:
     url: "https://github.com/NVIDIA-NeMo/Run.git"
     commit: "01a9a8ba360f7b2908728ad0516e0ad9d936966d"

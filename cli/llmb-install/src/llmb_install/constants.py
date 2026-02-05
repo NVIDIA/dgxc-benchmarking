@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -28,7 +28,24 @@ MIN_PYTHON_VERSION_TUPLE = tuple(map(int, MIN_PYTHON_VERSION.split('.')))
 MAX_PYTHON_VERSION_TUPLE = tuple(map(int, MAX_PYTHON_VERSION.split('.')))
 
 # GPU types supported
-SUPPORTED_GPU_TYPES = {'h100', 'gb300', 'gb200', 'b200'}
+SUPPORTED_GPU_TYPES = {'h100', 'gb300', 'gb200', 'b300', 'b200'}
+
+# GPU prefix priority for display ordering
+# Lower number = higher priority in selection UI
+# When displaying GPU types to users, sort by:
+#   1. Prefix priority (ascending)
+#   2. Model number (descending) within the same prefix
+# This ensures latest/premium GPUs appear first: gb300, gb200, b300, b200, h100
+#
+# IMPORTANT: When adding a new GPU type to SUPPORTED_GPU_TYPES, you MUST add its
+# prefix to this map. The installer will error if an unknown prefix is encountered.
+#
+# Format assumption: GPU types follow pattern "<prefix><number>" (e.g., "gb300", "h100")
+GPU_PREFIX_PRIORITY = {
+    'gb': 1,  # Grace Blackwell series (premium, ARM-based)
+    'b': 2,  # Blackwell series (x86-based)
+    'h': 3,  # Hopper series (x86-based)
+}
 
 # Architecture types
 ARCHITECTURES = {'x86_64': 'x86_64', 'aarch64': 'aarch64'}
@@ -36,6 +53,7 @@ ARCHITECTURES = {'x86_64': 'x86_64', 'aarch64': 'aarch64'}
 # Default architecture by GPU type
 DEFAULT_ARCHITECTURE_BY_GPU = {
     'h100': {'arch': 'x86_64', 'fixed_arch': False},
+    'b300': {'arch': 'x86_64', 'fixed_arch': False},
     'b200': {'arch': 'x86_64', 'fixed_arch': False},
     'gb300': {'arch': 'aarch64', 'fixed_arch': True},
     'gb200': {'arch': 'aarch64', 'fixed_arch': True},

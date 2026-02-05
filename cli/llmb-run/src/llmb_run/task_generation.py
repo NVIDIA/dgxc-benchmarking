@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -56,6 +56,7 @@ class TaskGenerationRequest:
     scale: Optional[str] = None  # Single or comma-separated
     max_scale: Optional[int] = None  # For discovery
     min_scale: bool = False  # For discovery
+    exact_scales: bool = False  # For discovery - prevent power-of-2 expansion
     file_path: Optional[str] = None  # For file mode
 
     # Modifiers
@@ -165,6 +166,7 @@ def _generate_explicit_workload_with_scale_discovery(request: TaskGenerationRequ
         request.repeats,
         request.profile,
         min_scale=request.min_scale,
+        exact_scales=request.exact_scales,
         dtype_filter=dtype_filter,
         workload_filter=workload_filter,
         specific_scales=specific_scales,
@@ -193,6 +195,7 @@ def _generate_discovery_tasks(request: TaskGenerationRequest) -> List[WorkloadTa
         request.repeats,
         request.profile,
         min_scale=request.min_scale,
+        exact_scales=request.exact_scales,
         dtype_filter=dtype_filter,
         workload_filter=workload_filter,
         specific_scales=specific_scales,
@@ -225,12 +228,17 @@ def generate_submit_all_tasks(
     repeats=1,
     profile=False,
     min_scale=False,
+    exact_scales=False,
     dtype_filter=None,
     workload_filter=None,
     specific_scales=None,
     extra_slurm_params: Optional[Dict[str, Any]] = None,
 ):
     """Generate tasks for all installed workloads up to max_scale.
+
+    By default (Discovery Mode), only 'pretrain' and 'finetune' workloads are included.
+    Other types (e.g., 'inference', 'microbenchmark') can be included by explicitly
+    requesting them via `workload_filter`.
 
     Args:
         workloads: Dictionary of available workloads from get_workloads()
@@ -239,6 +247,7 @@ def generate_submit_all_tasks(
         repeats: Number of repeats for each configuration (default: 1)
         profile: Whether to enable profiling for all tasks (default: False)
         min_scale: If True, only run minimum scale per metadata (default: False)
+        exact_scales: If True, only use scales from metadata (no power-of-2 expansion) (default: False)
         dtype_filter: List of dtypes to filter by, or None for all (default: None)
         workload_filter: List of workloads to filter by, or None for all (default: None)
         specific_scales: List of specific scales to run, or None to use max_scale/min_scale logic (default: None)
@@ -274,7 +283,7 @@ def generate_submit_all_tasks(
             continue
 
         workload_type = workload_data.get('workload_type', '')
-        if workload_type not in allowed_types:
+        if not workload_filter and workload_type not in allowed_types:
             logger.debug(f"Skipping {workload_key}: workload_type '{workload_type}' not in {allowed_types}")
             continue
 
@@ -310,10 +319,11 @@ def generate_submit_all_tasks(
             profile,
             task_list,
             min_scale,
-            dtype_filter,
-            workload_filter,
-            specific_scales,
-            extra_slurm_params,
+            runtime_exact_scales=exact_scales,
+            dtype_filter=dtype_filter,
+            workload_filter=workload_filter,
+            specific_scales=specific_scales,
+            extra_slurm_params=extra_slurm_params,
         )
 
     logger.debug(f"Generated {len(task_list)} tasks across {len(filtered_workloads)} workloads")
@@ -329,6 +339,7 @@ def _generate_workload_tasks(
     profile,
     task_list,
     min_scale=False,
+    runtime_exact_scales=False,
     dtype_filter=None,
     workload_filter=None,
     specific_scales=None,
@@ -345,6 +356,7 @@ def _generate_workload_tasks(
         profile: Whether to enable profiling
         task_list: List to append generated tasks to
         min_scale: If True, only run minimum scale per metadata (default: False)
+        runtime_exact_scales: If True, only use scales from metadata (no power-of-2 expansion) (default: False)
         dtype_filter: List of dtypes to filter by, or None for all (default: None)
         workload_filter: List of workload filters, may include workload_modelsize (default: None)
         specific_scales: List of specific scales to run, or None to use max_scale/min_scale logic (default: None)
@@ -394,7 +406,9 @@ def _generate_workload_tasks(
                 continue
 
             dtype_scales = cfg.get('scales', [])
-            exact_scales = cfg.get('exact_scales', model_config.get('exact_scales', False))
+            metadata_exact_scales = cfg.get('exact_scales', model_config.get('exact_scales', False))
+            # Logical OR: if runtime flag is set OR metadata says exact, then use exact scales
+            effective_exact_scales = runtime_exact_scales or metadata_exact_scales
 
             if not dtype_scales:
                 logger.warning(f"Skipping {workload_key}_{model_size} dtype={dtype}: no scales defined")
@@ -404,7 +418,7 @@ def _generate_workload_tasks(
                 # Use specific scales, but only those supported by the workload
                 scales_to_test = []
                 for requested_scale in specific_scales:
-                    if exact_scales:
+                    if effective_exact_scales:
                         # For exact scales, only include scales that are explicitly supported
                         if requested_scale in dtype_scales:
                             scales_to_test.append(requested_scale)
@@ -450,7 +464,7 @@ def _generate_workload_tasks(
                     # No max_scale limit, just use the minimum scale from metadata
                     scales_to_test = [min(dtype_scales)]
             else:
-                scales_to_test = _generate_scales_up_to_max(dtype_scales, max_scale, exact_scales)
+                scales_to_test = _generate_scales_up_to_max(dtype_scales, max_scale, effective_exact_scales)
 
             if not scales_to_test:
                 max_scale_str = max_scale if max_scale is not None else "metadata scales"

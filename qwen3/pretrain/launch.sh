@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -202,7 +202,7 @@ else
     exit 1
 fi
 
-CONFIG_OVERRIDES=" -tp $TP \
+CONFIG_OVERRIDES+=" -tp $TP \
   -pp $PP \
   -cp $CP \
   -ep $EP \
@@ -266,6 +266,7 @@ python3 scripts/performance/setup_experiment.py \
     --log_dir $NEMORUN_HOME \
     --time_limit $TIME_LIMIT \
     --max_steps $MAX_STEPS \
+    --hf_token ${HF_TOKEN:?HF_TOKEN is required} \
     $SLURM_ARGS
 
 popd

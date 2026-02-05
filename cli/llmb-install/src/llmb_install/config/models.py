@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -93,6 +93,21 @@ class InstallConfig:
             result['slurm'] = None
 
         return result
+
+    def to_play_dict(self) -> Dict[str, Any]:
+        """Convert config to dictionary for headless playfiles."""
+        data = self.to_dict()
+        denylist = {
+            'llmb_repo',
+            'dev_mode',
+            'ui_mode',
+            'cache_dirs_configured',
+            'is_incremental_install',
+        }
+        data = {key: value for key, value in data.items() if key not in denylist}
+        if data.get('image_folder') is None:
+            data.pop('image_folder', None)
+        return data
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'InstallConfig':

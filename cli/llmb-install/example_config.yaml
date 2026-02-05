@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -28,14 +28,12 @@
 
 venv_type: venv
 install_path: /lustre/username/llmb
-slurm_info:
-  slurm:
-    account: myaccount
-    gpu_partition: gpu
-    cpu_partition: cpu
-    gpu_partition_gres: 8
-    cpu_partition_gres: null
-    node_architecture: x86_64
+slurm:
+  account: myaccount
+  gpu_partition: gpu
+  cpu_partition: cpu
+  gpu_partition_gres: 8
+  cpu_partition_gres: null
 gpu_type: h100
 node_architecture: x86_64
 install_method: slurm
@@ -43,5 +41,5 @@ selected_workloads:
   - inference_llama4-h100
   - inference_llama4.1-h100
   - inference_nemotron-h100
-env_vars:
+environment_vars:
   HF_TOKEN: hf_your_token_here

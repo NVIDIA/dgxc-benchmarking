@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -83,7 +83,8 @@ if [ -n "$ADDITIONAL_SLURM_PARAMS" ]; then
     SLURM_ARGS="--additional_slurm_params ${ADDITIONAL_SLURM_PARAMS}"
 fi
 
-CONTAINER_MOUNTS=""
+export HF_HOME="$LLMB_INSTALL/.cache/huggingface"
+CONTAINER_MOUNTS="$HF_HOME"
 if [[ -n ${RUN_CONF_MOUNTS:-""} ]]; then
     if [[ -n ${CONTAINER_MOUNTS} ]]; then
         CONTAINER_MOUNTS+=","

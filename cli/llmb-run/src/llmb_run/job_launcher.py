@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,7 @@ import logging
 import os
 import re
 import subprocess
+import time
 from abc import ABC, abstractmethod
 
 from rich.console import Console
@@ -202,6 +203,47 @@ def get_venv_environment(venv_path: str, env_type: str = 'venv') -> dict:
     return env
 
 
+def create_experiment_directory(
+    workload_dir: str, workload_key: str, model_size: str, dtype: str, scale: int, max_retries: int = 3
+) -> str:
+    """Create experiment directory with collision handling.
+
+    Args:
+        workload_dir: Base workload directory path
+        workload_key: Workload identifier
+        model_size: Model size (e.g., "671b")
+        dtype: Data type (e.g., "bf16")
+        scale: Number of GPUs
+        max_retries: Maximum retry attempts for timestamp collision
+
+    Returns:
+        str: Full path to created experiment directory
+
+    Raises:
+        RuntimeError: If directory creation fails after max_retries
+    """
+    desc = f"{workload_key}_{model_size}_{dtype}_gpus{scale}"
+    experiments_base = os.path.join(workload_dir, "experiments", desc)
+
+    for attempt in range(max_retries):
+        timestamp = str(int(time.time()))
+        experiment_dir = os.path.join(experiments_base, timestamp)
+
+        try:
+            os.makedirs(experiment_dir)
+            return experiment_dir
+        except FileExistsError:
+            # Directory already exists (collision), wait and retry
+            if attempt < max_retries - 1:
+                logger.debug(f"Directory {experiment_dir} exists, retrying...")
+                time.sleep(1)
+        except OSError as e:
+            # Other OS errors (permission denied, disk full, etc.) - fail immediately
+            raise RuntimeError(f"Failed to create experiment directory {experiment_dir}: {e}") from e
+
+    raise RuntimeError(f"Failed to create unique experiment directory after {max_retries} attempts")
+
+
 class JobLauncher(ABC):
     """Abstract base class for job launchers."""
 
@@ -336,6 +378,122 @@ class SbatchLauncher(JobLauncher):
 
             # TODO: This job directory is not correct.
             return SlurmJob(job_id=job_id, job_workdir=None)
+        except subprocess.CalledProcessError as e:
+            logger.error(format_task_output(task, prefix="ERROR: ", suffix=f"error={e.stderr.strip()}"))
+            return SlurmJob(job_id=None, job_workdir=None)
+
+
+class ConfiguredSbatchLauncher(JobLauncher):
+    """Launcher for SLURM sbatch jobs with managed experiment directories.
+
+    This launcher creates experiment directories before job submission and passes experiment directory path via LLMB_EXPERIMENT_DIR environment variable.
+    """
+
+    def launch(self, task):
+        """Launch a task using sbatch with a pre-created experiment directory."""
+        # Working directory for sbatch (where launch.sh lives)
+        script_dir = self.workloads[task.workload_key]["dir"]
+        # Base directory for experiments (under $LLMB_INSTALL/workloads/)
+        llmb_workload = f"{self.config['launcher']['llmb_install']}/workloads/{task.workload_key}"
+
+        # Create experiment directory
+        try:
+            experiment_dir = create_experiment_directory(
+                workload_dir=llmb_workload,
+                workload_key=task.workload_key,
+                model_size=task.model_size,
+                dtype=task.dtype,
+                scale=task.scale,
+            )
+        except RuntimeError as e:
+            logger.error(format_task_output(task, prefix="ERROR: ", suffix=str(e)))
+            return SlurmJob(job_id=None, job_workdir=None)
+
+        # Build sbatch command
+        job_name = f"{task.workload_key}_{task.model_size}_{task.dtype}"
+
+        # Determine node configuration
+        if os.environ.get('GPUS_PER_NODE'):
+            gpus_per_node = int(os.environ.get('GPUS_PER_NODE'))
+        else:
+            gpu_type = self.get_gpu_type(task)
+            if gpu_type not in GPU_TYPE_TO_NUM_GPUS:
+                raise ValueError(
+                    f"Invalid GPU type specified: '{gpu_type}'. Valid types in 'llmb-run' modules are: {', '.join(GPU_TYPE_TO_NUM_GPUS.keys())}"
+                )
+            gpus_per_node = GPU_TYPE_TO_NUM_GPUS[gpu_type]
+
+        num_nodes = (task.scale + gpus_per_node - 1) // gpus_per_node
+        num_nodes = str(num_nodes)
+        ntasks_per_node = str(gpus_per_node) if task.scale >= gpus_per_node else str(task.scale)
+
+        cmd = [
+            "sbatch",
+            "--parsable",
+            f"--output={experiment_dir}/slurm-%j.out",
+            "-J",
+            job_name,
+            "-N",
+            num_nodes,
+            f"--ntasks-per-node={ntasks_per_node}",
+        ]
+
+        if task.extra_slurm_params and 'nice' in task.extra_slurm_params:
+            cmd.append(f"--nice={task.extra_slurm_params['nice']}")
+
+        cmd.append("launch.sh")
+
+        # Set up environment
+        env = os.environ.copy()
+        env["LLMB_INSTALL"] = self.config['launcher']['llmb_install']
+        env["LLMB_EXPERIMENT_DIR"] = experiment_dir
+        env["MODEL_SIZE"] = task.model_size
+        env["DTYPE"] = task.dtype
+        env["JOB_TOTAL_GPUS"] = str(task.scale)
+        env["GPU_TYPE"] = self.get_gpu_type(task)
+
+        # Add SLURM environment variables
+        slurm_env = get_slurm_env_vars(self.config)
+        env.update(slurm_env)
+
+        if task.profile:
+            env['ENABLE_PROFILE'] = 'true'
+
+        # Automatically enable VBoost for 'eos' cluster if not explicitly set
+        if (
+            should_enable_vboost(self.config)
+            and 'ENABLE_VBOOST' not in env
+            and 'ENABLE_VBOOST' not in task.env_overrides
+        ):
+            env['ENABLE_VBOOST'] = 'true'
+            logger.debug("Automatically enabled VBoost for 'eos' cluster")
+
+        # Handle environment variables from config
+        if 'environment' in self.config:
+            env_vars = {k: str(v) for k, v in self.config['environment'].items()}
+            env.update(env_vars)
+
+        # Convert all task override values to strings
+        task_env = {k: str(v) for k, v in task.env_overrides.items()}
+        env.update(task_env)
+
+        # Handle model parameter overrides
+        if task.model_overrides:
+            env['OPTIMIZATION_NAME'] = 'cc'  # Custom Config
+            env['OPTIMIZATION_CODE'] = self.model_optimizations(task.model_overrides)
+
+        try:
+            logger.debug(f"Command: {cmd}")
+            result = subprocess.run(cmd, capture_output=True, check=True, text=True, env=env, cwd=script_dir)
+            job_id = result.stdout.strip()
+            logger.info(
+                format_task_output(task, prefix="SUBMITTED: ", suffix=f"jobid={job_id} workdir={experiment_dir}")
+            )
+
+            # Create llmb-config.yaml file in the experiment directory
+            create_llmb_config(task, job_id, experiment_dir, self.config, self.workloads)
+
+            return SlurmJob(job_id=job_id, job_workdir=experiment_dir)
         except subprocess.CalledProcessError as e:
             logger.error(format_task_output(task, prefix="ERROR: ", suffix=f"error={e.stderr.strip()}"))
             return SlurmJob(job_id=None, job_workdir=None)
@@ -515,6 +673,8 @@ def create_launcher(launcher_type, config, workloads):
     """Factory function to create the appropriate launcher."""
     if launcher_type == 'sbatch':
         return SbatchLauncher(config, workloads)
+    elif launcher_type == 'configured_sbatch':
+        return ConfiguredSbatchLauncher(config, workloads)
     elif launcher_type == 'nemo':
         return Nemo2Launcher(config, workloads)
     elif launcher_type == 'megatron_bridge':

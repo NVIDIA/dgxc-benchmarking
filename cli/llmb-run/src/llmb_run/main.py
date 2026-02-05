@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -339,6 +339,12 @@ def submit(
         bool,
         typer.Option('--min-scale', help='Only run the minimum supported scale (discovery/mixed mode).'),
     ] = False,
+    exact_scales: Annotated[
+        bool,
+        typer.Option(
+            '--exact-scales', help='Only use scales from metadata (no power-of-2 expansion beyond metadata max).'
+        ),
+    ] = False,
     file_path: Annotated[
         Optional[str], typer.Option('-f', '--file', help='Path to workload specification file (.txt or .yaml).')
     ] = None,
@@ -370,6 +376,7 @@ def submit(
         scale=scale,
         max_scale=max_scale,
         min_scale=min_scale,
+        exact_scales=exact_scales,
         file_path=file_path,
         repeats=repeats,
         profile=profile,

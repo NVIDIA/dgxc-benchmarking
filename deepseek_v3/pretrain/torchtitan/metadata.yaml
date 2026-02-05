@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -58,7 +58,7 @@ setup:
 
 # Run
 run:
-  launcher_type: 'sbatch'
+  launcher_type: 'configured_sbatch'
   launch_script: 'launch.sh'
 
   gpu_configs:
