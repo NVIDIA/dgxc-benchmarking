@@ -300,8 +300,10 @@ print_preinstall_summary() {
     fi
 
     echo "────────────────────────────────────────────────────────────────────"
-    echo "Press Enter to launch the main installer..."
-    read -r
+    if [ -t 0 ]; then
+        echo "Press Enter to launch the main installer..."
+        read -r
+    fi
     echo ""
 }
 # Main execution: Setup environment and validate tools
