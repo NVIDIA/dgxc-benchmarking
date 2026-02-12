@@ -1,5 +1,5 @@
 # GenAI Benchmarking Helm Chart (single node)
-Designed as a helm chart to work standalone on a K8s cluster, this helm chart can deploy any [vLLM compatible model](https://docs.vllm.ai/en/latest/models/supported_models.html), or [SGLang compatible model](https://docs.sglang.ai/supported_models/generative_models.html) and benchmark it on a kubernetes cluster using [Perf Analyzer](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/perf_benchmark/perf_analyzer.html).
+Designed as a helm chart to work standalone on a K8s cluster, this helm chart can deploy any [vLLM compatible model](https://docs.vllm.ai/en/latest/models/supported_models.html), or [SGLang compatible model](https://docs.sglang.io/supported_models/text_generation/generative_models.html) and benchmark it on a kubernetes cluster using [Perf Analyzer](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/perf_benchmark/perf_analyzer.html).
 
 ## Setting the `values.yaml` for the benchmark
 
@@ -95,5 +95,4 @@ ngc cf task create --name benchmark --helm-chart qdrlnbkss8u1/llm-benchmark-char
   }' \
 --gpu-specification H100:GPU.H100_1x
 ```
-
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -31,6 +31,7 @@ set -eu -o pipefail
 # Configuration
 readonly MIN_PYTHON_VERSION="3.12"
 readonly RECOMMENDED_PYTHON_VERSION="3.12"
+readonly PINNED_UV_VERSION="0.9.28"
 
 # Welcome banner
 echo "════════════════════════════════════════════════════════════════════"
@@ -49,10 +50,84 @@ UV_INSTALLED_NOW=false
 UV_WAS_ADDED_TO_PATH=false
 CREATED_VENV=false
 VENV_DIR=""
+MULTI_UV_WARNING_SHOWN=false
 
 # Function to check if a command exists
 command_exists() {
     command -v "$1" &> /dev/null
+}
+
+# Prefer user-level uv install path when present.
+ensure_local_uv_path() {
+    local local_uv="$HOME/.local/bin/uv"
+    if [[ -x $local_uv ]]; then
+        case ":$PATH:" in
+            *":$HOME/.local/bin:"*) ;;
+            *)
+                export PATH="$HOME/.local/bin:$PATH"
+                UV_WAS_ADDED_TO_PATH=true
+                ;;
+        esac
+    fi
+}
+
+# Get uv version string (e.g., 0.9.28)
+get_uv_version() {
+    uv --version 2> /dev/null | awk '{print $2}'
+}
+
+# Returns success (0) if version A is greater than version B.
+version_gt() {
+    [[ $1 =~ ^[0-9] ]] && [[ $2 =~ ^[0-9] ]] \
+        && [[ $1 != "$2" ]] && [[ "$(printf '%s\n' "$1" "$2" | sort -V | tail -1)" == "$1" ]]
+}
+
+# Warn if multiple uv binaries are available in PATH.
+# This warning is intentionally suppressed in low-risk cases to reduce noise.
+warn_if_multiple_uv_installs() {
+    if [[ $MULTI_UV_WARNING_SHOWN == true ]] || ! command_exists uv; then
+        return 0
+    fi
+
+    local uv_paths
+    uv_paths=$(type -ap uv 2> /dev/null | awk '!seen[$0]++')
+
+    local count
+    count=$(printf "%s\n" "$uv_paths" | sed '/^$/d' | wc -l | tr -d ' ')
+    if [[ $count -gt 1 ]]; then
+        local active_uv
+        active_uv=$(command -v uv)
+        local managed_uv="$HOME/.local/bin/uv"
+
+        # Intentionally skip warning when managed uv is already first in PATH
+        # and we did not need to modify PATH in this session.
+        if [[ $active_uv == "$managed_uv" && $UV_WAS_ADDED_TO_PATH != true ]]; then
+            MULTI_UV_WARNING_SHOWN=true
+            return 0
+        fi
+
+        local active_version
+        active_version=$(get_uv_version 2> /dev/null || echo "unknown")
+        local version_note="v${active_version}"
+        if [[ $active_uv == "$managed_uv" ]]; then
+            version_note="v${active_version} ✅"
+        fi
+
+        echo ""
+        echo "⚠️  Multiple uv binaries found in PATH:"
+        while IFS= read -r uv_path; do
+            [[ -n $uv_path ]] && echo "   - $uv_path"
+        done <<< "$uv_paths"
+        echo ""
+        echo "   Active: $active_uv ($version_note)"
+        echo ""
+        echo "   If you run llmb-install in a new shell, a different uv may be"
+        echo "   resolved. To avoid issues, ensure ~/.local/bin appears first"
+        echo "   in your PATH (e.g., in ~/.bashrc)."
+        echo ""
+    fi
+
+    MULTI_UV_WARNING_SHOWN=true
 }
 
 # Check if Python version meets minimum requirement
@@ -89,6 +164,7 @@ show_uv_benefits() {
     echo "  • Makes benchmark installations 2-5x faster"
     echo "  • Automatically installs Python $RECOMMENDED_PYTHON_VERSION (required for recipes)"
     echo "  • Lightweight tool (~10MB) with better dependency resolution"
+    echo "  • This release supports uv versions up to $PINNED_UV_VERSION for recipe compatibility"
     echo ""
     echo "⚠️ Note: Will download installer from https://astral.sh/uv (official source)"
 }
@@ -98,7 +174,7 @@ show_python_error() {
     echo "❌ Cannot proceed: Python $current_version found (requires $MIN_PYTHON_VERSION)"
     echo ""
     echo "Options:"
-    echo "  1. Install 'uv' (recommended) - automatically installs Python $RECOMMENDED_PYTHON_VERSION"
+    echo "  1. Install 'uv $PINNED_UV_VERSION' (recommended) - automatically installs Python $RECOMMENDED_PYTHON_VERSION"
     echo "  2. Use conda to create a Python $RECOMMENDED_PYTHON_VERSION environment"
     echo "  3. Use pyenv or upgrade system Python to $RECOMMENDED_PYTHON_VERSION+"
     echo ""
@@ -106,31 +182,59 @@ show_python_error() {
     exit 1
 }
 
-# Simplified uv installation
+# Install pinned uv version required by recipes in this release
 install_uv() {
-    echo "Installing uv..."
-    if ! curl -LsSf https://astral.sh/uv/install.sh | sh; then
+    echo "Installing uv $PINNED_UV_VERSION..."
+    if ! curl -LsSf "https://astral.sh/uv/${PINNED_UV_VERSION}/install.sh" | sh; then
         echo "❌ uv installation failed"
         return 1
     fi
 
-    # Check if uv is now available, add to PATH if needed
+    ensure_local_uv_path
+    hash -d uv 2> /dev/null || true
+
+    # Check if uv is now available and matches the pinned version
     if command_exists uv; then
-        echo "✅ uv installed"
-        UV_INSTALLED_NOW=true
-        return 0
-    else
-        export PATH="$HOME/.local/bin:$PATH"
-        if command_exists uv; then
-            echo "✅ uv installed"
+        local uv_version
+        uv_version=$(get_uv_version || true)
+        if [[ $uv_version == "$PINNED_UV_VERSION" ]]; then
+            echo "✅ uv $PINNED_UV_VERSION installed"
             UV_INSTALLED_NOW=true
-            UV_WAS_ADDED_TO_PATH=true
+            warn_if_multiple_uv_installs
             return 0
-        else
-            echo "❌ uv installation failed"
-            return 1
         fi
     fi
+
+    echo "❌ uv installation failed: expected $PINNED_UV_VERSION, found $(get_uv_version || echo unknown)"
+    return 1
+}
+
+# Ensure uv is compatible for this release.
+# We only correct versions newer than the known-compatible target.
+ensure_compatible_uv() {
+    ensure_local_uv_path
+
+    if ! command_exists uv; then
+        return 1
+    fi
+
+    local uv_version
+    uv_version=$(get_uv_version || true)
+    if [[ -z $uv_version ]]; then
+        echo "⚠️  Unable to determine uv version. Installing uv $PINNED_UV_VERSION..."
+        install_uv
+        return $?
+    fi
+
+    if version_gt "$uv_version" "$PINNED_UV_VERSION"; then
+        echo "⚠️  Detected uv $uv_version, but this release supports up to uv $PINNED_UV_VERSION."
+        echo "   Installing uv $PINNED_UV_VERSION for compatibility..."
+        install_uv
+        return $?
+    fi
+
+    warn_if_multiple_uv_installs
+    return 0
 }
 
 # Environment setup with proper sequencing
@@ -145,15 +249,18 @@ setup_environment() {
         # Offer uv installation for faster benchmark installs (optional for existing good venvs)
         if ! command_exists uv; then
             echo ""
-            echo "💡 Optional: Install 'uv' for 2-5x faster benchmark installations"
+            echo "💡 Optional: Install 'uv $PINNED_UV_VERSION' for 2-5x faster benchmark installs"
             echo "   (Your current environment is ready and will work fine)"
             echo "   Downloads from https://astral.sh/uv (official source)"
             echo ""
-            read -p "Install 'uv' (recommended)? [y/N]: " -n 1 -r
+            read -p "Install 'uv $PINNED_UV_VERSION' (recommended)? [y/N]: " -n 1 -r
             echo
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 install_uv
             fi
+        elif ! ensure_compatible_uv; then
+            echo "❌ Cannot continue without a compatible uv installation."
+            exit 1
         fi
         return 0
     fi
@@ -163,6 +270,10 @@ setup_environment() {
 
     # If uv is available, use it (can handle any Python version)
     if command_exists uv; then
+        if ! ensure_compatible_uv; then
+            echo "❌ Cannot continue without a compatible uv installation."
+            exit 1
+        fi
         echo "Using uv to create virtual environment with Python $RECOMMENDED_PYTHON_VERSION..."
         create_venv_with_uv
         return 0
@@ -180,7 +291,7 @@ setup_environment() {
         echo ""
         echo "Or use your system Python $sys_python_ver (will work, but slower installs)"
         echo ""
-        read -p "Install 'uv'? [Y/n]: " -n 1 -r
+        read -p "Install 'uv $PINNED_UV_VERSION'? [Y/n]: " -n 1 -r
         echo
 
         if [[ ! $REPLY =~ ^[Nn]$ ]]; then
@@ -203,7 +314,7 @@ setup_environment() {
         echo ""
         show_uv_benefits
         echo ""
-        read -p "Install 'uv'? [Y/n]: " -n 1 -r
+        read -p "Install 'uv $PINNED_UV_VERSION'? [Y/n]: " -n 1 -r
         echo
 
         if [[ ! $REPLY =~ ^[Nn]$ ]]; then

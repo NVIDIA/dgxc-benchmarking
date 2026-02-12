@@ -541,6 +541,14 @@ Qwen3 requires internet access to fetch model configs, and may encounter Hugging
 ### Workaround
 Manually update the transformers version inside the container to >4.57.3. Expect this to be fixed in a future release.
 
+## 4. uv 0.9.29+ breaks all recipes that use nemo_run
+
+### Issue
+Nearly every recipe installs `nemo_run` and will fail with `uv` `0.9.29+` due to uv rejecting unknown fields in `pyproject.toml` files.
+
+### Workaround
+Run `./install.sh` from this release. It enforces `uv <=0.9.28`, which avoids the strict parser breakage.
+
 # Support
 
 Terminology used in these recipes is explained in the [Appendix](APPENDIX.md).
