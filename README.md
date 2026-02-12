@@ -32,6 +32,7 @@ Depending on your cluster's job scheduler, ensure the following are met:
     *   Version 22.x or newer
     *   `task/affinity` plugin required for process pinning
     *   [Enroot](https://github.com/NVIDIA/enroot/)
+    *   [Pyxis](https://github.com/NVIDIA/pyxis)
 
 
 ## Quick Start Guide
@@ -234,6 +235,41 @@ Some models require a HuggingFace account and HF_TOKEN, others require repo spec
 
 The LLM Benchmarking Collection published baseline benchmark results using the following reference infrastructures, CSP-specific configurations, and software.
 
+## GB200 Reference Architecture
+
+Baseline performance metrics for GB200 workloads were collected using the NVIDIA DGX GB200 Reference Architecture. For more information see [NVIDIA GB200 NVL72](https://www.nvidia.com/en-us/data-center/gb200-nvl72/)
+
+* GB200 Grace Blackwell Superchip
+  * CPU: 72 Arm Neoverse V2 cores with 4x 128b SVE2
+    * 3.5 GHz (max boost)
+    * Low-latency coherent interconnect between Grace CPU and B200 GPUs
+    * RAM: 960 GiB LPDDR5X (2x 480 GiB) | 546 GB/s
+    * Total Accessible Memory: 1.7 TiB
+    * 64x PCIe Gen5 lanes
+  * 2x Blackwell GPUs
+    * Memory bandwidth 16 TB/s
+* NVLink: NVLink 5th Generation
+  * 1.8 TB/s per GPU bandwidth
+
+## B200 Reference Architecture
+
+Baseline performance metrics for B200 workloads were collected using systems equipped with NVIDIA B200 GPUs. For more information see [NVIDIA Blackwell Architecture](https://www.nvidia.com/en-us/data-center/technologies/blackwell-architecture/).
+
+* GPU: 8xB200 192GB HBM3e (1.5TB total)
+  * TDP 1000W
+  * Memory bandwidth 8 TB/s
+* CPU: Intel Xeon Platinum 8570 x2
+  * 40 cores per socket
+  * 4 Ghz (max boost)
+  * RAM: 1 TiB | 1.6 TB/s per socket
+  * 48x PCIe Gen5 lanes
+* NVLink: NVLink 5th Generation
+  * 1.8 TB/s per GPU bandwidth
+  * 18 Links per GPU
+* InfiniBand:
+  * Compute links: 8x 400 Gbit/s
+* System Memory: 2TB
+
 ## H100 Reference Architecture
 
 Baseline performance metrics for H100 workloads were collected using the NVIDIA DGX H100 Reference Architecture. For more information see [DGX H100 Systems](https://blogs.nvidia.com/blog/dgx-h100-systems-shipping/).
@@ -247,7 +283,7 @@ Baseline performance metrics for H100 workloads were collected using the NVIDIA 
   * Numa nodes per socket = 1
   * PCIe Gen5
 * NVLink: NVLink 4th Generation
-  * 900 GB/s (GPU to GPU NVLink bidirectional bandwidth)
+  * 900 GB/s per GPU bandwidth
   * 18 Links per GPU
 * InfiniBand:
   * Compute links: 8x 400 Gbit/s
@@ -256,18 +292,6 @@ Baseline performance metrics for H100 workloads were collected using the NVIDIA 
 * Local Storage:
   * 2x 1.92TB NVMe M.2
   * 8x 3.84TB NVMe U.2
-
-## GB200 Reference Architecture
-
-Baseline performance metrics for GB200 workloads were collected using the NVIDIA DGX GB200 Reference Architercture. For more information see [NVIDIA GB200 NVL72](https://www.nvidia.com/en-us/data-center/gb200-nvl72/)
-
-* GB200 Grace Blackwell Superchip
-  * 72 Arm Neoverse V2 cores
-  * 2x Blackwell GPUs
-    * Memory bandwidth 16 TB/s
-* NVLink: NVLink 5th Generation
-  * 3.6 TB/s
-
 
 
 ## CSP Specific Configurations
@@ -409,6 +433,16 @@ tritonclient 2.51.0 requires urllib3>=2.0.7, but you have urllib3 1.26.20 which 
 ### Solution
 
 The error can be ignored as it doesn't affect benchmark functionality. 
+
+# Known Issues
+
+## 1. uv 0.9.29+ breaks recipes that use nemo_run
+
+### Issue
+Nearly every recipe installs `nemo_run` and can fail with `uv` `0.9.29+` due to strict dependency parsing in upstream `pyproject.toml` files.
+
+### Workaround
+Run `./install.sh` from this release. It enforces `uv <=0.9.28`, which avoids the strict parser breakage.
 
 # Support
 

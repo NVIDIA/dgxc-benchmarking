@@ -1,3 +1,8 @@
+## [v25.08.02] - 2026-02-11
+
+### Fixed
+  - Pin `uv` to `<=0.9.28` in `install.sh` to avoid strict parsing failures when installing pinned `nemo_run` commits with `uv 0.9.29+`.
+
 ## [v25.08.01] - 2025-11-07
 
 ### Changed
