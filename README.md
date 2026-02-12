@@ -33,6 +33,7 @@ Depending on your cluster's job scheduler, ensure the following are met:
     *   Version 22.x or newer
     *   `task/affinity` plugin required for process pinning
     *   [Enroot](https://github.com/NVIDIA/enroot/)
+    *   [Pyxis](https://github.com/NVIDIA/pyxis)
 
 
 ## Quick Start Guide
@@ -504,6 +505,14 @@ Some workloads complete all timesteps but print errors during the cleanup phase.
 
 ### Workaround
 We now detect this case and convert the exit code so Slurm reports success when the run actually finished. Log files will still contain the cleanup errors. If the job completed all timesteps and Slurm shows COMPLETED, you can ignore cleanup errors in the logs. This will be fixed in a future release.
+
+## 3. uv 0.9.29+ breaks all recipes that use nemo_run
+
+### Issue
+Nearly every recipe installs `nemo_run` and will fail with `uv` `0.9.29+` due to uv rejecting unknown fields in `pyproject.toml` files.
+
+### Workaround
+Run `./install.sh` from this release. It enforces `uv <=0.9.28`, which avoids the strict parser breakage.
 
 # Support
 
