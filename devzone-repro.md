@@ -8,7 +8,7 @@ This repository provides instructions reproduce inference performance data from 
 Before configuring the orchestrator, ensure you have downloaded the required NVFP4 model weights from Hugging Face:
 
 * **DeepSeek-R1 (DSR1):** [DeepSeek-R1-0528-NVFP4-v2](https://huggingface.co/nvidia/DeepSeek-R1-0528-NVFP4-v2)
-* **Qwen3.5-397B:** [nvidia/Qwen3.5-397B-A17B-NVFP4](https://huggingface.co/nvidia/Qwen3.5-397B-A17B-NVFP4)
+* **Qwen3.5-397B:** [Qwen/Qwen3.5-397B-A17B](https://huggingface.co/Qwen/Qwen3.5-397B-A17Bcontainer)
 * **Kimi-K2.5:** [Kimi-K2.5-NVFP4](https://huggingface.co/nvidia/Kimi-K2.5-NVFP4)
 
 ## Environment Setup
