@@ -8,7 +8,7 @@ This repository provides instructions reproduce inference performance data from 
 Before configuring the orchestrator, ensure you have downloaded the required NVFP4 model weights from Hugging Face:
 
 * **DeepSeek-R1 (DSR1):** [DeepSeek-R1-0528-NVFP4-v2](https://huggingface.co/nvidia/DeepSeek-R1-0528-NVFP4-v2)
-* **Qwen3.5-397B:** [Qwen/Qwen3.5-397B-A17B](https://huggingface.co/Qwen/Qwen3.5-397B-A17Bcontainer)
+* **Qwen3.5-397B:** [Qwen/Qwen3.5-397B-A17B](https://huggingface.co/Qwen/Qwen3.5-397B-A17B)
 * **Kimi-K2.5:** [Kimi-K2.5-NVFP4](https://huggingface.co/nvidia/Kimi-K2.5-NVFP4)
 
 ## Environment Setup
@@ -56,7 +56,7 @@ srtctl apply -f <path-to-config-file>
 
 Available benchmarking configurations for published performance data are mapped below. Select the recipe that matches your target performance profile.
 
-| Model | 1K/1K | 8K/1K | 1K/8K | 128K/8k |
+| Model | 1K/1K | 8K/1K | 1K/8K | 128K/8K |
 | :--- | :--- | :--- | :--- | :--- |
 | **DSR1** | | [dsr1/max_throughput](https://github.com/ishandhanani/srt-slurm/blob/recipes/moe/recipes/dsr1/max_throughput.yaml), [dsr1/mid_pareto](https://github.com/ishandhanani/srt-slurm/blob/recipes/moe/recipes/dsr1/mid_pareto.yaml), [dsr1/min_latency](https://github.com/ishandhanani/srt-slurm/blob/recipes/moe/recipes/dsr1/min_latency.yaml)| | [dsr1-128k8k/gb200](https://github.com/ishandhanani/srt-slurm/tree/recipes/moe/recipes/dsr1-128k8k/gb200), [dsr1-128k8k/gb300](https://github.com/ishandhanani/srt-slurm/tree/recipes/moe/recipes/dsr1-128k8k/gb300)|
 | **Kimi-K2.5** | [kimi-k2.5/b200/1k1k](https://github.com/ishandhanani/srt-slurm/tree/recipes/moe/recipes/kimi-k2.5/b200/1k1k) | [kimi-k2.5/b200/8k1k](https://github.com/ishandhanani/srt-slurm/tree/recipes/moe/recipes/kimi-k2.5/b200/8k1k) | [kimi-k2.5/b200/1k8k](https://github.com/ishandhanani/srt-slurm/tree/recipes/moe/recipes/kimi-k2.5/b200/1k8k)  | |
