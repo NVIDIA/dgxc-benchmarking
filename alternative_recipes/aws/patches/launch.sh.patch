@@ -1,0 +1,11 @@
+--- a/llmb_repo/llama3.1/launch.sh
++++ b/llmb_repo/llama3.1/launch.sh
+@@ -32,7 +32,7 @@
+ export MODEL_NAME=llama3.1
+ export FW_VERSION=25.11.01
+ 
+-export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh}
++export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+${FW_VERSION}-efa-nccl29.sqsh}
+ 
+ export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
+ 
