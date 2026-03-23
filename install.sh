@@ -57,6 +57,17 @@ command_exists() {
     command -v "$1" &> /dev/null
 }
 
+# Prompt user for a yes/no response; auto-selects default when not on a terminal
+prompt_user() {
+    local prompt="$1" default="$2"
+    if [ -t 0 ]; then
+        read -p "$prompt" -n 1 -r
+        echo
+    else
+        REPLY="$default"
+    fi
+}
+
 # Prefer user-level uv install path when present.
 ensure_local_uv_path() {
     local local_uv="$HOME/.local/bin/uv"
@@ -253,8 +264,7 @@ setup_environment() {
             echo "   (Your current environment is ready and will work fine)"
             echo "   Downloads from https://astral.sh/uv (official source)"
             echo ""
-            read -p "Install 'uv $PINNED_UV_VERSION' (recommended)? [y/N]: " -n 1 -r
-            echo
+            prompt_user "Install 'uv $PINNED_UV_VERSION' (recommended)? [y/N]: " "n"
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 install_uv
             fi
@@ -291,8 +301,7 @@ setup_environment() {
         echo ""
         echo "Or use your system Python $sys_python_ver (will work, but slower installs)"
         echo ""
-        read -p "Install 'uv $PINNED_UV_VERSION'? [Y/n]: " -n 1 -r
-        echo
+        prompt_user "Install 'uv $PINNED_UV_VERSION'? [Y/n]: " "y"
 
         if [[ ! $REPLY =~ ^[Nn]$ ]]; then
             if install_uv; then
@@ -314,8 +323,7 @@ setup_environment() {
         echo ""
         show_uv_benefits
         echo ""
-        read -p "Install 'uv $PINNED_UV_VERSION'? [Y/n]: " -n 1 -r
-        echo
+        prompt_user "Install 'uv $PINNED_UV_VERSION'? [Y/n]: " "y"
 
         if [[ ! $REPLY =~ ^[Nn]$ ]]; then
             if install_uv; then
@@ -411,8 +419,10 @@ print_preinstall_summary() {
     fi
 
     echo "────────────────────────────────────────────────────────────────────"
-    echo "Press Enter to launch the main installer..."
-    read -r
+    if [ -t 0 ]; then
+        echo "Press Enter to launch the main installer..."
+        read -r
+    fi
     echo ""
 }
 # Main execution: Setup environment and validate tools
