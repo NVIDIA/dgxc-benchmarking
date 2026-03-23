@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -188,7 +188,7 @@ class SystemConfigManager:
             # Atomic move to final location
             temp_path.replace(self.config_path)
 
-            logger.info(f"Saved system config to {self.config_path}")
+            logger.debug(f"Saved system config to {self.config_path}")
             logger.debug(
                 "Persisted fields: venv_type, install_method, gpu_type, " "node_architecture, slurm, environment_vars"
             )
@@ -218,7 +218,7 @@ class SystemConfigManager:
                 return None
 
             system_config = SystemConfig.from_dict(data)
-            logger.info(f"Loaded system config from {self.config_path}")
+            logger.debug(f"Loaded system config from {self.config_path}")
             logger.debug(f"Available defaults: {list(data.keys())}")
             return system_config
 
@@ -234,7 +234,7 @@ class SystemConfigManager:
         """Delete system config file if it exists."""
         if self.config_path.exists():
             self.config_path.unlink()
-            logger.info(f"Deleted system config: {self.config_path}")
+            logger.debug(f"Deleted system config: {self.config_path}")
 
     def get_path(self) -> Path:
         """Get the path to the system config file."""
@@ -325,7 +325,7 @@ class InstallStateManager:
             # Atomic move to final location
             temp_path.replace(self.config_path)
 
-            logger.info(f"Saved install state to {self.config_path}")
+            logger.debug(f"Saved install state to {self.config_path}")
             logger.debug(f"Completed workloads: {completed_workloads}")
 
         except (OSError, yaml.YAMLError) as e:
@@ -357,7 +357,7 @@ class InstallStateManager:
                 try:
                     timestamp = datetime.fromisoformat(timestamp_str)
                     if datetime.now() - timestamp > timedelta(days=7):
-                        logger.info(f"Install state is stale ({timestamp}), ignoring")
+                        logger.debug(f"Install state is stale ({timestamp}), ignoring")
                         return None
                 except ValueError:
                     logger.warning(f"Invalid timestamp in install state: {timestamp_str}")
@@ -384,7 +384,7 @@ class InstallStateManager:
                 self.clear_install_state()
                 return None
 
-            logger.info(f"Loaded install state from {self.config_path}")
+            logger.debug(f"Loaded install state from {self.config_path}")
             logger.debug(f"Completed workloads: {completed_workloads}")
             logger.debug(f"Workload venvs: {len(workload_venvs)} mappings")
             if existing_cluster_config:
@@ -400,7 +400,7 @@ class InstallStateManager:
         """Clear installation state after successful completion."""
         if self.config_path.exists():
             self.config_path.unlink()
-            logger.info(f"Cleared install state: {self.config_path}")
+            logger.debug(f"Cleared install state: {self.config_path}")
 
     def exists(self) -> bool:
         """Check if install state file exists."""

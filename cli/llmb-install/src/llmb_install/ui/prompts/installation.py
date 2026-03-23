@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -42,29 +42,36 @@ def prompt_install_location(ui: UIInterface, default: Optional[str] = None) -> O
     """
     ui.log("\nInstallation Location")
     ui.log("--------------------")
-    ui.log("Note: Workloads can be quite large and may require significant disk space.")
-    ui.log("It is recommended to install on a high-performance file system (e.g., Lustre, GPFS).")
-    ui.log("Example paths: /lustre/your/username/llmb or /gpfs/your/username/llmb\n")
+    cwd = os.getcwd()
+    ui.log(f"Current directory: {cwd}")
+    ui.log("Note: Installation can exceed 100GB with multiple workloads. Use high-performance storage (Lustre, GPFS).")
+    ui.log("Provide an absolute path (e.g., /lustre/scratch/username/llmb or ~/llmb-workloads)\n")
 
     def validate_path(path: str) -> str:
         if not path:
-            return "valid"
+            return "invalid:Path required. Enter an absolute path (e.g., /scratch/username/llmb)"
 
         # Remove any quotes that might be present
         path = path.strip('"\'')
 
-        # Skip validation for incomplete paths during typing
-        if path.endswith(os.sep):
-            return "valid"
+        # Expand ~ before checking if absolute (supports ~/llmb)
+        expanded_path = Path(path).expanduser()
 
-        parent_dir = os.path.dirname(path)
-        if parent_dir and not os.access(parent_dir, os.W_OK):
-            return "invalid:No write permission in the parent directory."
+        # Reject root directory
+        if expanded_path == Path("/"):
+            return "invalid:Cannot install to root directory"
+
+        # Require absolute path (after tilde expansion)
+        if not expanded_path.is_absolute():
+            return "invalid:Path must be absolute (start with / or ~)"
+
+        # Check write permission on existing parent directory
+        parent_dir = expanded_path.parent
+        if parent_dir.exists() and not os.access(parent_dir, os.W_OK):
+            return "invalid:No write permission in the parent directory"
         return "valid"
 
-    location = ui.prompt_path(
-        "Where would you like to install the workloads?", default=default or "", validate=validate_path
-    )
+    location = ui.prompt_path("Enter installation directory path:", default=default or "", validate=validate_path)
 
     if location is None:
         return None

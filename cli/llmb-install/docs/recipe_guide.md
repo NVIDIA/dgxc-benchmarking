@@ -5,6 +5,7 @@ This guide explains how to create and configure workload recipes using the `meta
 ## Overview
 
 Each workload recipe requires a `metadata.yaml` file that defines:
+
 - **General Information**: Workload identification and framework
 - **Container Images**: Runtime environment containers
 - **Repositories**: Git repositories for dependencies
@@ -166,7 +167,7 @@ downloads:
 #### Fields
 
 - **`repo_id`** (string, required): The HuggingFace repository ID.
-- **`assets`** (list of enums, optional): Which assets to download. Allowed values: `tokenizer`, `config`. 
+- **`assets`** (list of enums, optional): Which assets to download. Allowed values: `tokenizer`, `config`.
   - If omitted, it defaults to **both** `[tokenizer, config]`.
 
 #### Behavior and Rules
@@ -193,6 +194,7 @@ downloads:
 Existing recipes using `hf_tokenizers` should eventually migrate to the `huggingface` structure. Note that `hf_tokenizers` only downloads the tokenizer, while the new `huggingface` key defaults to both tokenizer and config.
 
 **Legacy (Tokenizer only):**
+
 ```yaml
 downloads:
   hf_tokenizers:
@@ -200,6 +202,7 @@ downloads:
 ```
 
 **Migrated (Tokenizer only):**
+
 ```yaml
 downloads:
   huggingface:
@@ -210,7 +213,9 @@ downloads:
 ### Examples
 
 #### 1. Default (Tokenizer + Config)
+
 Omit the `assets` field to download both.
+
 ```yaml
 downloads:
   huggingface:
@@ -218,6 +223,7 @@ downloads:
 ```
 
 #### 2. Tokenizer-only (Nemotron Pattern)
+
 ```yaml
 downloads:
   huggingface:
@@ -226,6 +232,7 @@ downloads:
 ```
 
 #### 3. Config-only (Rare)
+
 ```yaml
 downloads:
   huggingface:
@@ -275,6 +282,7 @@ tools:
 ```
 
 **Resolution Logic**:
+
 1. If GPU explicitly listed in `by_gpu` → use that version
 2. Else if `default` key exists → use default version
 3. Else → use container version (no download)
@@ -306,6 +314,7 @@ setup:
 #### Pip Dependencies
 
 Simple string format (PyPI package):
+
 ```yaml
 dependencies:
   pip:
@@ -314,6 +323,7 @@ dependencies:
 ```
 
 Repository-based package:
+
 ```yaml
 dependencies:
   pip:
@@ -352,6 +362,7 @@ setup:
 ```
 
 **Task Types**:
+
 - `local`: Run on current node
 - `nemo2`: Run with nemo2 launcher
 - `srun`: Run via SLURM srun
@@ -442,6 +453,7 @@ model_configs:
 ```
 
 **Fields**:
+
 - **`model_size`** (string, required): Model size identifier (e.g., `'7b'`, `'405b'`)
 - **`dtypes`** (required): Precision types to test. Can be:
   - Single dtype: `'fp8'`
@@ -449,8 +461,54 @@ model_configs:
   - Mapping: `fp8: [128, 256]` or `fp8: {scales: [128, 256], exact_scales: true}`
 - **`scales`** (list, optional): GPU counts to test (legacy, used when dtypes is not a mapping)
 - **`exact_scales`** (bool, optional): If `false` (default), scales are extended to max with power-of-2 values
+- **`proxy_scales`** (list, optional): Reduced GPU counts for quick validation/debug runs. Always treated as exact scales (no power-of-2 extension). Used with `llmb-run submit --proxy`
 
 **Supported dtypes**: `fp8`, `bf16`, `nvfp4`
+
+#### Proxy Scales
+
+Proxy scales enable quick validation runs on reduced GPU counts for debug workflows. These runs use altered configurations and cannot be compared to production results.
+
+**Simple format with proxy scales:**
+
+```yaml
+model_configs:
+  - model_size: '7b'
+    dtypes: ['fp8', 'bf16']
+    scales: [8, 16, 32, 64, 128]      # Production scales
+    proxy_scales: [4, 8]               # Debug/validation scales
+```
+
+**Per-dtype proxy scales:**
+
+```yaml
+model_configs:
+  - model_size: '405b'
+    dtypes:
+      fp8:
+        scales: [512, 1024, 2048]
+        proxy_scales: [128, 256]       # Reduced scales for fp8
+      bf16:
+        scales: [256, 512, 1024]
+        proxy_scales: [64, 128]        # Reduced scales for bf16
+```
+
+**Usage:**
+
+```bash
+# Use proxy scales for quick validation
+llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128 --proxy
+
+# Auto-discovery only includes workloads with proxy_scales defined
+llmb-run submit --max-scale 256 --proxy
+```
+
+**Important notes:**
+
+- Proxy scales are always treated as exact (no automatic power-of-2 extension)
+- Proxy runs use altered configurations optimized for smaller scale
+- Results from proxy runs cannot be used for performance validation or extrapolation
+- Designed for debugging, development, and configuration testing only
 
 ## GPU-Conditional Configuration Pattern
 
@@ -540,14 +598,17 @@ run:
         - model_size: '15b'
           dtypes: ['fp8', 'bf16']
           scales: [16, 32, 64, 128, 256, 512, 1024, 2048]
+          proxy_scales: [8, 16]           # Optional: reduced scales for debug/validation
         - model_size: '340b'
           dtypes: ['fp8', 'bf16']
           scales: [256, 512, 1024, 2048]
+          proxy_scales: [128, 256]        # Optional: reduced scales for debug/validation
     b200:
       model_configs:
         - model_size: '15b'
           dtypes: ['fp8', 'bf16']
           scales: [16, 32, 64, 128, 256, 512, 1024]
+          proxy_scales: [8, 16]
         - model_size: '340b'
           dtypes: ['fp8', 'bf16']
           scales: [128, 256, 512, 1024]
@@ -562,6 +623,7 @@ python -m yamale -s .gitlab/ci/metadata_schema.yaml <workload>/metadata.yaml
 ```
 
 The schema validates:
+
 - Required vs optional fields
 - Field types (string, int, bool, list, etc.)
 - Enum values (GPU types, dtypes, launcher types)
@@ -684,6 +746,7 @@ tools:
 **Error**: `workload_type: 'training' is not valid under any of the given enum values`
 
 **Solution**: Use valid enum values. Check the schema for allowed values:
+
 - workload_type: `pretrain`, `inference`, `finetune`
 - GPU types: `h100`, `b200`, `gb200`, `gb300`
 - dtypes: `fp8`, `bf16`, `nvfp4`
@@ -693,6 +756,7 @@ tools:
 **Error**: `commit: '763ffa8' is not valid - must be 40 characters`
 
 **Solution**: Use full commit hash:
+
 ```bash
 # Get full hash
 git rev-parse HEAD
@@ -729,6 +793,7 @@ setup:
 The complete schema is defined in `.gitlab/ci/metadata_schema.yaml`. Key enums and types:
 
 ### Enums
+
 - **GPU Types**: `h100`, `b200`, `gb200`, `gb300`, `default` (for by_gpu only)
 - **Workload Types**: `pretrain`, `inference`, `finetune`, `tools`
 - **Dtypes**: `fp8`, `bf16`, `nvfp4`
@@ -736,6 +801,6 @@ The complete schema is defined in `.gitlab/ci/metadata_schema.yaml`. Key enums a
 - **Job Types**: `local`, `nemo2`, `srun`, `sbatch`
 
 ### Format Patterns
+
 - **commit**: Full 40-character SHA hash
 - **image URLs**: Use `#` instead of `/` (e.g., `nvcr.io#nvidia/nemo:25.07.01`)
-

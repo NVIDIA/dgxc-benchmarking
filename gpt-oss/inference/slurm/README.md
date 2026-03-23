@@ -1,4 +1,5 @@
 # Overview
+
 This recipe provides instructions and scripts for benchmarking the performance of the GPT-OSS-120B model with NVIDIA dynamo-trtllm + NVIDIA AI Perf benchmark suite.
 
 The script uses dynamo-trtllm release containers to benchmark the [GPT-OSS-120B](https://huggingface.co/openai/gpt-oss-120b) inference workload. In this recipe, we benchmark the max-throughput use case only.
@@ -10,32 +11,30 @@ The script uses dynamo-trtllm release containers to benchmark the [GPT-OSS-120B]
 </div>
 
 # Performance Measurement and Analysis
+
 Below, we list the inference configuration and benchmarking performance of max throughput scenario for GPT-OSS-120B model.
 
 ## Maximum throughput
 
 ### GB200 Inference Use case configs
 
-| Use Case      | GPUs | ISL   | OSL   |  max_batch_size | concurrency | max_num_tokens | kv_cache_free_gpu_mem_fraction| Quantization |  TP |   PP |   DP | enable-dp-attention |
-|:--------------|:-----:|:-----:|:-----:|:----------------:|:-------:|:--------------:|:------------------------------:|:------------:|:----:|:----:|:----:|:---------------:|
-| Generation | 4 | 128 | 1000 | 800 | 2048 | 768 | 0.8 | MXFP4 | 4 | 1 | 4 | YES | 
-
-
+| Use Case   | GPUs | ISL | OSL  | max_batch_size | concurrency | max_num_tokens | kv_cache_free_gpu_mem_fraction | Quantization | TP  | PP  | DP  | enable-dp-attention |
+| :--------- | :--: | :-: | :--: | :------------: | :---------: | :------------: | :----------------------------: | :----------: | :-: | :-: | :-: | :-----------------: |
+| Generation |  4   | 128 | 1000 |      800       |    2048     |      768       |              0.8               |    MXFP4     |  4  |  1  |  4  |         YES         |
 
 ### B200 Inference Use case configs
 
-| Use Case      | GPUs | ISL   | OSL   |   max_batch_size | concurrency | max_num_tokens | kv_cache_free_gpu_mem_fraction | Quantization |  TP |   PP |   DP | enable-dp-attention |
-|:--------------|:----:|:-----:|:-----:|:----------------:|:------------:|:--------:|:------------------------------:|:------------:|:----:|:----:|:----:|:---------------:|
-| Generation | 4 | 128 | 1000 | 800 | 2048 |  768  | 0.8 | MXFP4 | 4 | 1 | 4 | YES | 
-
+| Use Case   | GPUs | ISL | OSL  | max_batch_size | concurrency | max_num_tokens | kv_cache_free_gpu_mem_fraction | Quantization | TP  | PP  | DP  | enable-dp-attention |
+| :--------- | :--: | :-: | :--: | :------------: | :---------: | :------------: | :----------------------------: | :----------: | :-: | :-: | :-: | :-----------------: |
+| Generation |  4   | 128 | 1000 |      800       |    2048     |      768       |              0.8               |    MXFP4     |  4  |  1  |  4  |         YES         |
 
 **Note**
+
 - kv_cache_free_gpu_mem_fraction: fraction of memory allocated to store the kv cache values after loading the model weights.
 - attn_dp_enabled: This flag in the config.yml dictates whether `Data parallelism` is enabled or disabled for the attention layers.
 - You can find more information on the TRT-LLM build parameters (https://nvidia.github.io/TensorRT-LLM/commands/trtllm-build.html) and NVIDIA Dynamo (https://developer.nvidia.com/dynamo) at the links above.
 
 More details about the inference terms can be found here [Appendix](../../../APPENDIX.md)
-
 
 # Prepare Environment
 
@@ -52,6 +51,7 @@ The following directory layout and key variables are used in the recipe:
 We reference a number of Slurm commands and parameters in this document. A brief summary is included below. It's important to note these are a guide and might not be applicable to all environments. Please consult with your system administrator for the parameters that are specific to your system.
 
 **Common parameters:**
+
 - `SBATCH_PARTITION` or `-p` - Partition (or queue) to use.
 - `SBATCH_ACCOUNT` or `-A` - Slurm account to associate with your job, different from your user. Meant for accounting purposes.
 - `SBATCH_GPUS_PER_NODE` or `--gres=gpu:<num gpus>` - If your cluster is configured with GRES this should be set to all GPUs in a node. Ignore if not configured.
@@ -73,21 +73,24 @@ cd $LLMB_INSTALL
 ### GB200 and B200
 
 ```bash
-llmb-run submit -w inference_gpt-oss-dynamo -s 120b --dtype mxfp4 --scale 4
+llmb-run submit -w inference_gpt-oss-dynamo --dtype mxfp4 --scale 4
 ```
 
-- Advanced users can learn more about: 
-  - [Dynamo benchmarking guide](https://github.com/ai-dynamo/dynamo/blob/main/docs/benchmarks/benchmarking.md) to understand Dynamo benchmarking use cases
-  -  [Max Tokens in Paged KV Cache and KV Cache Free GPU Memory Fraction](https://nvidia.github.io/TensorRT-LLM/performance/performance-tuning-guide/useful-runtime-flags.html#max-tokens-in-paged-kv-cache-and-kv-cache-free-gpu-memory-fraction) to control the maximum number of tokens handled by the KV cache manager
+<!-- NOTE: Update Dynamo links below when changing the version in metadata.yaml -->
+
+- Advanced users can learn more about:
+  - [Dynamo benchmarking guide](https://github.com/ai-dynamo/dynamo/blob/v0.6.0/docs/benchmarks/benchmarking.md) to understand Dynamo benchmarking use cases
+  - [Max Tokens in Paged KV Cache and KV Cache Free GPU Memory Fraction](https://nvidia.github.io/TensorRT-LLM/performance/performance-tuning-guide/useful-runtime-flags.html#max-tokens-in-paged-kv-cache-and-kv-cache-free-gpu-memory-fraction) to control the maximum number of tokens handled by the KV cache manager
 
 **Streaming:**
+
 - You can toggle streaming on and off. When off, users receive the entire response (all output tokens) back at once instead of receiving output tokens as they are generated
   - **By default, streaming is turned on in this workload**
-  -  If turned off -- TTFT (Time to First Token) and TPOT (Time per Output Token) metrics are not applicable, since individual token delivery is bypassed.
+  - If turned off -- TTFT (Time to First Token) and TPOT (Time per Output Token) metrics are not applicable, since individual token delivery is bypassed.
 
 ```bash
 # Example of turning streaming off on GB200 or B200
-STREAMING=false llmb-run submit -w inference_gpt-oss-dynamo -s 120b --dtype mxfp4 --scale 4
+STREAMING=false llmb-run submit -w inference_gpt-oss-dynamo --dtype mxfp4 --scale 4
 ```
 
 For more details on llmb-run usage, see the [llmb-run documentation](../../../cli/llmb-run/README.md).
@@ -96,7 +99,8 @@ For more details on llmb-run usage, see the [llmb-run documentation](../../../cl
 
 Alternatively, you can run inference scripts directly using the launch script. This method provides more control over individual parameters and environment variables.
 
-**Important**: 
+**Important**:
+
 - Ensure your virtual environment is activated before running the inference commands below. If you used the installer with conda, run `conda activate $LLMB_INSTALL/venvs/<env_name>`. If you used the installer with python venv, run `source $LLMB_INSTALL/venvs/<env_name>/bin/activate`.
 - Run the launch script from the installed recipe directory: `cd $LLMB_INSTALL/llmb_repo/gpt-oss/inference/slurm/`
 
@@ -110,11 +114,13 @@ sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} GPU_TYPE=gb200 ./launch.sh
 sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} GPU_TYPE=b200 ./launch.sh 
 ```
 
-### Results/Log files 
+### Results/Log files
+
 Results for the workload are stored at `$LLMB_INSTALL/workloads/inference_gpt-oss-dynamo/experiments/<model>_$ISL_$OSL_$MAX_BATCH_SIZE_$CONCURRENCY_$SLURMID`
-+Worker and server logs are stored in the sub dir `$LLMB_INSTALL/workloads/inference_gpt-oss-dynamo/experiments/<model>_$ISL_$OSL_$MAX_BATCH_SIZE_$CONCURRENCY_$SLURMID/server_logs` and benchmark logs are located at `$LLMB_INSTALL/workloads/inference_gpt-oss-dynamo/experiments/<model>_$ISL_$OSL_$MAX_BATCH_SIZE_$CONCURRENCY_$SLURMID/benchmark_logs`. We can see the final output log file as a `profile_export_aiperf.csv` in the benchmark_logs folder. 
++Worker and server logs are stored in the sub dir `$LLMB_INSTALL/workloads/inference_gpt-oss-dynamo/experiments/<model>_$ISL_$OSL_$MAX_BATCH_SIZE_$CONCURRENCY_$SLURMID/server_logs` and benchmark logs are located at `$LLMB_INSTALL/workloads/inference_gpt-oss-dynamo/experiments/<model>_$ISL_$OSL_$MAX_BATCH_SIZE_$CONCURRENCY_$SLURMID/benchmark_logs`. We can see the final output log file as a `profile_export_aiperf.csv` in the benchmark_logs folder.
 
 You should expect to see result directories like this:
+
 ```
 gpt-oss-dynamo_ISL_OSL_BS_CON_SLURM_JOBID/
 |- benchmark_logs
@@ -141,6 +147,7 @@ Structure of model weights folder `$LLMB_INSTALL/workloads/inference_gpt-oss-dyn
 
 Double check that your folder has the same 61 GiB size
 Note: `du -sh` includes hidden contents like `.git` and may report a larger total. To verify weights-only, inspect file sizes in this folder with `ls -lh`.
+
 ```
 total 61G
 drwxrwsr-x 5 <user> dip 4.0K Nov 17 14:47 .
@@ -177,4 +184,3 @@ drwxrwsr-x 2 <user> dip 4.0K Nov 17 14:45 original
 ```
 
 </details>
-

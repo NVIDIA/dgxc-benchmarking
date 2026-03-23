@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -24,6 +24,7 @@
 
 import os
 import subprocess
+from collections import Counter
 from typing import Any, Dict, List, Optional, Tuple
 
 
@@ -194,7 +195,7 @@ def validate_account(account_input: str, available_accounts: List[str]) -> str:
 
     Returns:
         str: 'valid' if valid, 'show_all' if should show all accounts,
-             'warning:<message>' if warning, or 'invalid:<message>' if invalid
+             or 'invalid:<message>' if invalid
     """
     if not account_input:
         return 'valid'
@@ -203,21 +204,21 @@ def validate_account(account_input: str, available_accounts: List[str]) -> str:
         return 'show_all'
 
     if available_accounts and account_input not in available_accounts:
-        return f"warning:'{account_input}' is not in the list of available accounts. Press Enter to use it anyway, or try another account."
+        return f"invalid:'{account_input}' is not in the list of available accounts."
 
     return 'valid'
 
 
 def validate_partition(partition_input: str, available_partitions: List[str]) -> str:
-    """Validate partition input.
+    """Validate partition input (supports comma-separated lists).
 
     Args:
-        partition_input: User's partition input
+        partition_input: User's partition input (single or comma-separated list)
         available_partitions: List of available partitions
 
     Returns:
         str: 'valid' if valid, 'show_all' if should show all partitions,
-             'warning:<message>' if warning, or 'invalid:<message>' if invalid
+             or 'invalid:<message>' if invalid
     """
     if not partition_input:
         return 'valid'
@@ -225,8 +226,25 @@ def validate_partition(partition_input: str, available_partitions: List[str]) ->
     if partition_input == '?' and available_partitions and len(available_partitions) > 10:
         return 'show_all'
 
-    if available_partitions and partition_input not in available_partitions:
-        return f"warning:'{partition_input}' is not in the list of available partitions. Press Enter to use it anyway, or try another partition."
+    # Support comma-separated partition lists (valid SLURM syntax)
+    partitions_list = normalize_partition_list(partition_input)
+
+    if not partitions_list:
+        return 'valid'
+
+    # If no available partitions list, accept anything (can't validate)
+    if not available_partitions:
+        return 'valid'
+
+    # Check each partition in the list
+    invalid_partitions = [p for p in partitions_list if p not in available_partitions]
+
+    if invalid_partitions:
+        if len(invalid_partitions) == 1:
+            return f"invalid:'{invalid_partitions[0]}' is not in the list of available partitions."
+        else:
+            invalid_str = "', '".join(invalid_partitions)
+            return f"invalid:Partitions not found: '{invalid_str}'."
 
     return 'valid'
 
@@ -244,11 +262,24 @@ def get_default_cpu_partition(partitions: List[str]) -> Optional[str]:
     return cpu_partitions[0] if cpu_partitions else None
 
 
+def normalize_partition_list(partition_input: str) -> list[str]:
+    """Normalize comma-separated partition text into a deduplicated list of names."""
+    if not partition_input:
+        return []
+    return list(dict.fromkeys(partition.strip() for partition in partition_input.split(',') if partition.strip()))
+
+
 def detect_partition_gres(partitions: list[str]) -> Dict[str, Dict[str, Any]]:
     """Detect GRES information for the given partitions using sinfo.
 
+    Each entry in *partitions* may be a single name (``"gpu1"``) or a
+    comma-separated composite (``"gpu1,gpu2"``).  Composites are expanded
+    for the sinfo query and the results are consolidated back under the
+    original composite key.  All partitions within a composite must share
+    the same GPU count.
+
     Returns:
-        Dict mapping partition names to their GRES info:
+        Dict mapping the original partition strings to their GRES info:
         {
             'partition_name': {
                 'gpu_count': Optional[int],     # consolidated GPU count or None
@@ -261,19 +292,27 @@ def detect_partition_gres(partitions: list[str]) -> Dict[str, Dict[str, Any]]:
     Raises:
         SystemExit: If sinfo is not available (hard error)
         RuntimeError: If sinfo command fails for other reasons
+        ValueError: If partitions within a composite have inconsistent GPU counts
     """
+    partition_to_requested_names: dict[str, list[str]] = {
+        partition: normalize_partition_list(partition) for partition in partitions
+    }
+
+    # Keep a stable order for sinfo query while removing duplicates.
+    expanded_partitions = list(dict.fromkeys(name for names in partition_to_requested_names.values() for name in names))
+
     partition_info = {
         partition: {
             "gpu_counts": [],
             "has_gpu_lines": False,
             "unparseable_lines": [],
         }
-        for partition in partitions
+        for partition in expanded_partitions
     }
 
     try:
         result = subprocess.run(
-            ["sinfo", "--noheader", "-p", ",".join(partitions), "-o", "%P,%G"],
+            ["sinfo", "--noheader", "-p", ",".join(expanded_partitions), "-o", "%P,%G"],
             capture_output=True,
             text=True,
             check=True,
@@ -312,16 +351,46 @@ def detect_partition_gres(partitions: list[str]) -> Dict[str, Dict[str, Any]]:
             # Keep track of lines we failed to parse that should have GPU info
             partition_info[partition_name]["unparseable_lines"].append(gres_raw)
 
-    # Consolidate results for each partition
-    for _partition, info_dict in partition_info.items():
-        unique_counts = list(set(info_dict["gpu_counts"]))
-        if not unique_counts:
-            info_dict["gpu_count"] = None
-            info_dict["is_heterogeneous"] = False
-        else:
-            # Pick the most common count when heterogeneous
-            most_common_count = max(set(info_dict["gpu_counts"]), key=info_dict["gpu_counts"].count)
-            info_dict["gpu_count"] = most_common_count
-            info_dict["is_heterogeneous"] = len(unique_counts) > 1
+    # Consolidate per-sinfo results back into the original (possibly composite) keys.
+    composite_partition_info = {}
+    for composite_partition, individual_partitions in partition_to_requested_names.items():
+        if not individual_partitions:
+            composite_partition_info[composite_partition] = {
+                "gpu_counts": [],
+                "gpu_count": None,
+                "has_gpu_lines": False,
+                "unparseable_lines": [],
+                "is_heterogeneous": False,
+            }
+            continue
 
-    return partition_info
+        merged = {"gpu_counts": [], "has_gpu_lines": False, "unparseable_lines": []}
+        per_partition_gpu_count = {}
+
+        for name in individual_partitions:
+            info = partition_info[name]
+            merged["gpu_counts"].extend(info["gpu_counts"])
+            merged["has_gpu_lines"] = merged["has_gpu_lines"] or info["has_gpu_lines"]
+            merged["unparseable_lines"].extend(info["unparseable_lines"])
+            per_partition_gpu_count[name] = (
+                Counter(info["gpu_counts"]).most_common(1)[0][0] if info["gpu_counts"] else None
+            )
+
+        if len(set(per_partition_gpu_count.values())) > 1:
+            details = ", ".join(f"{p}={c if c is not None else 'None'}" for p, c in per_partition_gpu_count.items())
+            raise ValueError(
+                f"Inconsistent GPU GRES across partition list '{composite_partition}': {details}. "
+                "Use partitions with matching GRES settings."
+            )
+
+        unique_counts = set(merged["gpu_counts"])
+        if not unique_counts:
+            merged["gpu_count"] = None
+            merged["is_heterogeneous"] = False
+        else:
+            merged["gpu_count"] = Counter(merged["gpu_counts"]).most_common(1)[0][0]
+            merged["is_heterogeneous"] = len(unique_counts) > 1
+
+        composite_partition_info[composite_partition] = merged
+
+    return composite_partition_info

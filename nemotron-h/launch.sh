@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -30,7 +30,7 @@ set -eu -o pipefail
 
 export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=nemotron-h
-export FW_VERSION=25.11.01
+export FW_VERSION=26.02.00
 
 export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 
@@ -93,6 +93,10 @@ if [[ $PROFILE_ENABLED == "true" ]]; then
     CONFIG_OVERRIDES+=" --enable_nsys "
     CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
     CONFIG_OVERRIDES+=" --profiling_stop_step=$PROFILE_STOP_STEP "
+    PROFILE_RANKS=$(seq -s, 0 $((JOB_TOTAL_GPUS - 1)))
+    CONFIG_OVERRIDES+=" --profiling_ranks=$PROFILE_RANKS"
+    CONFIG_OVERRIDES+=" --nsys_trace=cuda "
+    CONFIG_OVERRIDES+=" --nsys_extra_args=--nvtx-domain-include=NCCL "
     if [[ $GPU_METRICS_ENABLED == true ]]; then
         CONFIG_OVERRIDES+=" --profiling_gpu_metrics "
     fi
@@ -103,25 +107,21 @@ if [[ $ENABLE_VBOOST == true ]]; then
 fi
 
 if [[ $GPU_TYPE == "gb300" ]] || [[ $GPU_TYPE == "gb200" ]]; then
-    TP=2
-    MBS=1
+    if [[ $GPU_TYPE == "gb200" ]] && [[ $JOB_TOTAL_GPUS -eq 32 ]]; then
+        CONFIG_OVERRIDES+=" --cuda_graph_scope=mamba "
+    fi
     GPUS_PER_NODE=4
-elif [[ $GPU_TYPE == "b200" ]]; then
-    TP=2
-    MBS=1
-    GPUS_PER_NODE=8
-elif [[ $GPU_TYPE == "h100" ]]; then
-    TP=8
-    MBS=1
+elif [[ $GPU_TYPE == "b300" ]] || [[ $GPU_TYPE == "b200" ]] || [[ $GPU_TYPE == "h100" ]]; then
+    if [[ $GPU_TYPE == "b200" ]] && [[ $JOB_TOTAL_GPUS -eq 32 ]]; then
+        CONFIG_OVERRIDES+=" -tp 4 "
+        CONFIG_OVERRIDES+=" -mb 2 "
+    fi
     GPUS_PER_NODE=8
 fi
 
-GBS=$((JOB_TOTAL_GPUS * 3))
-
-CONFIG_OVERRIDES+=" -tp $TP \
-  -mb $MBS \
-  -gb $GBS \
-"
+if { [[ $GPU_TYPE == "gb300" ]] || [[ $GPU_TYPE == "gb200" ]] || [[ $GPU_TYPE == "b300" ]]; } && [[ $JOB_TOTAL_GPUS -ge 512 ]]; then
+    export NCCL_IB_QPS_PER_CONNECTION=${NCCL_IB_QPS_PER_CONNECTION:-4}
+fi
 
 # run command
 pushd $LLMB_WORKLOAD/Megatron-Bridge
@@ -132,8 +132,9 @@ python3 scripts/performance/setup_experiment.py \
     --gpu $GPU_TYPE \
     --num_gpus $JOB_TOTAL_GPUS \
     --gpus_per_node $GPUS_PER_NODE \
-    --model_name nemotronh \
-    --model_size $MODEL_SIZE \
+    --offline \
+    --model_family_name nemotronh \
+    --model_recipe_name nemotronh_56b \
     ${CONFIG_OVERRIDES} \
     --account $SBATCH_ACCOUNT \
     --partition $SBATCH_PARTITION \

@@ -8,33 +8,41 @@ TorchTitan is a proof-of-concept for Large-scale LLM training using native PyTor
 
 This recipe supports **H100**, **B200**, and **GB200** GPUs. The tables below show the **default benchmark configurations**; all values can be overridden via environment variables (see [Run Training](#run-training)).
 
-Only BF16 precision is supported by this recipe.
+BF16 is supported on all GPUs; FP8 is supported on B200 and GB200 only.
 
 ## GB200
 
-| Size | Precision | GPUs | SeqLen | Steps | DP | TP | EP | PP | MBS | GBS | GA | Dataset |
-|------|:---------:|:----:|:------:|:-----:|:--:|:--:|:--:|:--:|:---:|:---:|:--:|:-------:|
-| 671B | BF16      | 256  | 4096   | 200   | 32 | 1  | 32 | 8  | 16  | 512 | 1  | C4      |
+| Size | Precision | GPUs | SeqLen | Steps | DP  | TP  | EP  | PP  | MBS | GBS  | GA  | Dataset |
+| ---- | :-------: | :--: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :--: | :-: | :-----: |
+| 671B |   BF16    | 256  |  4096  |  200  | 256 |  1  | 64  |  1  |  8  | 2048 |  1  |   C4    |
+| 671B |    FP8    | 256  |  4096  |  200  | 256 |  1  | 64  |  1  |  8  | 2048 |  1  |   C4    |
 
 ## B200
 
-| Size | Precision | GPUs | SeqLen | Steps | DP | TP | EP | PP | MBS | GBS | GA | Dataset |
-|------|:---------:|:----:|:------:|:-----:|:--:|:--:|:--:|:--:|:---:|:---:|:--:|:-------:|
-| 671B | BF16      | 256  | 4096   | 200   | 32 | 1  | 32 | 8  | 16  | 512 | 1  | C4      |
+| Size | Precision | GPUs | SeqLen | Steps | DP  | TP  | EP  | PP  | MBS | GBS  | GA  | Dataset |
+| ---- | :-------: | :--: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :--: | :-: | :-----: |
+| 671B |   BF16    | 256  |  4096  |  200  | 256 |  1  | 64  |  1  |  8  | 2048 |  1  |   C4    |
+| 671B |    FP8    | 256  |  4096  |  200  | 256 |  1  | 64  |  1  |  8  | 2048 |  1  |   C4    |
 
 ## H100
 
-| Size | Precision | GPUs | SeqLen | Steps | DP | TP | EP | PP | MBS | GBS  | GA | Dataset |
-|------|:---------:|:----:|:------:|:-----:|:--:|:--:|:--:|:--:|:---:|:----:|:--:|:-------:|
-| 671B | BF16      | 512  | 4096   | 200   | 64 | 1  | 32 | 8  | 16  | 1024 | 1  | C4      |
+| Size | Precision | GPUs | SeqLen | Steps | DP  | TP  | EP  | PP  | MBS | GBS  | GA  | Dataset |
+| ---- | :-------: | :--: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :--: | :-: | :-----: |
+| 671B |   BF16    | 512  |  4096  |  200  | 64  |  1  | 64  |  8  | 16  | 1024 |  1  |   C4    |
+
+| Size | Precision | GPUs | SeqLen | Steps | DP  | TP  | EP  | PP  | MBS | GBS  | GA  | Dataset |
+| ---- | :-------: | :--: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :--: | :-: | :-----: |
+| 671B |   BF16    | 1024 |  4096  |  200  | 128 |  1  | 64  |  8  | 16  | 2048 |  1  |   C4    |
 
 # Prerequisites
 
 ## HuggingFace Account
 
 A HuggingFace account is required to download the tokenizer and dataset. You will need to:
+
 1. [Create a HuggingFace access token](https://huggingface.co/settings/tokens)
 2. Add the generated token to your environment:
+
 ```bash
 export HF_TOKEN=<your token>
 ```
@@ -52,6 +60,7 @@ No special access is required to run this benchmark. The DeepSeek-V3.1-Base toke
 We reference a number of Slurm commands and parameters in this document. A brief summary is included below. It's important to note these are a guide and might not be applicable to all environments. Please consult with your system administrator for the parameters that are specific to your system.
 
 **Common parameters:**
+
 - `SBATCH_PARTITION` or `-p` - Partition (or queue) to use.
 - `SBATCH_ACCOUNT` or `-A` - Slurm account to associate with your job, different from your user. Meant for accounting purposes.
 - `SBATCH_GPUS_PER_NODE` or `--gres=gpu:<num gpus>` - If your cluster is configured with GRES this should be set to all GPUs in a node. Ignore if not configured.
@@ -73,6 +82,7 @@ The following directory layout and key variables are used in the recipe:
 ## Installation Steps
 
 The installer will automatically:
+
 1. Pull and convert the PyTorch container image (nvidia/pytorch:25.10-py3)
 2. Clone the TorchTitan repository (commit: f1a96b34ff4c752b246a3e381976b7d74387bee6)
 3. Install TorchTitan into the container (`install_torchtitan_to_container.sh`)
@@ -106,15 +116,42 @@ The easiest way to run benchmarks is using the llmb-run launcher tool. This meth
 cd $LLMB_INSTALL
 
 # Run DeepSeek-V3 671B BF16 (scale = number of GPUs)
-llmb-run submit -w pretrain_deepseek-v3-torchtitan -s 671b --dtype bf16 --scale 256
-llmb-run submit -w pretrain_deepseek-v3-torchtitan -s 671b --dtype bf16 --scale 512
+llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype bf16 --scale 256
+llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype bf16 --scale 512
+```
+
+### Additional SLURM Parameters
+
+Use a SLURM reservation:
+
+```bash
+ADDITIONAL_SLURM_PARAMS="reservation=my_reservation" llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype bf16 --scale 256
+```
+
+Run on specific nodes:
+
+```bash
+ADDITIONAL_SLURM_PARAMS="nodelist=node001,node002" llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype bf16 --scale 256
+```
+
+Exclude specific nodes:
+
+```bash
+ADDITIONAL_SLURM_PARAMS="exclude=node003,node004" llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype bf16 --scale 256
+```
+
+Combine multiple parameters (semicolon-separated):
+
+```bash
+ADDITIONAL_SLURM_PARAMS="nodelist=node001,node002;reservation=my_reservation;exclusive" llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype bf16 --scale 256
 ```
 
 For more details on llmb-run usage, see the [llmb-run documentation](../../../cli/llmb-run/README.md).
 
 ## Direct Method
 
-**Important**: 
+**Important**:
+
 - Ensure your virtual environment is activated before running the training commands below. If you used the installer with conda, run `conda activate $LLMB_INSTALL/venvs/<env_name>`. If you used the installer with python venv, run `source $LLMB_INSTALL/venvs/<env_name>/bin/activate`.
 - Run the launch script from the installed recipe directory: `cd $LLMB_INSTALL/llmb_repo/deepseek_v3/pretrain/torchtitan/`
 
@@ -123,6 +160,7 @@ For more details on llmb-run usage, see the [llmb-run documentation](../../../cl
 **Required:**
 
 - `GPU_TYPE`: Type of GPU hardware
+
   - `h100` - NVIDIA H100 GPUs
   - `b200` - NVIDIA B200 GPUs
   - `gb200` - NVIDIA GB200 GPUs
@@ -144,13 +182,8 @@ For more details on llmb-run usage, see the [llmb-run documentation](../../../cl
 - `LOG_RANK`: Rank to log from (default: 448 for H100/B200, 224 for GB200)
 - `RUN_CONF_IMAGE`: Override container image path
 - `RUN_CONF_MOUNTS`: Additional container mounts
-- `ADDITIONAL_SLURM_PARAMS`: Additional SLURM parameters (optional)
-  - Format: Semicolon-separated parameters supporting both `key=value` pairs and standalone flags
-  - Use semicolons as delimiters (especially when values contain commas or ampersands)
-  - Examples:
-    - Key=value pairs: `"nodelist=node001,node002;constraint=gpu&memory"`
-    - Standalone flags: `"exclusive"`
-    - Mixed: `"constraint=gpu&memory;exclusive"`
+- `ADDITIONAL_SLURM_PARAMS`: Extra `sbatch` flags (e.g. `--nodelist`, `--reservation`), semicolon-separated
+  - Example: `"nodelist=node001,node002;reservation=my_reservation;exclusive"`
 
 ## Running the Launch Script
 
@@ -163,26 +196,31 @@ GPU_TYPE=<type> JOB_TOTAL_GPUS=<number> sbatch launch.sh
 ### Example Commands
 
 Train on H100 GPUs (minimum configuration):
+
 ```bash
 GPU_TYPE=h100 JOB_TOTAL_GPUS=512 sbatch launch.sh
 ```
 
 Train on B200 GPUs:
+
 ```bash
 GPU_TYPE=b200 JOB_TOTAL_GPUS=256 sbatch launch.sh
 ```
 
 Train on GB200 GPUs:
+
 ```bash
 GPU_TYPE=gb200 JOB_TOTAL_GPUS=256 sbatch launch.sh
 ```
 
 Train with custom training steps:
+
 ```bash
 GPU_TYPE=h100 JOB_TOTAL_GPUS=1024 TRAINING_STEPS=5000 sbatch launch.sh
 ```
 
 Train with custom parallelism settings:
+
 ```bash
 GPU_TYPE=h100 JOB_TOTAL_GPUS=512 \
   DATA_PARALLEL_SHARD_DEGREE=32 \
@@ -191,31 +229,16 @@ GPU_TYPE=h100 JOB_TOTAL_GPUS=512 \
   sbatch launch.sh
 ```
 
-### SLURM Node Specification Examples
-
-Train on specific nodes:
-```bash
-ADDITIONAL_SLURM_PARAMS="nodelist=node001,node002" GPU_TYPE=h100 JOB_TOTAL_GPUS=512 sbatch launch.sh
-```
-
-Train with node constraints:
-```bash
-ADDITIONAL_SLURM_PARAMS="constraint=gpu&memory;exclusive" GPU_TYPE=b200 JOB_TOTAL_GPUS=256 sbatch launch.sh
-```
-
-Train using a SLURM reservation:
-```bash
-ADDITIONAL_SLURM_PARAMS="reservation=my_reservation" GPU_TYPE=gb200 JOB_TOTAL_GPUS=256 sbatch launch.sh
-```
-
 ## Configuration Files
 
 The training uses a TOML configuration file located at:
+
 ```
 $LLMB_INSTALL/llmb_repo/deepseek_v3/pretrain/torchtitan/deepseek_v3_671b.toml
 ```
 
 This file contains:
+
 - Model architecture specifications (DeepSeek-V3 671B)
 - Optimizer settings (AdamW with lr=2.2e-4)
 - Learning rate scheduler configuration (warmup_steps=100, decay_ratio=0.8, cosine decay)
@@ -239,31 +262,37 @@ $LLMB_WORKLOAD/experiments/<workload>_<size>_<dtype>_gpus<number>/
     ├── log-torchtitan_*.out                  # Training stdout (per-rank logs)
     ├── log-torchtitan_*.err                  # Training stderr
     └── outputs/                              # Training outputs and dumps
-        └── profile_trace/                    # Profiling traces (if enabled)
+        ├── profile_trace/                    # Profiling traces (if enabled)
+        └── memory_snapshot/                  # Memory snapshots (if enabled)
 ```
 
 **Note:** The `<unix_timestamp>` subdirectory name is the Unix epoch timestamp (in seconds) when the job was launched.
 
 **Example:** For a 671B BF16 model run on 512 GPUs, outputs are stored in:
+
 ```
 $LLMB_WORKLOAD/experiments/pretrain_deepseek-v3-torchtitan_671b_bf16_gpus512/1769818909/
 ```
+
 where `1769818909` is the Unix timestamp of the job launch time.
 
 **Key files:**
+
 - `llmb-config_*.yaml` - Job configuration including model, scale, and cluster info
 - `slurm-*.out` - Slurm job outputs (main job, parsing, uploader)
 - `log-torchtitan_*.out` - Training step timing and performance metrics
 - `log-torchtitan_*.err` - Training error messages and warnings
 
 Additional outputs (if enabled in the TOML config):
-- `outputs/` - Training outputs, dumps, and profiling traces
+
+- `outputs/profile_trace/` - Profiling traces (if enabled)
+- `outputs/memory_snapshot/` - Memory snapshots (if enabled)
 - `outputs/tb/` - TensorBoard logs (if enabled)
 - `outputs/checkpoint/` - Model checkpoints (if enabled)
 
 # Performance Measurement and Analysis
 
-Performance for DeepSeek-V3 training is measured by seconds per iteration (training step time) and TFLOPS per GPU. These metrics are logged for every training step in the main training log file.
+Performance for DeepSeek-V3 training is measured by TFLOPS per GPU (see `tflops:` entry in the log), which indicates computational throughput efficiency. Additionally, tokens per second (`tps:` entry in the log) is captured. Both metrics are logged for every training step in the main training log file.
 
 ## Analyzing Training Performance
 
@@ -291,6 +320,7 @@ grep "step:" log-torchtitan_*.out | tail -20
 ```
 
 Look for log entries containing:
+
 - `step:` - Training step number
 - `loss:` - Training loss value
 - `tps:` - Tokens per second
@@ -300,6 +330,7 @@ Look for log entries containing:
 ### Extracting TPS (tokens/sec)
 
 The training log includes per-step tokens/sec in lines like:
+
 ```
 tps: 299
 ```
@@ -320,10 +351,12 @@ throughput (tokens/sec) = (sequence length) × (global batch size) / (training s
 ```
 
 Where:
+
 - Sequence length = 4096 (default)
 - Global batch size = (local batch size) × (gradient accumulation steps) × (number of GPUs) / (data parallel shard degree)
 
 Example for H100 with 512 GPUs:
+
 ```
 global_batch_size = 16 × 1 × 512 / 64 = 128  (where GA=1)
 throughput = 4096 × 128 / (step_time_seconds)
@@ -339,11 +372,7 @@ MFU = (achieved TFLOPS per GPU) / (peak theoretical TFLOPS)
 
 **Peak theoretical throughput across GPUs and Data Types (in TFLOPS)**
 
-| Data Type | GB200 | B200 | H100 |
-| --------  | :---: | :---:| :---:|
-| BF16      | 2450  | 2250 | 989  |
-| FP8       | 4900  | 4500 | 1979 | 
-
+For peak theoretical throughput values used in MFU calculations, see the [Peak Theoretical Throughput](../../../README.md#peak-theoretical-throughput) section in the main README.
 
 # Troubleshooting
 
@@ -352,6 +381,7 @@ MFU = (achieved TFLOPS per GPU) / (peak theoretical TFLOPS)
 ### Out of Memory (OOM)
 
 If you encounter OOM errors:
+
 1. Reduce `LOCAL_BATCH_SIZE`
 2. Increase parallelism degrees (especially pipeline parallel)
 3. Enable full activation checkpointing (already enabled by default)
@@ -359,6 +389,7 @@ If you encounter OOM errors:
 ### NCCL Timeout
 
 If you see NCCL timeout errors:
+
 1. Increase `[comm] init_timeout_seconds` in the TOML config (default: 1200 seconds)
 2. Check network connectivity between nodes
 3. Verify Slurm allocation includes all requested GPUs
@@ -366,6 +397,7 @@ If you see NCCL timeout errors:
 ### Container Mount Issues
 
 If the container cannot access files:
+
 1. Verify `LLMB_INSTALL` and `LLMB_WORKLOAD` paths are accessible
 2. Add additional mounts via `RUN_CONF_MOUNTS` if needed
 3. Check file permissions
@@ -373,6 +405,7 @@ If the container cannot access files:
 ### GPU Type Not Supported
 
 The error "Torchtitan recipes only supports h100, b200 and gb200 GPU types" means:
+
 - You're trying to use a GPU type not supported by this recipe
 - Currently supported: h100, b200, gb200
 
@@ -381,6 +414,7 @@ The error "Torchtitan recipes only supports h100, b200 and gb200 GPU types" mean
 ## Custom Dataset
 
 To use a different dataset:
+
 1. Place your dataset in `$LLMB_INSTALL/datasets/<dataset_name>`
 2. Set `DATASET_PATH=$LLMB_INSTALL/datasets/<dataset_name>` when launching
 3. Update the TOML config if needed to specify the dataset format
@@ -397,14 +431,13 @@ Example:
 
 ```bash
 # Using the -p flag
-llmb-run submit -w pretrain_deepseek-v3-torchtitan -s 671b --dtype bf16 --scale 256 -p
+llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype bf16 --scale 256 -p
 
 # Or using the environment variable
-ENABLE_PROFILE=true llmb-run submit -w pretrain_deepseek-v3-torchtitan -s 671b --dtype bf16 --scale 256
+ENABLE_PROFILE=true llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype bf16 --scale 256
 ```
 
 To view the generated traces, inspect the `outputs/` directory within your run folder.
-
 
 ### Option 2: Modifying the TOML configuration file
 
@@ -419,6 +452,19 @@ profile_freq = 10
 
 With this method, traces will be saved to the `outputs/<save_traces_folder>/` directory within your run folder.
 
+### Memory Snapshots
+
+A memory snapshot is a point-in-time capture of the GPU allocator state saved to disk, useful for debugging memory issues such as OOM errors, fragmentation, and per-rank memory leaks. Unlike a profiler trace (which records op timing), a memory snapshot records what was allocated and held at a given step.
+
+To enable, set in the TOML configuration file:
+
+```toml
+[profiling]
+enable_memory_snapshot = true
+save_memory_snapshot_folder = "memory_snapshot"  # customize as needed
+```
+
+When enabled, memory snapshots are written to `outputs/<save_memory_snapshot_folder>/iteration_<step>/rank<rank>_memory_snapshot.pickle` every `profile_freq` steps (and also on OOM).
 
 ## TensorBoard and Weights & Biases
 

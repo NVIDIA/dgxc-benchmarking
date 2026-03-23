@@ -1,7 +1,9 @@
 # Overview
+
 This recipe provides instructions and scripts for benchmarking the performance of the DeepSeek-R1-FP4 model with the sglang benchmark suite.
 
 The script uses sglang release containers to benchmark the [DeepSeek-R1-FP4](https://huggingface.co/nvidia/DeepSeek-R1-FP4) inference workload. In this recipe, we benchmark the max-throughput use case only.
+
 - **Maximum throughput**: The system is configured to generate as many tokens per second as possible. This typically involves large batch sizes, long generation lengths, and aggressive request packing to fully utilize GPU compute. While this approach increases overall efficiency and hardware utilization, it also results in higher latency for individual requests. It's ideal for offline processing, batch jobs, or queued summarization tasks.
 
 <div style="background-color: #ffeeba; padding: 10px; border-left: 6px solid #f0ad4e;">
@@ -9,35 +11,36 @@ The script uses sglang release containers to benchmark the [DeepSeek-R1-FP4](htt
 </div>
 
 # Performance Measurement and Analysis
+
 Below, we list the inference configuration and benchmarking performance of max throughput scenario for DeepSeek-R1-FP4 model.
 
 ## Maximum throughput
 
 ### GB200 Inference Use case configs
 
-| Use Case      | GPUs | ISL   | OSL   |   max_running_requests | concurrency | chunked prefill tokens | num_prompts | mem-fraction-static | Quantization |  TP |   PP |   DP | enable-dp-attention |
-|:--------------|:----:|:-----:|:-----:|:----------------:|:-------:|:-----|:--------------:|:------------------------------:|:------------:|:----:|:----:|:----:|:---------------:|
-| reasoning     |    4 | 1,000 | 1,000 |  1,024 | 4,096   | 16384 | 20,000   |       0.8      | NVFP4   |    4 |    1 |    4 |     Yes         |
-| chat          |    4 | 128   | 128   |  1,024 | 12,000  | 32768 | 60,000   |       0.8      | NVFP4   |    4 |    1 |    4 |     Yes         |
-| summarization |    4 | 8,000 | 512   |  1,024 | 4,096   | 32768 | 20,000   |       0.8      | NVFP4   |    4 |    1 |    4 |     Yes         |
-| generation    |    4 | 512   | 8,000 |  1,024 | 1,024   | 32768 | 5,000    |       0.8      | NVFP4   |    4 |    1 |    4 |     Yes         |
+| Use Case      | GPUs |  ISL  |  OSL  | max_running_requests | concurrency | chunked prefill tokens | num_prompts | mem-fraction-static | Quantization | TP  | PP  | DP  | enable-dp-attention |
+| :------------ | :--: | :---: | :---: | :------------------: | :---------: | :--------------------- | :---------: | :-----------------: | :----------: | :-: | :-: | :-: | :-----------------: |
+| reasoning     |  4   | 1,000 | 1,000 |        1,024         |    4,096    | 16384                  |   20,000    |         0.8         |    NVFP4     |  4  |  1  |  4  |         Yes         |
+| chat          |  4   |  128  |  128  |        1,024         |   12,000    | 32768                  |   60,000    |         0.8         |    NVFP4     |  4  |  1  |  4  |         Yes         |
+| summarization |  4   | 8,000 |  512  |        1,024         |    4,096    | 32768                  |   20,000    |         0.8         |    NVFP4     |  4  |  1  |  4  |         Yes         |
+| generation    |  4   |  512  | 8,000 |        1,024         |    1,024    | 32768                  |    5,000    |         0.8         |    NVFP4     |  4  |  1  |  4  |         Yes         |
 
 ### B200 Inference Use case configs
 
-| Use Case      | GPUs | ISL   | OSL   |   max_running_requests | concurrency | chunked prefill tokens | num_prompts | mem-fraction-static | Quantization |  TP |   PP |   DP | enable-dp-attention |
-|:--------------|:----:|:-----:|:-----:|:----------------:|:------------:|:------|:--------:|:------------------------------:|:------------:|:----:|:----:|:----:|:---------------:|
-| reasoning     |    8 | 1,000 | 1,000 |  4,096 | 4,096   | 32,768  | 20,000   |   0.7   | NVFP4     |    8 |    1 |    8 |     Yes         |
-| chat          |    8 | 128   | 128   |  4,096 | 4,096   | 16,384 | 20,000    |   0.7    | NVFP4    |    8 |    1 |    8 |     Yes         |
-| summarization |    8 | 8,000 | 512   |  4,096 | 2,048   | 32,768 | 10,000    |   0.8    | NVFP4    |    8 |    1 |    8 |     Yes         |
-| generation    |    8 | 512   | 8,000 |  4,096 | 2,048   | 32,768 | 10,000    |   0.8    | NVFP4    |    8 |    1 |    8 |     Yes         |
+| Use Case      | GPUs |  ISL  |  OSL  | max_running_requests | concurrency | chunked prefill tokens | num_prompts | mem-fraction-static | Quantization | TP  | PP  | DP  | enable-dp-attention |
+| :------------ | :--: | :---: | :---: | :------------------: | :---------: | :--------------------- | :---------: | :-----------------: | :----------: | :-: | :-: | :-: | :-----------------: |
+| reasoning     |  8   | 1,000 | 1,000 |        4,096         |    4,096    | 32,768                 |   20,000    |         0.7         |    NVFP4     |  8  |  1  |  8  |         Yes         |
+| chat          |  8   |  128  |  128  |        4,096         |    4,096    | 16,384                 |   20,000    |         0.7         |    NVFP4     |  8  |  1  |  8  |         Yes         |
+| summarization |  8   | 8,000 |  512  |        4,096         |    2,048    | 32,768                 |   10,000    |         0.8         |    NVFP4     |  8  |  1  |  8  |         Yes         |
+| generation    |  8   |  512  | 8,000 |        4,096         |    2,048    | 32,768                 |   10,000    |         0.8         |    NVFP4     |  8  |  1  |  8  |         Yes         |
 
 **Note**
+
 - mem-fraction-static: fraction of memory allocated to store the kv cache values after loading the model weights.
 - enable-dp-attention: This flag in the config.yml dictates whether `Data parallelism` is enabled or disabled for the attention layers.
 - you can find more information on the sglang parameters here ([sglang arguments](https://docs.sglang.ai/advanced_features/server_arguments.html))
 
 More details about the inference terms can be found here [Appendix](../../../APPENDIX.md)
-
 
 # Prepare Environment
 
@@ -54,6 +57,7 @@ The following directory layout and key variables are used in the recipe:
 We reference a number of Slurm commands and parameters in this document. A brief summary is included below. It's important to note these are only guidelines and might not be applicable to all environments. Please consult with your system administrator for the parameters that are specific to your system.
 
 **Common parameters:**
+
 - `SBATCH_PARTITION` or `-p` - Partition (or queue) to use.
 - `SBATCH_ACCOUNT` or `-A` - Slurm account to associate with your job, different from your user. Meant for accounting purposes.
 - `SBATCH_GPUS_PER_NODE` or `--gres=gpu:<num gpus>` - If your cluster is configured with GRES this should be set to all GPUs in a node. Ignore if not configured.
@@ -66,52 +70,53 @@ These parameters can be set either by exporting the environment variable or usin
 The easiest way to run benchmarks is using the llmb-run launcher tool. This method handles configuration automatically and provides a streamlined interface.
 
 ### Maximum throughput
+
 ```bash
 # Navigate to your installation directory
 cd $LLMB_INSTALL
 
 # Run a benchmark on GB200 with llmb-run per use case for the maximum throughput scenario (** Recommended **)
 # Reasoning
-MAX_BATCH_SIZE=1024 CONCURRENCY=4096 CHUNKED_PREFILL_SIZE=16384 NUM_PROMPTS=20000 MEM_FRACTION_STATIC=0.8 USE_CASES="reasoning:1000/1000" llmb-run submit -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 4
+MAX_BATCH_SIZE=1024 CONCURRENCY=4096 CHUNKED_PREFILL_SIZE=16384 NUM_PROMPTS=20000 MEM_FRACTION_STATIC=0.8 USE_CASES="reasoning:1000/1000" llmb-run submit -w inference_deepseek-r1-sglang --dtype nvfp4 --scale 4
 
 # Chat
-MAX_BATCH_SIZE=1024 CONCURRENCY=12000 CHUNKED_PREFILL_SIZE=32768 NUM_PROMPTS=60000 MEM_FRACTION_STATIC=0.8 USE_CASES="chat:128/128" llmb-run submit -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 4
+MAX_BATCH_SIZE=1024 CONCURRENCY=12000 CHUNKED_PREFILL_SIZE=32768 NUM_PROMPTS=60000 MEM_FRACTION_STATIC=0.8 USE_CASES="chat:128/128" llmb-run submit -w inference_deepseek-r1-sglang --dtype nvfp4 --scale 4
 
 # Summarization
-MAX_BATCH_SIZE=1024 CONCURRENCY=4096 CHUNKED_PREFILL_SIZE=32768 NUM_PROMPTS=20000 MEM_FRACTION_STATIC=0.8 USE_CASES="summarization:8000/512" llmb-run submit -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 4
+MAX_BATCH_SIZE=1024 CONCURRENCY=4096 CHUNKED_PREFILL_SIZE=32768 NUM_PROMPTS=20000 MEM_FRACTION_STATIC=0.8 USE_CASES="summarization:8000/512" llmb-run submit -w inference_deepseek-r1-sglang --dtype nvfp4 --scale 4
 
 # Generation
-MAX_BATCH_SIZE=1024 CONCURRENCY=1024 CHUNKED_PREFILL_SIZE=32768 NUM_PROMPTS=5000 MEM_FRACTION_STATIC=0.8 USE_CASES="generation:512/8000" llmb-run submit -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 4
+MAX_BATCH_SIZE=1024 CONCURRENCY=1024 CHUNKED_PREFILL_SIZE=32768 NUM_PROMPTS=5000 MEM_FRACTION_STATIC=0.8 USE_CASES="generation:512/8000" llmb-run submit -w inference_deepseek-r1-sglang --dtype nvfp4 --scale 4
 
 # Run a benchmark on B200 with llmb-run per use case for the maximum throughput scenario (** Recommended **)
 # Reasoning
-MAX_BATCH_SIZE=4096 CONCURRENCY=4096 CHUNKED_PREFILL_SIZE=32768 NUM_PROMPTS=20000 MEM_FRACTION_STATIC=0.7 USE_CASES="reasoning:1000/1000" llmb-run submit -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 8
+MAX_BATCH_SIZE=4096 CONCURRENCY=4096 CHUNKED_PREFILL_SIZE=32768 NUM_PROMPTS=20000 MEM_FRACTION_STATIC=0.7 USE_CASES="reasoning:1000/1000" llmb-run submit -w inference_deepseek-r1-sglang --dtype nvfp4 --scale 8
 
 # Chat
-MAX_BATCH_SIZE=4096 CONCURRENCY=4096 CHUNKED_PREFILL_SIZE=16384 NUM_PROMPTS=20000 MEM_FRACTION_STATIC=0.7 USE_CASES="chat:128/128" llmb-run submit -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 8
+MAX_BATCH_SIZE=4096 CONCURRENCY=4096 CHUNKED_PREFILL_SIZE=16384 NUM_PROMPTS=20000 MEM_FRACTION_STATIC=0.7 USE_CASES="chat:128/128" llmb-run submit -w inference_deepseek-r1-sglang --dtype nvfp4 --scale 8
 
 # Summarization
-MAX_BATCH_SIZE=4096 CONCURRENCY=2048 CHUNKED_PREFILL_SIZE=32768 NUM_PROMPTS=10000 MEM_FRACTION_STATIC=0.8 USE_CASES="summarization:8000/512" llmb-run submit -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 8
+MAX_BATCH_SIZE=4096 CONCURRENCY=2048 CHUNKED_PREFILL_SIZE=32768 NUM_PROMPTS=10000 MEM_FRACTION_STATIC=0.8 USE_CASES="summarization:8000/512" llmb-run submit -w inference_deepseek-r1-sglang --dtype nvfp4 --scale 8
 
 # Generation
-MAX_BATCH_SIZE=4096 CONCURRENCY=2048 CHUNKED_PREFILL_SIZE=32768 NUM_PROMPTS=10000 MEM_FRACTION_STATIC=0.8 USE_CASES="generation:512/8000" llmb-run submit -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 8
+MAX_BATCH_SIZE=4096 CONCURRENCY=2048 CHUNKED_PREFILL_SIZE=32768 NUM_PROMPTS=10000 MEM_FRACTION_STATIC=0.8 USE_CASES="generation:512/8000" llmb-run submit -w inference_deepseek-r1-sglang --dtype nvfp4 --scale 8
 ```
 
 - Single use cases and their optimized parameters are listed above and work out of the box. Advanced users can add more use cases and configurations in `launch_server.sh` and `launch.sh`.
 - Use cases such as summarization and generation do not work well with large prompts, so the total prompts are decreased for these usescase.
 
-
 **Multiple USE_CASES:**
+
 - While it is possible to run multiple USE_CASES within a single llmb-run invocation, doing so will increase the total runtime of the SLURM job. To minimize job duration and improve scheduling efficiency, it is recommended to split use cases into separate runs.
 - This approach may be beneficial for advanced LLMB users running multiple short benchmarking experiments, as it allows the model to be loaded only once across multiple experiments.
 
 ```bash
 # Multi USE_CASE example on GB200
 # Note that running multiple use cases at once may take longer time and it is advised to adjust the SBATCH time limits accordingly.
- USE_CASES="reasoning:1000/1000 chat:128/128" llmb-run submit -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 4
+ USE_CASES="reasoning:1000/1000 chat:128/128" llmb-run submit -w inference_deepseek-r1-sglang --dtype nvfp4 --scale 4
 
 # Multi USE_CASE example on B200
- USE_CASES="reasoning:1000/1000 chat:128/128" llmb-run submit -w inference_deepseek-r1-sglang -s 671b --dtype nvfp4 --scale 8
+ USE_CASES="reasoning:1000/1000 chat:128/128" llmb-run submit -w inference_deepseek-r1-sglang --dtype nvfp4 --scale 8
 ```
 
 For more details on llmb-run usage, see the [llmb-run documentation](../../../cli/llmb-run/README.md).
@@ -121,6 +126,7 @@ For more details on llmb-run usage, see the [llmb-run documentation](../../../cl
 Alternatively, you can run inference scripts directly using the launch script. This method provides more control over individual parameters and environment variables.
 
 **Important**:
+
 - Ensure your virtual environment is activated before running the benchmark commands below. If you used the installer with conda, run `conda activate $LLMB_INSTALL/venvs/<env_name>`. If you used the installer with python venv, run `source $LLMB_INSTALL/venvs/<env_name>/bin/activate`.
 - Run the launch script from the installed recipe directory: `cd $LLMB_INSTALL/llmb_repo/deepseek_r1/inference/sglang/`
 
@@ -135,6 +141,7 @@ sbatch -A ${SBATCH_ACCOUNT} -p ${SBATCH_PARTITION} GPU_TYPE=b200 ./launch.sh
 ```
 
 ### Results/Log files
+
 The server logs are located at `$LLMB_INSTALL/workloads/inference_deepseek-r1-sglang/experiments/server_TP_DP_SLURM_JOBID.out` This log shows the model weights loading and details on how tokens are processed.
 Benchmark results for the workload are stored at `$LLMB_INSTALL/workloads/inference_deepseek-r1-sglang/experiments/<model>_<mode>_TP_DP_CON_USECASE`
 
@@ -151,7 +158,9 @@ Each directory will contain SLURM output log file per job:
 Model_TP_DP_CON_<use_case>/
 ├── Model_TP_DP_CON_<use_case>_SLURM_JOBID.out  # Benchmarking output
 ```
+
 The `PERFORMANCE OVERVIEW` section in the `*.out` file provides key performance metrics:
+
 ```
 ...
 
@@ -195,6 +204,7 @@ Structure of model weights folder `$LLMB_INSTALL/workloads/inference_deepseek-r1
 
 Double check that your folder has the same 395GiB size
 Note: `du -sh` includes hidden contents like `.git` and may report a larger total. To verify weights-only, inspect file sizes in this folder with `ls -lh`.
+
 ```
 total 395G
 drwxr-xr-x  3 <user> dip  12K Jun 18 19:45 .

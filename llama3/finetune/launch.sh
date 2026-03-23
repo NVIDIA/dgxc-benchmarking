@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -20,8 +20,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-# Check Bash version
-if [ "${BASH_VERSION:0:1}" -lt 4 ] || [ "${BASH_VERSION:0:1}" -eq 4 ] && [ "${BASH_VERSION:2:1}" -lt 2 ]; then
+if [ ${BASH_VERSION:0:1} -lt 4 ] || [ ${BASH_VERSION:0:1} -eq 4 ] && [ ${BASH_VERSION:2:1} -lt 2 ]; then
     printf "Unsupported %s version: %s\n" "${BASH}" "${BASH_VERSION}" >&2
     echo "Requires Bash 4.2 or greater." >&2
     exit 1
@@ -30,39 +29,39 @@ fi
 set -eu -o pipefail
 
 # Required environment variables
+: "${HF_TOKEN:?Required variable Hugging Face token}"
+: "${LLMB_INSTALL:?Required variable LLMB_INSTALL}"
 : "${SBATCH_ACCOUNT:?Required variable SBATCH_ACCOUNT}"
 : "${SBATCH_PARTITION:?Required variable SBATCH_PARTITION}"
-: "${HF_TOKEN:?Required variable Hugging Face token}"
-: "${GPU_TYPE:?Required variable GPU_TYPE (Eg: gb200, b200, h100)}"
-: "${LLMB_INSTALL:?Required variable LLMB_INSTALL}"
 
 export WORKLOAD_TYPE=finetune
 export MODEL_NAME=llama3
-export FW_VERSION=25.09.00
+export MODEL_SIZE=${MODEL_SIZE:-70b}
+if [[ $MODEL_SIZE != "70b" ]]; then
+    echo "ERROR: Only 70b LoRA is supported. MODEL_SIZE=$MODEL_SIZE is not supported."
+    exit 1
+fi
+export FW_VERSION=26.02.00
 
 export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 
 export LLMB_WORKLOAD=$LLMB_INSTALL/workloads/${WORKLOAD_TYPE}_${MODEL_NAME}
 export LLMB_REPO=$PWD
 
-export IMAGE=${IMAGE:-${LLMB_INSTALL}/images/nvidia+nemo+${FW_VERSION}.sqsh}
+export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh}
 
 export NEMORUN_HOME=$LLMB_WORKLOAD
-if [ ! -d "$LLMB_WORKLOAD/checkpoint_and_dataset" ]; then
-    echo "Error: checkpoint_and_dataset folder not found in $LLMB_WORKLOAD"
-    echo "Please ensure you have downloaded both the dataset and checkpoint data. See the README for more details."
-    exit 1
-fi
-export HF_HOME=${HF_HOME:-$LLMB_WORKLOAD/checkpoint_and_dataset}
-export NEMO_HOME=${NEMO_HOME:-$LLMB_WORKLOAD/checkpoint_and_dataset}
+export NEMO_HOME=${NEMO_HOME:-$LLMB_WORKLOAD}
 
-#Default values
-GPU_TYPE=${GPU_TYPE,,}
-DTYPE=${DTYPE:-bf16}
-DTYPE=${DTYPE,,}
-JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
-MAX_STEPS=${MAX_STEPS:-50}
-CPU_PER_TASK_PINNING=${CPU_PER_TASK_PINNING:-0}
+export DTYPE=${DTYPE:-fp8}
+export DTYPE=${DTYPE,,}
+export GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
+export GPU_TYPE=${GPU_TYPE,,}
+export JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
+export TIME_LIMIT=${TIME_LIMIT:-"00:30:00"}
+export MAX_STEPS=${MAX_STEPS:-50}
+export PROFILE_START_STEP=${PROFILE_START_STEP:-45}
+export PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
 
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 PROFILE_ENABLED=${PROFILE_ENABLED,,}
@@ -74,12 +73,10 @@ ENABLE_VBOOST=${ENABLE_VBOOST,,}
 # Handle additional SLURM parameters from environment variable
 ADDITIONAL_SLURM_PARAMS=${ADDITIONAL_SLURM_PARAMS:-""}
 
-export PROFILE_START_STEP=${PROFILE_START_STEP:-45}
-export PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
-
-if [[ $DTYPE == "fp8" ]]; then
-    export FP8_RECIPE=${FP8_RECIPE:-cs}
-    export FP8_RECIPE=${FP8_RECIPE,,}
+# Add additional SLURM parameters if provided
+SLURM_ARGS=""
+if [ -n "$ADDITIONAL_SLURM_PARAMS" ]; then
+    SLURM_ARGS="--additional_slurm_params ${ADDITIONAL_SLURM_PARAMS}"
 fi
 
 CONTAINER_MOUNTS=""
@@ -90,111 +87,110 @@ if [[ -n ${RUN_CONF_MOUNTS:-""} ]]; then
     CONTAINER_MOUNTS+="${RUN_CONF_MOUNTS}"
 fi
 
+CONFIG_OVERRIDES=""
+if [[ -n ${CONTAINER_MOUNTS} ]]; then
+    CONFIG_OVERRIDES+=" --custom_mounts $CONTAINER_MOUNTS"
+fi
+
 NUM_LAYERS=${NUM_LAYERS:-80}
 HIDDEN_SIZE=${HIDDEN_SIZE:-8192}
 
-if [ $GPU_TYPE = "gb200" ]; then
-    #Default launch configs for GB200
+if [[ $GPU_TYPE == "gb200" ]] || [[ $GPU_TYPE == "gb300" ]]; then
     GPUS_PER_NODE=${GPUS_PER_NODE:-4}
-    #Parallelism settings for GB200
-    TP=${TP:-1}
-    PP=${PP:-4}
-    CP=${CP:-1}
-    VP=${VP:-20}
-    MBS=${MBS:-1}
-    GBS=${GBS:-$((JOB_TOTAL_GPUS * 8))}
-    CUDA_GRAPH=${CUDA_GRAPH:-true}
-    TIME_LIMIT=${TIME_LIMIT:-"00:15:00"}
-elif [ $GPU_TYPE = "b200" ]; then
-    #Default launch config for B200
+elif [[ $GPU_TYPE == "b200" ]] || [[ $GPU_TYPE == "h100" ]]; then
     GPUS_PER_NODE=${GPUS_PER_NODE:-8}
-    #Parallelism settings for B200
-    TP=${TP:-1}
-    PP=${PP:-4}
-    CP=${CP:-1}
-    VP=${VP:-20}
-    MBS=${MBS:-1}
-    GBS=${GBS:-$((JOB_TOTAL_GPUS * 4))}
-    CUDA_GRAPH=${CUDA_GRAPH:-false}
-    TIME_LIMIT=${TIME_LIMIT:-"00:15:00"}
-elif [ $GPU_TYPE = "h100" ]; then
-    #Default launch config for H100
-    GPUS_PER_NODE=${GPUS_PER_NODE:-8}
-    #Parallelism settings for H100
-    TP=${TP:-2}
-    PP=${PP:-4}
-    CP=${CP:-1}
-    VP=${VP:-20}
-    MBS=${MBS:-1}
-    GBS=${GBS:-$((JOB_TOTAL_GPUS * 4))}
-    CUDA_GRAPH=${CUDA_GRAPH:-false}
-    TIME_LIMIT=${TIME_LIMIT:-"00:15:00"}
 else
     echo "$GPU_TYPE not supported"
     exit 1
 fi
 
-CONFIG_OVERRIDES=" -tp $TP \
-  -pp $PP \
-  -cp $CP \
-  -vp $VP \
-  -ep 1 \
-  -gb $GBS \
-  -mb $MBS \
-  --cuda_graphs $CUDA_GRAPH \
-  --num_layers $NUM_LAYERS \
-  --hidden_size $HIDDEN_SIZE \
-"
+if [[ -n ${TP:-} ]]; then
+    CONFIG_OVERRIDES+=" -tp $TP "
+fi
+if [[ -n ${PP:-} ]]; then
+    CONFIG_OVERRIDES+=" -pp $PP "
+fi
+if [[ -n ${CP:-} ]]; then
+    CONFIG_OVERRIDES+=" -cp $CP "
+fi
+if [[ -n ${GBS:-} ]]; then
+    CONFIG_OVERRIDES+=" -gb $GBS "
+fi
+if [[ -n ${MBS:-} ]]; then
+    CONFIG_OVERRIDES+=" -mb $MBS "
+fi
+if [[ -n ${VP:-} ]]; then
+    CONFIG_OVERRIDES+=" -vp $VP "
+fi
+
+if [[ -n ${CUDA_GRAPH_SCOPE:-} ]]; then
+    CUDA_GRAPH_IMPL="transformer_engine"
+    if [[ $CUDA_GRAPH_SCOPE == "full_iteration" ]]; then
+        CUDA_GRAPH_IMPL="local"
+    elif [[ $CUDA_GRAPH_SCOPE == "none" ]]; then
+        CUDA_GRAPH_IMPL="none"
+    fi
+    CONFIG_OVERRIDES+=" --cuda_graph_impl=$CUDA_GRAPH_IMPL "
+    if [[ $CUDA_GRAPH_IMPL != "none" ]]; then
+        CONFIG_OVERRIDES+=" --cuda_graph_scope=$CUDA_GRAPH_SCOPE "
+    fi
+fi
 
 if [[ $PROFILE_ENABLED == "true" ]]; then
-    CONFIG_OVERRIDES+=" -en "
+    CONFIG_OVERRIDES+=" --enable_nsys "
     CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
     CONFIG_OVERRIDES+=" --profiling_stop_step=$PROFILE_STOP_STEP "
+    CONFIG_OVERRIDES+=" --nsys_trace=cuda,nvtx "
+    CONFIG_OVERRIDES+=" --nsys_extra_args=--nvtx-domain-include=NCCL "
+    CONFIG_OVERRIDES+=" --profiling_ranks=$(seq -s, 0 $((JOB_TOTAL_GPUS - 1))) "
     if [[ $GPU_METRICS_ENABLED == true ]]; then
-        CONFIG_OVERRIDES+=" -pgm "
+        CONFIG_OVERRIDES+=" --profiling_gpu_metrics "
     fi
-    MAX_STEPS=$PROFILE_STOP_STEP
 fi
 
 if [[ $DTYPE == "fp8" ]]; then
-    CONFIG_OVERRIDES+=" -fr $FP8_RECIPE "
-fi
-
-if [[ -n ${CONTAINER_MOUNTS} ]]; then
-    CONFIG_OVERRIDES+=" --custom_mounts $CONTAINER_MOUNTS"
+    if [[ $GPU_TYPE == "h100" ]]; then
+        export FP8_RECIPE=${FP8_RECIPE:-fp8_cs}
+        if [[ ${FP8_RECIPE,,} != "fp8_cs" ]]; then
+            echo "ERROR: fp8_cs is the only fp8 flavor supported on H100 GPUs." >&2
+            exit 1
+        fi
+    elif [[ $GPU_TYPE == "gb200" ]] || [[ $GPU_TYPE == "gb300" ]]; then
+        export FP8_RECIPE=${FP8_RECIPE:-fp8_cs}
+    else
+        export FP8_RECIPE=${FP8_RECIPE:-fp8_mx}
+    fi
+    export FP8_RECIPE=${FP8_RECIPE,,}
+    COMPUTE_DTYPE=$FP8_RECIPE
+else
+    COMPUTE_DTYPE=$DTYPE
 fi
 
 if [[ $ENABLE_VBOOST == true ]]; then
     CONFIG_OVERRIDES+=" --enable_vboost true "
 fi
 
-SCRIPT_NAME="scripts.performance.llm.finetune_llama3_70b"
-
-# Add additional SLURM parameters if provided
-SLURM_ARGS=""
-if [ -n "$ADDITIONAL_SLURM_PARAMS" ]; then
-    SLURM_ARGS="--additional_slurm_params ${ADDITIONAL_SLURM_PARAMS}"
-fi
-
-pushd "${LLMB_WORKLOAD}/NeMo"
-
-python3 -m ${SCRIPT_NAME} \
+# run command
+pushd $LLMB_WORKLOAD/Megatron-Bridge
+python3 scripts/performance/setup_experiment.py \
+    --container_image $IMAGE \
     --hf_token "${HF_TOKEN}" \
-    --gpu "${GPU_TYPE}" \
-    --num_gpus "${JOB_TOTAL_GPUS}" \
-    --container_image "${IMAGE}" \
-    --compute_dtype "${DTYPE}" \
-    --gpus_per_node "${GPUS_PER_NODE}" \
-    --max_steps "${MAX_STEPS}" \
-    --finetuning "lora" \
-    --skip_dataset_download \
-    --skip_import_checkpoint \
-    $CONFIG_OVERRIDES \
-    slurm \
-    --account "${SBATCH_ACCOUNT}" \
-    --partition "${SBATCH_PARTITION}" \
-    --log_dir "${NEMORUN_HOME}" \
+    --compute_dtype $COMPUTE_DTYPE \
+    --model_family_name llama \
+    --model_recipe_name llama3_70b \
+    --gpu $GPU_TYPE \
+    --num_gpus $JOB_TOTAL_GPUS \
+    --gpus_per_node $GPUS_PER_NODE \
+    --task "lora" \
+    --pretrained_checkpoint $LLMB_WORKLOAD/checkpoint_and_dataset/llama3_70b \
+    --data squad_packed \
+    --dataset_root $LLMB_WORKLOAD/checkpoint_and_dataset/datasets \
+    ${CONFIG_OVERRIDES} \
+    --account $SBATCH_ACCOUNT \
+    --partition $SBATCH_PARTITION \
+    --log_dir $NEMORUN_HOME \
     --time_limit $TIME_LIMIT \
+    --max_steps $MAX_STEPS \
     $SLURM_ARGS
 
 popd

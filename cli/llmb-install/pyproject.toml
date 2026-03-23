@@ -1,18 +1,17 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "llmb-install"
-version = "1.6.0.post1"
+version = "1.8.3"
 requires-python = ">=3.10"
 description = "Installer for LLM benchmarking workloads"
 
 dependencies = [
-    "PyYAML>=6.0",
-    "questionary>=1.10.0",
-    "rich>=13.0",
-    "prompt_toolkit<3.0.52",
+    "PyYAML~=6.0",
+    "questionary~=2.1",
+    "rich>=10.0.0,<15",
     "transformers>4.57.3,<5.0.0",
     "huggingface-hub>=0.20.0",
 ]
@@ -25,8 +24,8 @@ dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "pytest-mock>=3.10",
-    "black",
-    "ruff"
+    "black~=26.1",
+    "ruff~=0.15"
 ]
 
 [tool.black]

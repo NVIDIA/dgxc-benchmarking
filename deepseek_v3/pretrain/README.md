@@ -5,6 +5,7 @@ This directory contains performance recipes for DeepSeek V3 pre-training workloa
 ## Available Frameworks
 
 ### TorchTitan
+
 - **Path**: [torchtitan/](torchtitan/README.md)
 - **Description**: Large-scale LLM training using native PyTorch with FSDP, tensor parallelism, pipeline parallelism, and expert parallelism
 - **Model Size**: 671B parameters
@@ -12,10 +13,11 @@ This directory contains performance recipes for DeepSeek V3 pre-training workloa
 - **Precision**: BF16 (FP8 not currently supported in this variant)
 
 ### Megatron-Bridge
+
 - **Path**: [megatron_bridge/](megatron_bridge/README.md)
 - **Description**: Training using NeMo Megatron-Bridge framework
 - **Model Size**: 671B parameters
-- **Supported GPUs**: GB300, GB200, B200, H100
+- **Supported GPUs**: GB300, GB200, B300, B200, H100
 - **Precision**: FP8, BF16
 
 ## Quick Start
@@ -25,6 +27,4 @@ Please refer to the framework-specific README files for detailed setup and runni
 - [TorchTitan README](torchtitan/README.md)
 - [Megatron-Bridge README](megatron_bridge/README.md)
 
-
 For complete installation instructions, see the [main repository README](../../README.md).
-

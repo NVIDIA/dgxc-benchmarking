@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -43,7 +43,6 @@ GPU_TYPE=${GPU_TYPE,,}
 
 export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh}
 
-CLUSTER_TYPE=${CLUSTER_TYPE:-slurm}
 DTYPE=${DTYPE:-fp8}
 DTYPE=${DTYPE,,}
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
@@ -74,11 +73,6 @@ if [[ -n ${RUN_CONF_MOUNTS:-""} ]]; then
         CONTAINER_MOUNTS+=","
     fi
     CONTAINER_MOUNTS+="${RUN_CONF_MOUNTS}"
-fi
-
-if [[ $CLUSTER_TYPE != "slurm" ]]; then
-    echo "Only SLURM is supported for this workload"
-    exit 1
 fi
 
 if [ $GPU_TYPE = "gb200" ] || [ $GPU_TYPE = "gb300" ]; then
@@ -176,44 +170,25 @@ fi
 
 pushd $LLMB_WORKLOAD/NeMo
 
-if [ $CLUSTER_TYPE = slurm ]; then
-    # Add additional SLURM parameters if provided
-    SLURM_ARGS=""
-    if [ -n "$ADDITIONAL_SLURM_PARAMS" ]; then
-        SLURM_ARGS="--additional_slurm_params ${ADDITIONAL_SLURM_PARAMS}"
-    fi
-
-    python -m scripts.performance.llm.pretrain_grok1_314b \
-        --gpu $GPU_TYPE \
-        --container_image $IMAGE \
-        --compute_dtype $DTYPE \
-        --num_gpus $JOB_TOTAL_GPUS \
-        --gpus_per_node $GPUS_PER_NODE \
-        --max_steps $MAX_STEPS \
-        $CONFIG_OVERRIDES \
-        slurm \
-        --account $SBATCH_ACCOUNT \
-        --partition $SBATCH_PARTITION \
-        --time_limit $TIME_LIMIT \
-        --log_dir ${NEMORUN_HOME} \
-        $SLURM_ARGS
-else
-    python -m scripts.performance.llm.pretrain_grok1_314b \
-        --gpu $GPU_TYPE \
-        --container_image nvcr.io/nvidia/nemo:$FW_VERSION \
-        --compute_dtype $DTYPE \
-        --num_gpus $JOB_TOTAL_GPUS \
-        --gpus_per_node $GPUS_PER_NODE \
-        --max_steps $MAX_STEPS \
-        --hf_token $HF_TOKEN \
-        $CONFIG_OVERRIDES \
-        runai \
-        --base_url $BASE_URL \
-        --app_id $APP_ID \
-        --app_secret $APP_SECRET \
-        --project_name $PROJECT_NAME \
-        --pvc_nemo_run_dir $PVC_DIR
-
+# Add additional SLURM parameters if provided
+SLURM_ARGS=""
+if [ -n "$ADDITIONAL_SLURM_PARAMS" ]; then
+    SLURM_ARGS="--additional_slurm_params ${ADDITIONAL_SLURM_PARAMS}"
 fi
+
+python -m scripts.performance.llm.pretrain_grok1_314b \
+    --gpu $GPU_TYPE \
+    --container_image $IMAGE \
+    --compute_dtype $DTYPE \
+    --num_gpus $JOB_TOTAL_GPUS \
+    --gpus_per_node $GPUS_PER_NODE \
+    --max_steps $MAX_STEPS \
+    $CONFIG_OVERRIDES \
+    slurm \
+    --account $SBATCH_ACCOUNT \
+    --partition $SBATCH_PARTITION \
+    --time_limit $TIME_LIMIT \
+    --log_dir ${NEMORUN_HOME} \
+    $SLURM_ARGS
 
 popd

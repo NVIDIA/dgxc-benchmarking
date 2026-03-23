@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -61,6 +61,12 @@ run:
   launch_script: 'launch.sh'
 
   gpu_configs:
+    gb300:
+      model_configs:
+        - model_size: '120b'
+          dtypes: ['mxfp4']
+          scales: [1, 4]
+          exact_scales: true
     gb200:
       model_configs:
         - model_size: '120b'

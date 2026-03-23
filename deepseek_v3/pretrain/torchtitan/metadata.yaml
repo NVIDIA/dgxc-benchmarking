@@ -27,21 +27,24 @@ general:
 
 container:
   images: 
-    - 'nvcr.io#nvidia/pytorch:25.10-py3'
+    - 'nvcr.io#nvidia/pytorch:25.12-py3'
 
 repositories:
   torchtitan:
     url: "https://github.com/elfiegg/torchtitan.git"
-    commit: "4517aeba999524ff8fa98c338c9758ed1651117a"
+    commit: "b5351f166b2751684aeb1d2cb15ceb619d383ae0"
 
 setup:
   venv_req: true
   dependencies:
-    pip:
-      - package: torchtitan
+    git:
+      torchtitan:
         repo_key: torchtitan
-        install_target: '.'
+        install_method:
+          type: clone
+    pip:
       - 'huggingface_hub[cli]'
+      - 'requests'
   tasks:
     - name: container_setup
       cmd: './install_torchtitan_to_container.sh'
@@ -67,14 +70,16 @@ run:
         - model_size: '671b'
           dtypes:
             bf16: [256]
+            fp8: [256]
     h100:
       model_configs:
         - model_size: '671b'
           dtypes:
-            bf16: [512]
-    
+            bf16: [512, 1024]
+
     gb200:
       model_configs:
         - model_size: '671b'
           dtypes:
             bf16: [256]
+            fp8: [256]

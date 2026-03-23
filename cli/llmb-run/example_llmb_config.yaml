@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -48,5 +48,6 @@ container_info:
   - nvcr.io#nvidia/nemo:25.04.01
 job_config:
   profile_enabled: false
+  proxy: false
   env_overrides: {}
   model_overrides: {}

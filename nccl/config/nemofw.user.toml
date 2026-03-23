@@ -7,7 +7,7 @@ SWEEP_LOG_ROOT="/nvcomms-workspace"
 NCCL_TEST_PATH="/usr/local/bin/"
 
 pyxis = [
-    "--container-image=$LLMB_INSTALL/images/nvidia+nemo+25.09.00.sqsh --no-container-mount-home"
+    "--container-image=$LLMB_INSTALL/images/nvidia+nemo+__FW_VERSION__.sqsh --no-container-mount-home"
 ]
 NVCOMMS_PERF_TOOLS_BINARY_SUFFIX="_mpi"
 NVCOMMS_PERF_TOOLS_WORKSPACE="$LLMB_INSTALL/workloads/microbenchmark_nccl/experiments/"

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -49,10 +49,55 @@ def load_cluster_config(install_path: str) -> Optional[Dict[str, Any]]:
 
     try:
         with open(cluster_config_path, 'r') as f:
-            return yaml.safe_load(f)
+            config = yaml.safe_load(f)
+            return normalize_cluster_config(config) if config else None
     except (yaml.YAMLError, OSError) as e:
         logger.warning(f"Could not load cluster config: {e}")
         return None
+
+
+def normalize_cluster_config(config: dict) -> dict:
+    """Normalize a loaded cluster config to v2 format.
+
+    Detects v1 by presence of 'launcher' key (v1 configs have no schema_version).
+    If already v2 (no 'launcher'), returns as-is.
+    """
+    if 'launcher' not in config:
+        return config  # Already v2
+
+    normalized = dict(config)
+    launcher = normalized.pop('launcher')
+
+    # Flatten launcher fields to top level
+    normalized['schema_version'] = 2
+    for key in ('llmb_repo', 'llmb_install', 'gpu_type', 'cluster_name'):
+        if key in launcher:
+            normalized[key] = launcher[key]
+
+    # Move launcher.node_architecture → install.node_architecture if needed
+    if 'node_architecture' in launcher:
+        install = normalized.get('install', {}).copy()
+        if 'node_architecture' not in install:
+            install['node_architecture'] = launcher['node_architecture']
+            normalized['install'] = install
+
+    # Restructure flat slurm keys into gpu/cpu blocks
+    slurm = normalized.get('slurm', {})
+    if 'gpu_partition' in slurm or 'cpu_partition' in slurm:
+        new_slurm = {}
+        if 'account' in slurm:
+            new_slurm['account'] = slurm['account']
+        new_slurm['gpu'] = {
+            'partition': slurm.get('gpu_partition', ''),
+            'gres': slurm.get('gpu_gres'),
+        }
+        new_slurm['cpu'] = {
+            'partition': slurm.get('cpu_partition', ''),
+            'gres': slurm.get('cpu_gres'),
+        }
+        normalized['slurm'] = new_slurm
+
+    return normalized
 
 
 def create_cluster_config(
@@ -113,23 +158,11 @@ def create_cluster_config(
                     'venv_type': venv_type,
                 }
 
-    launcher_config = {
-        'llmb_repo': root_dir,
-        'llmb_install': install_path,
-        'gpu_type': gpu_type,
-        'node_architecture': node_architecture,  # Keep for backward compatibility
-    }
-
     # Add cluster name if available
     # For incremental installs, preserve existing cluster_name if current detection fails
     cluster_name = get_cluster_name()
-    if cluster_name:
-        launcher_config['cluster_name'] = cluster_name
-    elif existing_cluster_config:
-        # Preserve existing cluster_name if we can't detect it now
-        existing_cluster_name = existing_cluster_config.get('launcher', {}).get('cluster_name')
-        if existing_cluster_name:
-            launcher_config['cluster_name'] = existing_cluster_name
+    if not cluster_name and existing_cluster_config:
+        cluster_name = existing_cluster_config.get('cluster_name')
 
     # Build install metadata section
     # For incremental installs, merge with existing install section to preserve all fields
@@ -155,15 +188,23 @@ def create_cluster_config(
             install_section['image_folder'] = image_folder
 
     cluster_config = {
-        'launcher': launcher_config,
-        'install': install_section,  # New section for install-specific metadata
+        'schema_version': 2,
+        'llmb_repo': root_dir,
+        'llmb_install': install_path,
+        'gpu_type': gpu_type,
+        **({'cluster_name': cluster_name} if cluster_name else {}),
+        'install': install_section,
         'environment': env_vars,
         'slurm': {
             'account': slurm_info['slurm']['account'],
-            'gpu_partition': slurm_info['slurm']['gpu_partition'],
-            'gpu_gres': slurm_info['slurm'].get('gpu_partition_gres'),
-            'cpu_partition': slurm_info['slurm']['cpu_partition'],
-            'cpu_gres': slurm_info['slurm'].get('cpu_partition_gres'),
+            'gpu': {
+                'partition': slurm_info['slurm']['gpu_partition'],
+                'gres': slurm_info['slurm'].get('gpu_partition_gres'),
+            },
+            'cpu': {
+                'partition': slurm_info['slurm']['cpu_partition'],
+                'gres': slurm_info['slurm'].get('cpu_partition_gres'),
+            },
         },
         'workloads': {'installed': all_workloads, 'config': merged_workload_venvs},
     }
@@ -173,4 +214,4 @@ def create_cluster_config(
     with open(config_path, 'w') as f:
         yaml.dump(cluster_config, f, default_flow_style=False, sort_keys=False)
 
-    print(f"Created cluster configuration: {config_path}")
+    logger.debug(f"Created cluster configuration: {config_path}")

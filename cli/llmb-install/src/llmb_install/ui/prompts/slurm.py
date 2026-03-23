@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,9 @@ from typing import Dict, Optional
 
 from llmb_install.cluster import slurm
 from llmb_install.ui.interface import UIInterface
+
+# Validation error prefix used by cluster.slurm validation functions
+INVALID_PREFIX = "invalid:"
 
 
 def _prompt_gpu_gres(ui: UIInterface, partition_name: str) -> Optional[int]:
@@ -118,8 +121,8 @@ def prompt_slurm_info(
                 ui.log("  " + ", ".join(accounts[i : i + 5]))
             ui.log("")
             return "Type your account name"
-        elif validation_result.startswith('warning:'):
-            return validation_result[8:]  # Remove 'warning:' prefix
+        elif validation_result.startswith(INVALID_PREFIX):
+            return validation_result[len(INVALID_PREFIX) :]
         else:
             return validation_result
 
@@ -169,16 +172,18 @@ def prompt_slurm_info(
                 ui.log("  " + ", ".join(partitions[i : i + 5]))
             ui.log("")
             return "Type your partition name"
-        elif validation_result.startswith('warning:'):
-            return validation_result[8:]  # Remove 'warning:' prefix
+        elif validation_result.startswith(INVALID_PREFIX):
+            return validation_result[len(INVALID_PREFIX) :]
         else:
             return validation_result
 
-    ui.log("This is the partition where you want to run the benchmarks.")
+    def is_valid_partition_default(partition_default: str) -> bool:
+        """Check whether a saved partition default is valid for current partitions."""
+        return bool(partition_default) and slurm.validate_partition(partition_default, partitions) == 'valid'
 
     # Use provided default if available and valid, otherwise use detected default or single partition
-    if defaults and 'gpu_partition' in defaults and defaults['gpu_partition'] in partitions:
-        gpu_default = defaults['gpu_partition']
+    if defaults and is_valid_partition_default(defaults.get('gpu_partition', '')):
+        gpu_default = ",".join(slurm.normalize_partition_list(defaults['gpu_partition']))
         if express_mode:
             ui.log(f"Using saved default GPU partition: {gpu_default}")
     elif default_partition:
@@ -189,21 +194,9 @@ def prompt_slurm_info(
     else:
         gpu_default = ""
 
-    gpu_partition = ui.prompt_text("SLURM GPU partition:", default=gpu_default, validate=validate_partition)
-
-    if gpu_partition is None:
-        return None
-
     cpu_default = slurm.get_default_cpu_partition(partitions)
-
-    ui.log("")
-    ui.log(
-        "This is the partition for tasks that do not require GPUs. If you only have GPU partitions, use a low priority queue."
-    )
-
-    # Use provided default if available and valid, otherwise use detected default or single partition
-    if defaults and 'cpu_partition' in defaults and defaults['cpu_partition'] in partitions:
-        final_cpu_default = defaults['cpu_partition']
+    if defaults and is_valid_partition_default(defaults.get('cpu_partition', '')):
+        final_cpu_default = ",".join(slurm.normalize_partition_list(defaults['cpu_partition']))
         if express_mode:
             ui.log(f"Using saved default CPU partition: {final_cpu_default}")
     elif cpu_default:
@@ -214,35 +207,58 @@ def prompt_slurm_info(
     else:
         final_cpu_default = ""
 
-    cpu_partition = ui.prompt_text("SLURM CPU partition:", default=final_cpu_default, validate=validate_partition)
+    ui.log("This is the partition where you want to run the benchmarks.")
+    ui.log("You can specify multiple partitions as a comma-separated list (e.g., 'gpu1,gpu2').")
 
-    if cpu_partition is None:
-        return None
+    while True:
+        gpu_partition = ui.prompt_text("SLURM GPU partition:", default=gpu_default, validate=validate_partition)
+        if gpu_partition is None:
+            return None
 
-    ui.log("")
-    # Streamlined GRES auto-detection (with rich diagnostics)
-    # -------------------------------------------------------------
+        # Normalize comma-separated list (remove spaces between partitions for SLURM)
+        gpu_partition = ",".join(slurm.normalize_partition_list(gpu_partition))
 
-    # Perform GRES detection using business logic
-    try:
-        gres_info = slurm.detect_partition_gres([gpu_partition, cpu_partition])
-    except RuntimeError:
-        # sinfo failed but system has SLURM - fall back to manual prompting
-        ui.log("Falling back to manual GRES entry.")
-        gres_info = {
-            gpu_partition: {
-                "gpu_count": None,
-                "has_gpu_lines": True,
-                "unparseable_lines": [],
-                "is_heterogeneous": False,
-            },
-            cpu_partition: {
-                "gpu_count": None,
-                "has_gpu_lines": True,
-                "unparseable_lines": [],
-                "is_heterogeneous": False,
-            },
-        }
+        ui.log("")
+        ui.log(
+            "This is the partition for tasks that do not require GPUs. If you only have GPU partitions, use a low priority queue."
+        )
+
+        cpu_partition = ui.prompt_text("SLURM CPU partition:", default=final_cpu_default, validate=validate_partition)
+        if cpu_partition is None:
+            return None
+
+        # Normalize comma-separated list (remove spaces between partitions for SLURM)
+        cpu_partition = ",".join(slurm.normalize_partition_list(cpu_partition))
+
+        ui.log("")
+        try:
+            gres_info = slurm.detect_partition_gres([gpu_partition, cpu_partition])
+            break
+        except ValueError as e:
+            ui.log(f"Partition GRES conflict detected: {e}")
+            ui.log("Please enter partition lists with compatible GPU GRES settings.")
+            gpu_default = gpu_partition
+            final_cpu_default = cpu_partition
+            ui.log("")
+            continue
+        except RuntimeError:
+            # sinfo failed but system has SLURM - fall back to manual prompting
+            ui.log("Falling back to manual GRES entry.")
+            gres_info = {
+                gpu_partition: {
+                    "gpu_count": None,
+                    "has_gpu_lines": True,
+                    "unparseable_lines": [],
+                    "is_heterogeneous": False,
+                },
+                cpu_partition: {
+                    "gpu_count": None,
+                    "has_gpu_lines": True,
+                    "unparseable_lines": [],
+                    "is_heterogeneous": False,
+                },
+            }
+            break
 
     gpu_partition_info = gres_info[gpu_partition]
     cpu_partition_info = gres_info[cpu_partition]

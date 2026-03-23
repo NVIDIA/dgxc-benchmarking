@@ -1,12 +1,13 @@
 # Overview
+
 This recipe provides a method and script to produce performance results for the NCCL benchmarks. The SLURM sbatch script launches a collection of benchmarking jobs to evaluate an Infiniband network.
 
 ## System Requirements
+
 - SLURM workload manager
 - NVIDIA H100-DGX GPUs
 - InfiniBand (IB) networking with Quantum2 switches and CX7 NICs
 - CUDA toolkit
-
 
 # Performance Measurement and Analysis
 
@@ -89,6 +90,7 @@ $LLMB_WORKLOAD/experiments/microbenchmark_nccl/
 </details>
 
 Expected results folder structure:
+
 ```text
 $LLMB_WORKLOAD/experiments/
 └── microbenchmark_nccl/
@@ -107,17 +109,21 @@ $LLMB_WORKLOAD/experiments/
             └── ... (similar folders/files for other tests)
 ```
 
-
 # Prerequisites
 
+Run `install.sh` first so required tools (including `uv`) are available before NCCL setup generates `launch.sh`.
+
 ## Set environment variable (optional)
+
 Only needed if not using `llmb-run`, or if you want to run `llmb-run` from outside `$LLMB_INSTALL`.
+
 ```shell
 # Set your installation directory
 export LLMB_INSTALL=<path to your installation directory> (e.g. /lustre/llmb/)
 ```
 
 # Run NCCL Benchmarks
+
 ## Quick Start (llmb-run)
 
 `llmb-run` uses your SLURM settings from install to submit jobs.
@@ -127,12 +133,9 @@ export LLMB_INSTALL=<path to your installation directory> (e.g. /lustre/llmb/)
 cd $LLMB_INSTALL
 
 # Run a benchmark (scale = total GPUs)
-llmb-run submit -w microbenchmark_nccl -s nccl --dtype fp8 --scale <NUM_GPUS>
+llmb-run submit -w microbenchmark_nccl --scale <NUM_GPUS>
 
 # Examples
-llmb-run submit -w microbenchmark_nccl -s nccl --dtype fp8 --scale 2
-llmb-run submit -w microbenchmark_nccl -s nccl --dtype fp8 --scale 16
+llmb-run submit -w microbenchmark_nccl --scale 2
+llmb-run submit -w microbenchmark_nccl --scale 16
 ```
-
-Note: `--dtype` and `-s` are placeholders required by llmb-run today; NCCL ignores them. We plan to remove these in a future release.
-

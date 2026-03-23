@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -249,7 +249,7 @@ while IFS= read -r file; do
     esac
 
     # Check if file contains any of the new-format timing data
-    has_timing_data=$(grep -q -E "elapsed time per iteration \(ms\):|MODEL_TFLOP\/s\/GPU" "$file" 2> /dev/null && echo "yes" || echo "no")
+    has_timing_data=$(grep -q -E "elapsed time per iteration \(ms\):|MODEL_TFLOP\/s\/GPU|TFLOP\/s\/GPU" "$file" 2> /dev/null && echo "yes" || echo "no")
 
     if [[ $has_timing_data == "yes" ]]; then
         # AWK now:
@@ -257,10 +257,28 @@ while IFS= read -r file; do
         #  - stores it into last_tflop,
         #  - when an iteration line with "elapsed time per iteration (ms)" is found within the iteration window,
         #    it pairs that elapsed time with the last_tflop (and then clears last_tflop so it isn't reused).
-        result=$(awk -v min_iter="$MIN_ITERATION" -v max_iter="$MAX_ITERATION" '
-            # capture the numeric token right before MODEL_TFLOP/s/GPU (handles 1234.5 and scientific)
-            /MODEL_TFLOP\/s\/GPU/ {
-                if (match($0, /([0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?)\s*MODEL_TFLOP\/s\/GPU/, tf_arr)) {
+        # For LoRA runs, extract num_gpus and gbs from filename for formula-based TFLOPS computation
+        is_lora=false
+        num_gpus_val=0
+        gbs_val=0
+        if [[ $filename == *lora* ]]; then
+            is_lora=true
+            num_gpus_val=$(echo "$filename" | awk 'match($0, /gpus([0-9]+)/, a) {print a[1]}')
+            gbs_val=$(echo "$filename" | awk 'match($0, /gbs([0-9]+)/, a) {print a[1]}')
+        fi
+
+        result=$(awk -v min_iter="$MIN_ITERATION" -v max_iter="$MAX_ITERATION" \
+            -v is_lora="$is_lora" -v num_gpus="$num_gpus_val" -v gbs="$gbs_val" '
+            # LoRA: parse seq_length from log for formula-based TFLOPS (log value is incorrect for LoRA)
+            is_lora == "true" && /seq.?length/ && seq_len == 0 {
+                if (match($0, /seq.?length[^0-9]*([0-9]+)/, arr)) {
+                    seq_len = arr[1] + 0
+                }
+            }
+
+            # non-LoRA: capture the numeric token right before MODEL_TFLOP/s/GPU (handles 1234.5 and scientific)
+            is_lora != "true" && (/MODEL_TFLOP\/s\/GPU/ || /TFLOP\/s\/GPU/) {
+                if (match($0, /([0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?)\s*(MODEL_TFLOP\/s\/GPU|TFLOP\/s\/GPU)/, tf_arr)) {
                     last_tflop = tf_arr[1]
                 }
             }
@@ -275,7 +293,7 @@ while IFS= read -r file; do
                             time_values[count] = ms_arr[1] + 0
                             time_sum += time_values[count]
 
-                            if (last_tflop != "") {
+                            if (is_lora != "true" && last_tflop != "") {
                                 tflops_count++
                                 tflops_values[tflops_count] = last_tflop + 0
                                 tflops_sum += tflops_values[tflops_count]
@@ -302,7 +320,37 @@ while IFS= read -r file; do
                         tflops_mean_str = "-"
                         tflops_std_str = "-"
 
-                        if (tflops_count > 0) {
+                        if (is_lora == "true" && seq_len > 0 && num_gpus > 0 && gbs > 0) {
+                            # Llama3 70B LoRA model constants
+                            hs = 8192; n_layers = 80; n_heads = 64
+                            nqg = 8; ffn_hs = 28672; vocab_size = 128256
+
+                            # seq_length-specific stats (from Megatron-Bridge PR #2416)
+                            avg_seqlen2 = 0; avg_tokens = 0
+                            if (seq_len == 4096) { avg_seqlen2 = 842603; avg_tokens = 4096 }
+                            else if (seq_len == 2048) { avg_seqlen2 = 488991; avg_tokens = 2030 }
+
+                            if (avg_seqlen2 > 0) {
+                                model_flops_frozen = avg_tokens * n_layers * hs^2 * (12 + 12*nqg/n_heads + 18*ffn_hs/hs + 6*vocab_size/(n_layers*hs))
+                                model_flops_unfrozen = n_layers * hs^2 * (12 * avg_seqlen2 / hs)
+                                total_flops = gbs * (model_flops_frozen * (2.0/3.0) + model_flops_unfrozen)
+
+                                for (i = 1; i <= count; i++) {
+                                    step_time_s = time_values[i] / 1000.0
+                                    tflops_i = total_flops / (num_gpus * step_time_s * 1e12)
+                                    tflops_values[i] = tflops_i
+                                    tflops_sum += tflops_i
+                                }
+                                tflops_count = count
+
+                                tflops_mean = tflops_sum / tflops_count
+                                tflops_var = 0
+                                for (i = 1; i <= tflops_count; i++) tflops_var += (tflops_values[i] - tflops_mean)^2
+                                tflops_std = (tflops_count > 1 ? sqrt(tflops_var / (tflops_count - 1)) : 0)
+                                tflops_mean_str = sprintf("%.2f", tflops_mean)
+                                tflops_std_str = sprintf("%.2f", tflops_std)
+                            }
+                        } else if (tflops_count > 0) {
                             tflops_mean = tflops_sum / tflops_count
                             tflops_var = 0
                             for (i = 1; i <= tflops_count; i++) tflops_var += (tflops_values[i] - tflops_mean)^2

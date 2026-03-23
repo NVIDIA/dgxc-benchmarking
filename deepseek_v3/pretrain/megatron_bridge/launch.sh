@@ -44,7 +44,7 @@ DTYPE=${DTYPE,,}
 if [[ $GPU_TYPE == "h100" ]]; then
     FW_VERSION=25.09.00
 else
-    FW_VERSION=25.11.01
+    FW_VERSION=26.02.00
 fi
 
 if [[ $DTYPE == "fp8" ]]; then
@@ -52,7 +52,6 @@ if [[ $DTYPE == "fp8" ]]; then
         FP8_RECIPE="mx"
         COMPUTE_TYPE=${DTYPE}_${FP8_RECIPE}
     else
-        FP8_RECIPE="cs"
         COMPUTE_TYPE=${DTYPE}
     fi
 else
@@ -71,7 +70,7 @@ GPU_METRICS_ENABLED=${ENABLE_GPU_METRICS:-false}
 GPU_METRICS_ENABLED=${GPU_METRICS_ENABLED,,}
 ENABLE_VBOOST=${ENABLE_VBOOST:-false}
 ENABLE_VBOOST=${ENABLE_VBOOST,,}
-TIME_LIMIT=${TIME_LIMIT:-"00:40:00"}
+TIME_LIMIT=${TIME_LIMIT:-"01:30:00"}
 MAX_STEPS=${MAX_STEPS:-50}
 
 # Handle additional SLURM parameters from environment variable
@@ -101,6 +100,12 @@ if [[ $PROFILE_ENABLED == "true" ]]; then
     CONFIG_OVERRIDES+=" --enable_nsys "
     CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
     CONFIG_OVERRIDES+=" --profiling_stop_step=$PROFILE_STOP_STEP "
+    if [[ $FW_VERSION == "26.02.00" ]]; then
+        PROFILE_RANKS=$(seq -s, 0 $((JOB_TOTAL_GPUS - 1)))
+        CONFIG_OVERRIDES+=" --profiling_ranks=$PROFILE_RANKS"
+        CONFIG_OVERRIDES+=" --nsys_trace=cuda "
+        CONFIG_OVERRIDES+=" --nsys_extra_args=--nvtx-domain-include=NCCL "
+    fi
     if [[ $GPU_METRICS_ENABLED == true ]]; then
         CONFIG_OVERRIDES+=" --profiling_gpu_metrics "
     fi
@@ -110,46 +115,29 @@ if [[ $ENABLE_VBOOST == true ]]; then
     CONFIG_OVERRIDES+=" --enable_vboost true "
 fi
 
-if [[ $GPU_TYPE == "gb300" ]]; then
-    if [[ $JOB_TOTAL_GPUS -eq 128 ]]; then
-        EP=32
-    else
-        EP=64
+if [[ $GPU_TYPE == "gb300" ]] || [[ $GPU_TYPE == "gb200" ]]; then
+    if [[ $GPU_TYPE == "gb300" ]] && [[ $JOB_TOTAL_GPUS -eq 128 ]]; then
+        CONFIG_OVERRIDES+=" -pp 4 "
+        CONFIG_OVERRIDES+=" -vp 4 "
+        CONFIG_OVERRIDES+=" -ep 32 "
+        CONFIG_OVERRIDES+=" --recompute_modules=mla_up_proj "
     fi
-    PP=4
-    VP=4
-    TP=1
+    if [[ $JOB_TOTAL_GPUS -eq 64 ]]; then
+        CONFIG_OVERRIDES+=" -tp 1 "
+        CONFIG_OVERRIDES+=" -pp 1 "
+        CONFIG_OVERRIDES+=" -vp None "
+        CONFIG_OVERRIDES+=" -ep 64 "
+        CONFIG_OVERRIDES+=" --hidden_size 1024 "
+    fi
     GPUS_PER_NODE=4
-elif [[ $GPU_TYPE == "gb200" ]]; then
-    EP=64
-    PP=4
-    VP=4
-    TP=1
-    GPUS_PER_NODE=4
-elif [[ $GPU_TYPE == "b200" ]]; then
-    EP=8
-    VP="None"
-    TP=1
-    PP=16
-    GPUS_PER_NODE=8
-elif [[ $GPU_TYPE == "h100" ]]; then
-    EP=64
-    PP=8
-    VP=4
-    TP=2
+elif [[ $GPU_TYPE == "b300" ]] || [[ $GPU_TYPE == "b200" ]] || [[ $GPU_TYPE == "h100" ]]; then
+    if [[ $GPU_TYPE == "b300" ]] && [[ $DTYPE == "bf16" ]]; then
+        CONFIG_OVERRIDES+=" -pp 8 "
+        CONFIG_OVERRIDES+=" -vp None "
+        CONFIG_OVERRIDES+=" --recompute_modules=mla_up_proj "
+    fi
     GPUS_PER_NODE=8
 fi
-
-MBS=1
-GBS=$((JOB_TOTAL_GPUS * 8))
-
-CONFIG_OVERRIDES+=" -tp $TP \
-  -ep $EP \
-  -pp $PP \
-  -vp $VP \
-  -mb $MBS \
-  -gb $GBS \
-"
 
 if [[ $GPU_TYPE == "h100" ]] && [[ $DTYPE == "fp8" ]]; then
     CONFIG_OVERRIDES+=" --fp8_recipe cs "
@@ -157,21 +145,38 @@ fi
 
 # run command
 pushd $LLMB_WORKLOAD/Megatron-Bridge
-
-python3 scripts/performance/setup_experiment.py \
-    --container_image $IMAGE \
-    --compute_dtype $COMPUTE_TYPE \
-    --gpu $GPU_TYPE \
-    --num_gpus $JOB_TOTAL_GPUS \
-    --gpus_per_node $GPUS_PER_NODE \
-    --model_name deepseek \
-    --model_size v3 \
-    ${CONFIG_OVERRIDES} \
-    --account $SBATCH_ACCOUNT \
-    --partition $SBATCH_PARTITION \
-    --log_dir $NEMORUN_HOME \
-    --time_limit $TIME_LIMIT \
-    --max_steps $MAX_STEPS \
-    $SLURM_ARGS
-
+if [[ $FW_VERSION == "26.02.00" ]]; then
+    python3 scripts/performance/setup_experiment.py \
+        --container_image $IMAGE \
+        --compute_dtype $COMPUTE_TYPE \
+        --gpu $GPU_TYPE \
+        --num_gpus $JOB_TOTAL_GPUS \
+        --gpus_per_node $GPUS_PER_NODE \
+        --offline \
+        --model_family_name deepseek \
+        --model_recipe_name deepseek_v3 \
+        ${CONFIG_OVERRIDES} \
+        --account $SBATCH_ACCOUNT \
+        --partition $SBATCH_PARTITION \
+        --log_dir $NEMORUN_HOME \
+        --time_limit $TIME_LIMIT \
+        --max_steps $MAX_STEPS \
+        $SLURM_ARGS
+elif [[ $FW_VERSION == "25.09.00" ]]; then
+    python3 scripts/performance/setup_experiment.py \
+        --container_image $IMAGE \
+        --compute_dtype $COMPUTE_TYPE \
+        --gpu $GPU_TYPE \
+        --num_gpus $JOB_TOTAL_GPUS \
+        --gpus_per_node $GPUS_PER_NODE \
+        --model_name deepseek \
+        --model_size v3 \
+        ${CONFIG_OVERRIDES} \
+        --account $SBATCH_ACCOUNT \
+        --partition $SBATCH_PARTITION \
+        --log_dir $NEMORUN_HOME \
+        --time_limit $TIME_LIMIT \
+        --max_steps $MAX_STEPS \
+        $SLURM_ARGS
+fi
 popd

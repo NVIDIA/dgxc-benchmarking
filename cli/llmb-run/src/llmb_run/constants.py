@@ -27,15 +27,8 @@ SLURM_OUTPUT_PATTERN = 'slurm-%j.out'
 # File patterns
 METADATA_FILE_PATTERN = '**/metadata.yaml'
 
-# Model parameter mappings
-NEMO_MODEL_PARAMS = {
-    "mbs": "model.micro_batch_size",
-    "gbs": "model.global_batch_size",
-    "cp": "model.context_parallel_size",
-    "tp": "model.tensor_model_parallel_size",
-    "pp": "model.pipeline_model_parallel_size",
-    "vp": "model.virtual_pipeline_model_parallel_size",
-}
+# NVLink switch domain size for GB200/GB300 (GB200 NVL72 = 18 nodes x 4 GPUs)
+NVLINK_DOMAIN_SIZE = 18
 
 # Mapping of GPU types to number of GPUs per node
 GPU_TYPE_TO_NUM_GPUS = {

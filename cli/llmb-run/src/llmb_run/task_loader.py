@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -28,6 +28,7 @@ import re
 
 import yaml
 
+from llmb_run.config_manager import ClusterConfig
 from llmb_run.metadata_utils import parse_workload_name
 from llmb_run.tasks import WorkloadTask
 from llmb_run.workload_validator import (
@@ -45,7 +46,7 @@ def merge_dicts(default, override):
     return result
 
 
-def get_tasks_simple(workloads, input_file, cluster_config=None):
+def get_tasks_simple(workloads, input_file, cluster_config: ClusterConfig | None = None):
     """Parse a simple format task file into workload configurations.
 
     The simple format is designed for quick task specification with minimal syntax.
@@ -98,7 +99,7 @@ def get_tasks_simple(workloads, input_file, cluster_config=None):
                 if header_match := header_re.match(line):
                     workload_key, model_size = header_match.groups()
 
-                    cluster_gpu_type = cluster_config.get('launcher', {}).get('gpu_type') if cluster_config else None
+                    cluster_gpu_type = cluster_config.gpu_type if cluster_config else None
                     is_valid, error_type, error_msg, suggestions = validate_workload_with_details(
                         workloads, workload_key, model_size, cluster_gpu_type, cluster_config
                     )
@@ -108,7 +109,7 @@ def get_tasks_simple(workloads, input_file, cluster_config=None):
                             model_size,
                             None,
                             None,
-                            cluster_config.get('launcher', {}).get('gpu_type') if cluster_config else None,
+                            cluster_config.gpu_type if cluster_config else None,
                             error_type,
                             error_msg,
                             suggestions,
@@ -148,15 +149,20 @@ def get_tasks_simple(workloads, input_file, cluster_config=None):
     return workload_tasks
 
 
-def get_tasks_yaml(input_file):
+def get_tasks_yaml(input_file, workloads=None, cluster_config: ClusterConfig | None = None):
     """Parse an advanced YAML workload file.
 
     The expected YAML format is described in the README.md file.
 
+    Args:
+        input_file: Path to YAML file
+        workloads: Dictionary of workloads for validation (optional)
+        cluster_config: Cluster configuration for validation (optional)
+
     Returns a dictionary in the same nested format:
       { workload: { model_size: [ list of tuples ] } }
     where each tuple is:
-      (workload, model_size, dtype, scale, profile, env_overrides, model_overrides)
+      (workload, model_size, dtype, scale, profile, proxy, env_overrides, model_overrides)
     """
     with open(input_file, 'r') as f:
         data = yaml.safe_load(f)
@@ -213,6 +219,7 @@ def get_tasks_yaml(input_file):
             repeats = task.get("repeats", top_repeats)
             profile = task.get("profile", False)
             add_profile = task.get("add_profile", top_add_profile)
+            proxy = task.get("proxy", False)
 
             # Validate that only one profiling mode is set
             if profile and add_profile:
@@ -252,11 +259,13 @@ def get_tasks_yaml(input_file):
                         # Add regular performance runs
                         for _r in range(repeats):
                             tasks_list.append(
-                                (workload_key, model_size, dtype, scale, profile, task_env, current_params)
+                                (workload_key, model_size, dtype, scale, profile, proxy, task_env, current_params)
                             )
                         # Add one profiling run if requested
                         if add_profile:
-                            tasks_list.append((workload_key, model_size, dtype, scale, True, task_env, current_params))
+                            tasks_list.append(
+                                (workload_key, model_size, dtype, scale, True, proxy, task_env, current_params)
+                            )
             else:
                 # No sweeps needed, proceed as before
                 current_params = default_params.copy()
@@ -264,19 +273,23 @@ def get_tasks_yaml(input_file):
                 for dtype, scale in itertools.product(dtypes, scales):
                     # Add regular performance runs
                     for _r in range(repeats):
-                        tasks_list.append((workload_key, model_size, dtype, scale, profile, task_env, current_params))
+                        tasks_list.append(
+                            (workload_key, model_size, dtype, scale, profile, proxy, task_env, current_params)
+                        )
                     # Add one profiling run if requested
                     if add_profile:
-                        tasks_list.append((workload_key, model_size, dtype, scale, True, task_env, current_params))
+                        tasks_list.append(
+                            (workload_key, model_size, dtype, scale, True, proxy, task_env, current_params)
+                        )
 
         workload_tasks.setdefault(workload_key, {})[model_size] = tasks_list
     return workload_tasks
 
 
-def get_tasks_wrapper(workloads, input_file, cluster_config=None):
+def get_tasks_wrapper(workloads, input_file, cluster_config: ClusterConfig | None = None):
     """Dispatcher for task parsing based on file extension."""
     if input_file.endswith(('.yaml', '.yml')):
-        return get_tasks_yaml(input_file)
+        return get_tasks_yaml(input_file, workloads, cluster_config)
     else:
         return get_tasks_simple(workloads, input_file, cluster_config)
 
@@ -307,9 +320,11 @@ def flatten_yaml_tasks(advanced_tasks):
     for workload in advanced_tasks:
         for model_size in advanced_tasks[workload]:
             for t in advanced_tasks[workload][model_size]:
-                # t is a tuple: (workload, model_size, dtype, scale, profile, env_overrides, model_overrides)
-                w, m, dt, scale, profile, env_overrides, model_overrides = t
+                # t is a tuple: (workload, model_size, dtype, scale, profile, proxy, env_overrides, model_overrides)
+                w, m, dt, scale, profile, proxy, env_overrides, model_overrides = t
                 task_list.append(
-                    WorkloadTask(w, m, dt, scale, profile, env_overrides=env_overrides, model_overrides=model_overrides)
+                    WorkloadTask(
+                        w, m, dt, scale, profile, proxy, env_overrides=env_overrides, model_overrides=model_overrides
+                    )
                 )
     return task_list

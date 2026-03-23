@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -19,11 +19,18 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-# High-level launcher configuration (moved from current workloads section)
-launcher:
-  llmb_repo: "/path/to/LLMB_REPO"
-  llmb_install: "/lustre/path/to/LLMB_INSTALL"
-  gpu_type: "gb200"  # GPU_TYPE assumed to be homogeneous environment.
+# Cluster configuration schema version.
+schema_version: 2
+
+# High-level cluster configuration.
+llmb_repo: "/path/to/LLMB_REPO"
+llmb_install: "/lustre/path/to/LLMB_INSTALL"
+gpu_type: "gb200"  # GPU_TYPE assumed to be homogeneous environment.
+# cluster_name: "cluster_name"        # Optional
+
+# Install metadata.
+install:
+  node_architecture: "aarch64"  # Node architecture for profiling/tool mount selection.
 
 # Any environment variables that should apply to all workloads.
 environment:
@@ -31,10 +38,12 @@ environment:
 
 slurm:
   account: "all_the_fairshare"
-  gpu_partition: "partition"
-  gpu_gres: null
-  cpu_partition: "partition"
-  cpu_gres: null
+  gpu:
+    partition: "gpu_partition"
+    gres: 8
+  cpu:
+    partition: "cpu_partition"
+    gres: null  # Optional: unset inherited GPU request for dedicated CPU queues.
 
 workloads:
   # List of workloads that are installed on the cluster, auto populated by installer.

@@ -1,7 +1,7 @@
 # Workload-Specific Tools
 
 > **For Recipe Developers**: This guide shows how to configure workload-specific tool versions in your metadata.yaml files.
-> 
+>
 > **See Also**: [Recipe Development Guide](recipe_guide.md) for complete metadata.yaml documentation.
 
 ## Overview
@@ -13,6 +13,7 @@ The `tools` section in metadata.yaml allows you to specify tool versions (like n
 **Only use the tools section when you need a specific tool version.** If your container's tools work fine, don't add this section.
 
 Common use cases:
+
 - Specific nsys version required for profiling on certain GPU types
 - Different GPU types need different tool versions
 - Container's tool version has bugs or missing features
@@ -20,6 +21,7 @@ Common use cases:
 ## Supported Tools
 
 Currently supported:
+
 - `nsys` - NVIDIA Nsight Systems profiler
 - `cuda_cupti_lib` - CUDA CUPTI library (profiling workaround)
 
@@ -93,7 +95,8 @@ run:
           scales: [256]
 ```
 
-**Result**: 
+**Result**:
+
 - h100: Downloads nsys 2025.5.1.120
 - b200: Downloads nsys 2025.5.1.120
 
@@ -128,7 +131,8 @@ run:
       model_configs: [...]
 ```
 
-**Result**: 
+**Result**:
+
 - h100: Downloads nsys 2025.1.1
 - gb300: Downloads nsys 2025.6.0
 - b200: Downloads nsys 2025.5.1.120 (default)
@@ -166,7 +170,8 @@ run:
       model_configs: [...]
 ```
 
-**Result**: 
+**Result**:
+
 - h100: Downloads nsys 2025.1.1
 - gb300: Downloads nsys 2025.6.0
 - b200: Uses container nsys (no download)
@@ -177,11 +182,13 @@ run:
 ### Directory Structure
 
 Tools are installed to:
+
 ```text
 $LLMB_INSTALL/tools/{tool_name}/{version}/
 ```
 
 For example:
+
 ```text
 $LLMB_INSTALL/tools/nsys/2025.1.1/bin/nsys
 $LLMB_INSTALL/tools/nsys/2025.5.1.120/bin/nsys
@@ -216,7 +223,7 @@ Skipping nsys 2025.1.1 -- already installed at $LLMB_INSTALL/tools/nsys/2025.1.1
 The tool resolution follows this priority:
 
 1. **GPU explicitly listed** in `by_gpu` → use that version
-2. **`default` key exists** → use default version  
+2. **`default` key exists** → use default version
 3. **Neither exists** → use container version (no download)
 
 ## Tips and Best Practices
@@ -229,14 +236,17 @@ The tool resolution follows this priority:
 ## Troubleshooting
 
 ### Tool not downloading
+
 - Check that the tool is in the `by_gpu` list or `default` is set
 - Verify GPU type spelling matches supported types
 
 ### Wrong version installed
+
 - Check that GPU type is spelled correctly in `by_gpu`
 - Verify version string matches exactly
 
 ### Download fails
+
 - Verify version string is valid for the tool
 - Check network connectivity and download URL accessibility
 - Ensure the login node has internet access
@@ -271,6 +281,7 @@ tools:
 ### Installation Result
 
 Extracts to `$LLMB_INSTALL/tools/cuda_cupti_lib/{version}/lib/` with files like:
+
 - `libcupti.so.2025.3.1` (versioned library)
 - `libcupti.so` (symlink)
 
@@ -285,6 +296,7 @@ Check the [NVIDIA Nsight Systems download page](https://developer.nvidia.com/nsi
 Version format: `YYYY.MM.PATCH.BUILD-COMMIT`
 
 Examples:
+
 - `2025.1.1.118-3638078`
 - `2025.5.1.121-3638078`
 
@@ -295,6 +307,6 @@ CUPTI libraries are distributed as part of CUDA toolkit redistributables.
 Version format: `MAJOR.MINOR.PATCH`
 
 Examples:
+
 - `13.0.85`
 - `12.6.77`
-

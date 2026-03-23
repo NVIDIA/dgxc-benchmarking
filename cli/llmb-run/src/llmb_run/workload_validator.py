@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -45,6 +45,7 @@ from enum import Enum
 
 import yaml
 
+from llmb_run.config_manager import ClusterConfig
 from llmb_run.constants import EXCLUDE_WORKLOADS, METADATA_FILE_PATTERN
 from llmb_run.metadata_utils import normalize_model_dtype_config
 
@@ -60,11 +61,11 @@ class ValidationErrorType(Enum):
     SCALE_NOT_SUPPORTED = "scale_not_supported"
 
 
-def get_workloads(config):
+def get_workloads(config: ClusterConfig):
     """Get a list of all workload metadata files in the repo. Extract relevant data."""
     workloads = {}
     # Get list of metadata files using the new launcher config structure
-    llmb_repo = config['launcher']['llmb_repo']
+    llmb_repo = config.llmb_repo
     metadata_files = glob.glob(f"{llmb_repo}/{METADATA_FILE_PATTERN}", recursive=True)
 
     for meta_file in metadata_files:
@@ -110,14 +111,24 @@ def get_workloads(config):
 
 
 def validate_workload_with_details(
-    workloads, workload_key, model_size, cluster_gpu_type, cluster_config, dtype=None, scale=None
+    workloads, workload_key, model_size, cluster_gpu_type, cluster_config, dtype=None, scale=None, proxy=False
 ):
     """Validate workload and return detailed results for better error reporting.
+
+    Args:
+        workloads: Dictionary of all workloads
+        workload_key: Workload identifier
+        model_size: Model size string
+        cluster_gpu_type: GPU type of the cluster
+        cluster_config: Cluster configuration
+        dtype: Optional data type to validate
+        scale: Optional scale to validate
+        proxy: If True, validate against proxy_scales instead of production scales
 
     Returns:
         tuple: (is_valid: bool, error_type: ValidationErrorType, error_message: str, suggestions: list)
     """
-    installed_workloads = cluster_config.get('workloads', {}).get('installed', [])
+    installed_workloads = cluster_config.workloads.installed
 
     if workload_key not in workloads:
         # Filter suggestions by installed workloads
@@ -173,15 +184,22 @@ def validate_workload_with_details(
             return False, ValidationErrorType.DTYPE_NOT_SUPPORTED, error_msg, supported_dtypes
 
     if scale is not None:
-        # Resolve scales and exact_scales. If per-dtype mapping exists and dtype is provided,
-        # validate against per-dtype scales; otherwise fall back to model-level scales.
+        # Determine which scale field to validate against based on mode
+        scale_field = 'proxy_scales' if proxy else 'scales'
+
+        # Get scales from per-dtype config if available, otherwise from model-level config
         if dtype is not None and dtypes_mapping:
             dtype_cfg = dtypes_mapping.get(dtype, {})
-            supported_scales = dtype_cfg.get('scales', [])
-            exact_scales = dtype_cfg.get('exact_scales', model_config.get('exact_scales', False))
+            supported_scales = dtype_cfg.get(scale_field, [])
+            exact_scales = True if proxy else dtype_cfg.get('exact_scales', model_config.get('exact_scales', False))
         else:
-            supported_scales = model_config.get('scales', [])
-            exact_scales = model_config.get('exact_scales', False)
+            supported_scales = model_config.get(scale_field, [])
+            exact_scales = True if proxy else model_config.get('exact_scales', False)
+
+        # Error if proxy mode but no proxy scales defined
+        if proxy and not supported_scales:
+            error_msg = f"No proxy scales defined for {workload_key}_{model_size}."
+            return False, ValidationErrorType.SCALE_NOT_SUPPORTED, error_msg, []
 
         try:
             scale_int = int(scale)
@@ -265,7 +283,7 @@ def print_avail_workloads(workloads, cluster_config, cluster_gpu_type=None, verb
         logger.info("No workloads found.")
         return True
 
-    installed_workloads = cluster_config.get('workloads', {}).get('installed', [])
+    installed_workloads = cluster_config.workloads.installed
 
     # Filter by workload_filter if specified
     if workload_filter:
@@ -322,6 +340,7 @@ def print_avail_workloads(workloads, cluster_config, cluster_gpu_type=None, verb
                             'dtypes': set(),
                             'per_dtype_scales': {},  # dtype -> set[int]
                             'per_dtype_exact': {},  # dtype -> bool
+                            'per_dtype_proxy_scales': {},  # dtype -> set[int]
                             'gpu_types': set(),
                         }
 
@@ -329,10 +348,14 @@ def print_avail_workloads(workloads, cluster_config, cluster_gpu_type=None, verb
                     dtype_map = normalize_model_dtype_config(model_config)
                     if dtype_map:
                         model_details[model_size]['dtypes'].update(dtype_map.keys())
-                        # Track per-dtype scales and exactness for display
+                        # Track per-dtype scales, proxy_scales, and exactness for display
                         for _dt, cfg in dtype_map.items():
                             scales_ints = [int(s) for s in cfg.get('scales', [])]
+                            proxy_scales_ints = [int(s) for s in cfg.get('proxy_scales', [])]
                             model_details[model_size]['per_dtype_scales'].setdefault(_dt, set()).update(scales_ints)
+                            model_details[model_size]['per_dtype_proxy_scales'].setdefault(_dt, set()).update(
+                                proxy_scales_ints
+                            )
                             model_details[model_size]['per_dtype_exact'][_dt] = bool(cfg.get('exact_scales', False))
                     else:
                         dvalues = model_config.get('dtypes', [])
@@ -341,7 +364,11 @@ def print_avail_workloads(workloads, cluster_config, cluster_gpu_type=None, verb
                         model_details[model_size]['dtypes'].update(dvalues)
                         for _dt in dvalues:
                             scales_ints = [int(s) for s in model_config.get('scales', [])]
+                            proxy_scales_ints = [int(s) for s in model_config.get('proxy_scales', [])]
                             model_details[model_size]['per_dtype_scales'].setdefault(_dt, set()).update(scales_ints)
+                            model_details[model_size]['per_dtype_proxy_scales'].setdefault(_dt, set()).update(
+                                proxy_scales_ints
+                            )
                             model_details[model_size]['per_dtype_exact'][_dt] = bool(
                                 model_config.get('exact_scales', False)
                             )
@@ -357,10 +384,13 @@ def print_avail_workloads(workloads, cluster_config, cluster_gpu_type=None, verb
                     # Decide whether to aggregate or split per dtype
                     per_scales = details['per_dtype_scales']
                     per_exact = details['per_dtype_exact']
+                    per_proxy_scales = details['per_dtype_proxy_scales']
                     unique_scales = {tuple(sorted(per_scales.get(dt, set()))) for dt in dtype_list}
                     unique_exact = {bool(per_exact.get(dt, False)) for dt in dtype_list}
+                    unique_proxy_scales = {tuple(sorted(per_proxy_scales.get(dt, set()))) for dt in dtype_list}
+
                     if len(unique_scales) == 1 and len(unique_exact) == 1:
-                        # Aggregated output
+                        # Aggregated output for production scales
                         common_scales_tuple = next(iter(unique_scales))
                         common_scales = sorted(common_scales_tuple, key=int)
                         if not common_scales:
@@ -371,6 +401,14 @@ def print_avail_workloads(workloads, cluster_config, cluster_gpu_type=None, verb
                                 logger.info(f"    Scales: {scales_str} (exact matches only)")
                             else:
                                 logger.info(f"    Scales: {scales_str}")
+
+                        # Show proxy scales if available and consistent across dtypes
+                        if len(unique_proxy_scales) == 1:
+                            common_proxy_scales_tuple = next(iter(unique_proxy_scales))
+                            common_proxy_scales = sorted(common_proxy_scales_tuple, key=int)
+                            if common_proxy_scales:
+                                proxy_scales_str = ', '.join(map(str, common_proxy_scales))
+                                logger.info(f"    Proxy scales: {proxy_scales_str}")
                     else:
                         # Split per dtype for clarity
                         logger.info("    Scales by dtype:")
@@ -380,6 +418,15 @@ def print_avail_workloads(workloads, cluster_config, cluster_gpu_type=None, verb
                                 continue
                             exact_suffix = " (exact)" if per_exact.get(dt, False) else ""
                             logger.info(f"      {dt}: {', '.join(map(str, scales_for_dt))}{exact_suffix}")
+
+                        # Show proxy scales per dtype if any exist
+                        any_proxy_scales = any(per_proxy_scales.get(dt, set()) for dt in dtype_list)
+                        if any_proxy_scales:
+                            logger.info("    Proxy scales by dtype:")
+                            for dt in dtype_list:
+                                proxy_scales_for_dt = sorted(per_proxy_scales.get(dt, set()), key=int)
+                                if proxy_scales_for_dt:
+                                    logger.info(f"      {dt}: {', '.join(map(str, proxy_scales_for_dt))}")
                 else:
                     logger.info("    Data types: None specified")
                 if len(details['gpu_types']) > 1 or not cluster_gpu_type:

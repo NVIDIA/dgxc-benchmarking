@@ -29,7 +29,7 @@ import argparse
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from llmb_install.cluster.gpu import filter_workloads_by_gpu_type, resolve_gpu_overrides
 from llmb_install.config.cluster import create_cluster_config
@@ -46,6 +46,7 @@ from llmb_install.config.system import (
     save_install_state,
     save_system_config,
 )
+from llmb_install.constants import EXIT_CANCELLED, EXIT_ERROR
 from llmb_install.core.dependency import (
     _resolve_dependencies,
     clone_git_repos,
@@ -93,6 +94,7 @@ from llmb_install.utils.filesystem import (
 
 # Import utility functions from our new modules
 from llmb_install.utils.git import ensure_git_lfs_configured, is_git_lfs_installed
+from llmb_install.utils.install_summary import write_install_summary_file
 from llmb_install.utils.logging import get_logger, setup_logging
 
 
@@ -154,7 +156,7 @@ class Installer:
             return None
 
         # Validate required fields
-        required = ['launcher', 'workloads', 'slurm']
+        required = ['gpu_type', 'workloads', 'slurm', 'install']
         if not all(k in cluster_config for k in required):
             return None
 
@@ -190,7 +192,7 @@ class Installer:
             print("This directory contains a completed installation.")
             print("Please choose a different installation path, or remove the existing installation.")
             print("Future versions will support updating existing installations.")
-            raise SystemExit(1)
+            raise SystemExit(EXIT_ERROR)
         elif repo_state == 'orphaned':
             self.logger.debug(f"Removing orphaned directory: {repo_copy_path}")
             clean_repository_directory(repo_copy_path)
@@ -214,7 +216,7 @@ class Installer:
                 self.logger.debug(f"Repository copied from {self.root_dir} to {repo_copy_path}")
             except Exception as e:
                 print(f"Failed to copy repository: {e}")
-                raise SystemExit(1) from e
+                raise SystemExit(EXIT_ERROR) from e
         else:
             print(f"Using existing repository copy at {repo_copy_path}")
 
@@ -625,7 +627,7 @@ class Installer:
                     return True
                 else:
                     print("\nNo workloads selected. Exiting.")
-                    return True
+                    raise SystemExit(EXIT_CANCELLED)
 
             # Calculate which workloads still need to be installed (preserve completed progress)
             workloads_to_install = [w for w in new_config.selected_workloads if w not in completed_workloads]
@@ -712,7 +714,7 @@ class Installer:
             print("  - Ubuntu/Debian: sudo apt-get install git-lfs")
             print("  - RHEL/CentOS: sudo yum install git-lfs")
             print("\nFor more information, visit: https://git-lfs.com/")
-            raise SystemExit(1) from None
+            raise SystemExit(EXIT_ERROR) from None
 
         # Ensure Git LFS is configured
         try:
@@ -720,7 +722,7 @@ class Installer:
         except Exception as e:
             print(f"\nError: Failed to configure Git LFS: {e}")
             print("Please run 'git lfs install' manually and try again.")
-            raise SystemExit(1) from e
+            raise SystemExit(EXIT_ERROR) from e
 
         # Check for resume state BEFORE loading workloads
         # This ensures we load from the correct repository location (llmb_repo copy vs original)
@@ -751,7 +753,7 @@ class Installer:
                 cluster_config = self._detect_incremental_install(install_path_from_cwd)
                 if cluster_config:
                     # Running from LLMB_INSTALL - validate llmb_repo from cluster config
-                    llmb_repo = cluster_config.get('launcher', {}).get('llmb_repo')
+                    llmb_repo = cluster_config.get('llmb_repo')
                     if not llmb_repo or not os.path.exists(llmb_repo):
                         print(f"\nError: Existing installation at {install_path_from_cwd} cannot be used.")
                         if llmb_repo:
@@ -760,7 +762,7 @@ class Installer:
                             print("The cluster_config.yaml is missing the llmb_repo path.")
                         print("\nThis installation cannot be extended with additional workloads.")
                         print("Please start a fresh installation from a repository checkout.")
-                        raise SystemExit(1)
+                        raise SystemExit(EXIT_ERROR)
 
                     self.root_dir = llmb_repo
                     self.logger.debug(f"Incremental install detected: Loading workloads from {self.root_dir}")
@@ -802,18 +804,18 @@ class Installer:
                     print("\nClearing stale resume state...")
                     clear_install_state()
                     print("Resume state cleared. Please run llmb-install again to start fresh.")
-                    raise SystemExit(0)
+                    raise SystemExit(EXIT_CANCELLED)
                 else:
                     print("\nExiting. Resume state preserved at:")
                     print("  ~/.config/llmb/install_state.yaml")
                     print("\nTo manually clear state, run:")
                     print("  rm ~/.config/llmb/install_state.yaml")
-                    raise SystemExit(1)
+                    raise SystemExit(EXIT_CANCELLED)
             else:
                 # Fresh install but no workloads found in original repo
                 print(f"\nError: No workloads found in {self.root_dir}")
                 print("This repository may be missing workload metadata files.")
-                raise SystemExit(1)
+                raise SystemExit(EXIT_ERROR)
 
         # Check for resume before mode selection (single integration point)
         # Pass the already-loaded state to avoid redundant loading
@@ -916,7 +918,7 @@ class Installer:
             print("  llmb-install")
             print("\nThis will save your system settings (GPU type, SLURM config, etc.) for future express installs.")
             print("\nAlternatively, use '--play <config.yaml>' for full headless installation.")
-            raise SystemExit(1)
+            raise SystemExit(EXIT_ERROR)
 
         # Collect configuration using express mode with confirmation loop
         while True:
@@ -924,7 +926,7 @@ class Installer:
 
             if not config.selected_workloads:
                 print("\nNo workloads selected. Exiting.")
-                return
+                raise SystemExit(EXIT_CANCELLED)
 
             # Show configuration summary and get confirmation
             if self._confirm_configuration(config):
@@ -933,7 +935,7 @@ class Installer:
                 print("\nReturning to configuration...")
                 # Express mode doesn't support re-configuration, so this shouldn't happen
                 print("Configuration changes not supported in express mode.")
-                raise SystemExit(0)
+                raise SystemExit(EXIT_CANCELLED)
 
         # Update config.image_folder from args if provided, overriding system config
         if getattr(args, 'image_folder', None) is not None:
@@ -963,17 +965,17 @@ class Installer:
             if cluster_config:
                 # Note: llmb_repo validation already happened in run() method,
                 # but we validate again here for consistency and defensive programming
-                llmb_repo = cluster_config.get('launcher', {}).get('llmb_repo')
+                llmb_repo = cluster_config.get('llmb_repo')
                 if not llmb_repo or not os.path.exists(llmb_repo):
                     # This should have been caught in run(), but handle it anyway
                     print(f"\nError: Installation at {install_path_from_cwd} cannot be used.")
                     print("Cannot proceed with incremental install.")
-                    raise SystemExit(1)
+                    raise SystemExit(EXIT_ERROR)
 
                 # Offer incremental install
                 ui = self.create_ui(args.ui_mode)
                 installed_workloads = cluster_config.get('workloads', {}).get('installed', [])
-                gpu_type = cluster_config.get('launcher', {}).get('gpu_type', 'unknown')
+                gpu_type = cluster_config.get('gpu_type', 'unknown')
 
                 print(f"Found existing installation at {install_path_from_cwd} ({gpu_type.upper()})")
                 print(f"  Currently installed: {', '.join(installed_workloads)}")
@@ -991,11 +993,11 @@ class Installer:
                 # Handle cancellation (Ctrl-C returns None)
                 if choice is None:
                     print("\n\nInstallation cancelled by user.")
-                    raise SystemExit(0)
+                    raise SystemExit(EXIT_CANCELLED)
 
                 if choice == 'exit':
                     print("\nTo start a new installation, run llmb-install from a repository checkout.")
-                    raise SystemExit(0)
+                    raise SystemExit(EXIT_CANCELLED)
 
                 # Proceed with incremental install
                 config, existing_venvs = self._collect_incremental_configuration(
@@ -1032,7 +1034,7 @@ class Installer:
 
             if not config.selected_workloads:
                 print("\nNo workloads selected. Exiting.")
-                return
+                raise SystemExit(EXIT_CANCELLED)
 
             # Check if this is an incremental install (from entrance point #2)
             is_incremental = getattr(config, '_is_incremental', False)
@@ -1113,13 +1115,13 @@ class Installer:
             install_path = prompt_install_location(ui, default=defaults.get('install_path'))
             if not install_path:
                 print("\nInstallation cancelled.")
-                raise SystemExit(0)
+                raise SystemExit(EXIT_CANCELLED)
 
             # NEW: Check for existing installation (entrance point #2)
             cluster_config = self._detect_incremental_install(install_path)
             if cluster_config:
                 # Validate llmb_repo path before offering incremental install
-                llmb_repo = cluster_config.get('launcher', {}).get('llmb_repo')
+                llmb_repo = cluster_config.get('llmb_repo')
                 if not llmb_repo or not os.path.exists(llmb_repo):
                     print(f"\nError: Existing installation at {install_path} cannot be used.")
                     if llmb_repo:
@@ -1131,7 +1133,7 @@ class Installer:
                     continue  # Re-prompt for path
 
                 installed_workloads = cluster_config.get('workloads', {}).get('installed', [])
-                gpu_type = cluster_config.get('launcher', {}).get('gpu_type', 'unknown')
+                gpu_type = cluster_config.get('gpu_type', 'unknown')
 
                 print(f"\nExisting installation detected at {install_path} ({gpu_type.upper()})")
                 print(f"  Currently installed: {', '.join(installed_workloads)}")
@@ -1149,12 +1151,12 @@ class Installer:
                 # Handle cancellation (Ctrl-C returns None)
                 if choice is None:
                     print("\n\nInstallation cancelled by user.")
-                    raise SystemExit(0)
+                    raise SystemExit(EXIT_CANCELLED)
 
                 if choice == 'incremental':
                     # Reload workloads from the correct llmb_repo for this installation
                     # (Important for entrance point #2 - interactive path prompt)
-                    llmb_repo = cluster_config.get('launcher', {}).get('llmb_repo')
+                    llmb_repo = cluster_config.get('llmb_repo')
                     if llmb_repo and llmb_repo != self.root_dir:
                         self.logger.debug(f"Reloading workloads from installation's llmb_repo: {llmb_repo}")
                         self.root_dir = llmb_repo
@@ -1200,8 +1202,10 @@ class Installer:
         if image_folder and not image_folder_from_args:
             ui.log(f"Using saved image folder: {image_folder}")
 
-        # Skip repository setup if editing configuration with same install path
-        if override_defaults and override_defaults.llmb_repo and override_defaults.install_path == install_path:
+        # Skip repository setup if in record mode (no filesystem modifications needed)
+        if record_mode:
+            self.logger.debug("Record mode: Skipping repository setup and cache configuration")
+        elif override_defaults and override_defaults.llmb_repo and override_defaults.install_path == install_path:
             # Reuse existing repository location from previous configuration
             self.root_dir = override_defaults.llmb_repo
             self.logger.debug(f"Edit mode: Reusing existing repository at {self.root_dir}")
@@ -1210,7 +1214,8 @@ class Installer:
             self.root_dir = self._handle_repository_setup(install_path, dev_mode)
 
         # Setup cache directories now that we know the install path
-        setup_cache_directories(install_path, venv_type)
+        if not record_mode:
+            setup_cache_directories(install_path, venv_type)
 
         # Import prompt functions for SLURM and GPU configuration
         from llmb_install.ui.prompts.gpu import prompt_gpu_type as new_prompt_gpu_type
@@ -1234,7 +1239,7 @@ class Installer:
         slurm_config = new_prompt_slurm_info(ui, slurm_defaults, express_mode=False)
         if not slurm_config:
             print("\nInstallation cancelled.")
-            raise SystemExit(0)
+            raise SystemExit(EXIT_CANCELLED)
 
         gpu_type = new_prompt_gpu_type(ui, self.workloads, defaults.get('gpu_type'), express_mode=False)
 
@@ -1247,7 +1252,7 @@ class Installer:
         filtered_workloads = filter_workloads_by_gpu_type(self.workloads, gpu_type)
         if not filtered_workloads:
             print(f"No workloads found that support {gpu_type} GPU type.")
-            raise SystemExit(1)
+            raise SystemExit(EXIT_ERROR)
 
         # Add tools to workload list
         tools = filter_tools_from_workload_list(self.workloads)
@@ -1270,12 +1275,12 @@ class Installer:
         )
         if not selected:
             print("\nInstallation cancelled.")
-            raise SystemExit(0)
+            raise SystemExit(EXIT_CANCELLED)
 
         env_vars = prompt_environment_variables(ui, defaults.get('environment_vars'), express_mode=False)
         if env_vars is None:
             print("\nInstallation cancelled.")
-            raise SystemExit(0)
+            raise SystemExit(EXIT_CANCELLED)
         print()
 
         # Create configuration object
@@ -1355,7 +1360,7 @@ class Installer:
         slurm_config = new_prompt_slurm_info(ui, slurm_defaults, express_mode=False)
         if not slurm_config:
             print("\nConfiguration cancelled.")
-            raise SystemExit(0)
+            raise SystemExit(EXIT_CANCELLED)
 
         # 3. Install method - allow changes if system supports both
         install_method = prompt_install_method(ui, resume_config.install_method, express_mode=False)
@@ -1402,7 +1407,7 @@ class Installer:
 
             if selected is None:  # User cancelled
                 print("\nConfiguration cancelled.")
-                raise SystemExit(0)
+                raise SystemExit(EXIT_CANCELLED)
 
             # Check if user selected no workloads for incremental install (no new workloads to add)
             # In this case, skip remaining prompts and return early with empty selection
@@ -1441,7 +1446,7 @@ class Installer:
 
         if new_env_vars is None:  # User cancelled
             print("\nConfiguration cancelled.")
-            raise SystemExit(0)
+            raise SystemExit(EXIT_CANCELLED)
 
         # Merge new env vars
         env_vars = new_env_vars
@@ -1573,7 +1578,7 @@ class Installer:
             prompt_message = "Continue adding workloads to existing installation?"
             choices = [
                 {'name': 'Yes, resume incremental installation', 'value': 'yes'},
-                {'name': 'Clear resume state and return to incremental install menu', 'value': 'clear'},
+                {'name': 'Discard pending workloads and start over', 'value': 'clear'},
                 {'name': 'Edit configuration', 'value': 'edit'},
             ]
         elif allow_fresh_start:
@@ -1598,7 +1603,7 @@ class Installer:
             elif choice is None:
                 # User cancelled (Ctrl+C), exit installer
                 print("\nInstallation cancelled by user.")
-                raise SystemExit(0)
+                raise SystemExit(EXIT_CANCELLED)
             else:
                 print("Please select a valid option.")
 
@@ -1647,9 +1652,8 @@ class Installer:
                 existing_workload_venvs[wl_name] = wl_config['venv_path']
 
         # Extract locked configuration from cluster_config
-        launcher = cluster_config['launcher']
-        gpu_type = launcher['gpu_type']
-        llmb_repo = launcher.get('llmb_repo')
+        gpu_type = cluster_config['gpu_type']
+        llmb_repo = cluster_config.get('llmb_repo')
 
         # Extract install-specific metadata (new in Phase 1)
         install_metadata = cluster_config.get('install', {})
@@ -1668,12 +1672,14 @@ class Installer:
             print("The cluster_config.yaml is missing venv_type information.")
             print("\nThis installation appears to be corrupted or from an incompatible version.")
             print("Please start a fresh installation from a repository checkout.")
-            return (None, {})
+            raise SystemExit(EXIT_ERROR)
 
-        # Get node_architecture - prefer install section, fall back to launcher for backward compat
-        node_architecture_from_install = install_metadata.get('node_architecture')
-        node_architecture_from_launcher = launcher.get('node_architecture', 'x86_64')
-        node_architecture = node_architecture_from_install or node_architecture_from_launcher
+        # Get node_architecture from install section (canonical location)
+        node_architecture = install_metadata.get('node_architecture')
+        if not node_architecture:
+            print(f"\nError: Cannot determine node architecture for installation at {install_path}")
+            print("The cluster_config.yaml is missing node_architecture information.")
+            raise SystemExit(EXIT_ERROR)
 
         # Get image_folder - from install section or -i flag override
         image_folder_from_config = install_metadata.get('image_folder')
@@ -1696,8 +1702,8 @@ class Installer:
         print(f"🔒 Virtual Environment: {venv_type}")
         if slurm_config_dict:
             print(f"🔒 SLURM Account: {slurm_config_dict.get('account', 'N/A')}")
-            print(f"🔒 GPU Partition: {slurm_config_dict.get('gpu_partition', 'N/A')}")
-            print(f"🔒 CPU Partition: {slurm_config_dict.get('cpu_partition', 'N/A')}")
+            print(f"🔒 GPU Partition: {slurm_config_dict.get('gpu', {}).get('partition', 'N/A')}")
+            print(f"🔒 CPU Partition: {slurm_config_dict.get('cpu', {}).get('partition', 'N/A')}")
         if image_folder:
             flag_indicator = " (from -i flag)" if image_folder_from_flag else ""
             print(f"🔒 Image Folder: {image_folder}{flag_indicator}")
@@ -1719,7 +1725,7 @@ class Installer:
         if not available_workloads:
             print("No additional workloads available for this GPU type.")
             print("All supported workloads are already installed.")
-            return (None, {})
+            raise SystemExit(EXIT_CANCELLED)
 
         print(f"Available workloads to add ({len(available_workloads)}):")
 
@@ -1731,20 +1737,22 @@ class Installer:
                 allow_empty=False,
             )
         except KeyboardInterrupt:
-            # User cancelled - treat same as no selection
-            # This allows clean return rather than propagating the exception
-            return (None, {})
+            print("\n\nInstallation cancelled by user.")
+            raise SystemExit(EXIT_CANCELLED) from None
 
         if not selected:
-            return (None, {})
+            print("\nNo workloads selected. Exiting.")
+            raise SystemExit(EXIT_CANCELLED)
 
         # Build InstallConfig using existing settings
+        gpu_slurm = slurm_config_dict.get('gpu', {})
+        cpu_slurm = slurm_config_dict.get('cpu', {})
         slurm_obj = SlurmConfig(
             account=slurm_config_dict.get('account', ''),
-            gpu_partition=slurm_config_dict.get('gpu_partition', ''),
-            cpu_partition=slurm_config_dict.get('cpu_partition', ''),
-            gpu_partition_gres=slurm_config_dict.get('gpu_gres'),
-            cpu_partition_gres=slurm_config_dict.get('cpu_gres'),
+            gpu_partition=gpu_slurm.get('partition', ''),
+            cpu_partition=cpu_slurm.get('partition', ''),
+            gpu_partition_gres=gpu_slurm.get('gres'),
+            cpu_partition_gres=cpu_slurm.get('gres'),
         )
 
         config = InstallConfig(
@@ -1783,7 +1791,7 @@ class Installer:
         system_config = load_system_config()
         if not system_config:
             print("Error: System config disappeared between checks")
-            raise SystemExit(1)
+            raise SystemExit(EXIT_ERROR)
 
         ui = SimpleUI()  # Use simple UI for minimal prompts
 
@@ -1825,7 +1833,7 @@ class Installer:
             install_path = prompt_install_location(ui)
             if not install_path:
                 print("\nInstallation cancelled.")
-                raise SystemExit(0)
+                raise SystemExit(EXIT_CANCELLED)
 
         # NEW: Check for existing installation
         cluster_config = self._detect_incremental_install(install_path)
@@ -1836,7 +1844,7 @@ class Installer:
             print("  1. cd to the installation directory")
             print("  2. Run: llmb-install")
             print("  3. Select workloads to add")
-            raise SystemExit(0)
+            raise SystemExit(EXIT_ERROR)
 
         # Handle repository copying here (before other prompts)
         dev_mode = getattr(args, 'dev_mode', False)
@@ -1854,7 +1862,7 @@ class Installer:
                 filtered_workloads = filter_workloads_by_gpu_type(self.workloads, system_config.gpu_type)
                 if not filtered_workloads:
                     print(f"Error: No workloads available for GPU type: {system_config.gpu_type}")
-                    raise SystemExit(1)
+                    raise SystemExit(EXIT_ERROR)
 
                 # Add tools
                 tools = filter_tools_from_workload_list(self.workloads)
@@ -1875,7 +1883,7 @@ class Installer:
             filtered_workloads = filter_workloads_by_gpu_type(self.workloads, system_config.gpu_type)
             if not filtered_workloads:
                 print(f"Error: No workloads available for GPU type: {system_config.gpu_type}")
-                raise SystemExit(1)
+                raise SystemExit(EXIT_ERROR)
 
             # Add tools and resolve GPU overrides
             tools = filter_tools_from_workload_list(self.workloads)
@@ -1889,13 +1897,13 @@ class Installer:
                 ui.log(f"Installing Exemplar Cloud workloads from exemplar.yaml: {', '.join(selected)}")
             except ValueError as e:
                 print(f"Error: {e}")
-                raise SystemExit(1) from e
+                raise SystemExit(EXIT_ERROR) from e
         else:
             # Prompt for workload selection
             filtered_workloads = filter_workloads_by_gpu_type(self.workloads, system_config.gpu_type)
             if not filtered_workloads:
                 print(f"Error: No workloads available for GPU type: {system_config.gpu_type}")
-                raise SystemExit(1)
+                raise SystemExit(EXIT_ERROR)
 
             # Add tools
             tools = filter_tools_from_workload_list(self.workloads)
@@ -1907,7 +1915,7 @@ class Installer:
             selected, workload_selection_mode = prompt_workload_selection(ui, filtered_workloads)
             if not selected:
                 print("\nInstallation cancelled.")
-                raise SystemExit(0)
+                raise SystemExit(EXIT_CANCELLED)
 
         # Use saved environment variables (express mode doesn't prompt for these)
         env_vars = system_config.environment_vars.copy() if system_config.environment_vars else {}
@@ -1956,7 +1964,7 @@ class Installer:
         # Use already loaded workloads (avoid duplicate repo root messages)
         if not hasattr(self, 'workloads') or not self.workloads:
             print("Error: No workloads found in repository")
-            raise SystemExit(1)
+            raise SystemExit(EXIT_ERROR)
 
         # Try to load system config for GPU filtering
         system_config = None
@@ -2016,6 +2024,29 @@ class Installer:
                 for name in sorted(gpu_workloads[gpu_type]):
                     print(f"  {name}")
 
+    def _categorize_missing_workloads(self, workload_names: List[str]) -> Tuple[List[Tuple[str, List[str]]], List[str]]:
+        """Categorize workloads as unsupported (exist but wrong GPU) or not found (don't exist).
+
+        Args:
+            workload_names: List of workload names to categorize
+
+        Returns:
+            Tuple of (unsupported_workloads, not_found_workloads)
+            - unsupported_workloads: List of (name, supported_gpu_types)
+            - not_found_workloads: List of workload names
+        """
+        unsupported = []
+        not_found = []
+
+        for w in workload_names:
+            if w in self.workloads:
+                supported_gpus = sorted(self.workloads[w].get('run', {}).get('gpu_configs', {}).keys())
+                unsupported.append((w, supported_gpus))
+            else:
+                not_found.append(w)
+
+        return unsupported, not_found
+
     def _prepare_workloads(self, gpu_type: str, selected: List[str]) -> Dict[str, Dict[str, Any]]:
         """Prepare workloads for installation by filtering and resolving GPU overrides.
 
@@ -2029,8 +2060,19 @@ class Installer:
         # Filter workloads by GPU type
         filtered_workloads = filter_workloads_by_gpu_type(self.workloads, gpu_type)
         if not filtered_workloads:
-            print(f"No workloads found that support {gpu_type} GPU type.")
-            raise SystemExit(1)
+            # Early exit: No workloads in the repository support this GPU type
+            unsupported, _ = self._categorize_missing_workloads(selected)
+
+            if unsupported:
+                # User selected specific workloads - show what they support
+                print(f"\nError: The following workloads do not support gpu_type '{gpu_type}':")
+                for name, gpus in unsupported:
+                    print(f"  - {name} (supported gpu_types: {', '.join(gpus)})")
+            else:
+                # Generic error (e.g., empty selected list or invalid GPU type)
+                print(f"No workloads found that support {gpu_type} GPU type.")
+
+            raise SystemExit(EXIT_ERROR)
 
         # Add tools to workload list
         tools = filter_tools_from_workload_list(self.workloads)
@@ -2042,8 +2084,17 @@ class Installer:
         # Validate that all selected workloads exist
         missing_workloads = [w for w in selected if w not in filtered_workloads]
         if missing_workloads:
-            print(f"Error: Selected workloads not found: {missing_workloads}")
-            raise SystemExit(1)
+            unsupported, not_found = self._categorize_missing_workloads(missing_workloads)
+
+            if unsupported:
+                print(f"\nError: The following workloads do not support gpu_type '{gpu_type}':")
+                for name, gpus in unsupported:
+                    print(f"  - {name} (supported gpu_types: {', '.join(gpus)})")
+
+            if not_found:
+                print(f"\nError: The following workloads were not found: {not_found}")
+
+            raise SystemExit(EXIT_ERROR)
 
         return filtered_workloads
 
@@ -2067,12 +2118,14 @@ class Installer:
             workload_venvs: Mapping of workload names to their venv paths
             existing_cluster_config: Original cluster config for incremental installs
         """
-        if install_config.dev_mode:
-            return
-
         try:
             for workload_key in workload_keys:
-                completed_workloads.append(workload_key)
+                if workload_key not in completed_workloads:
+                    completed_workloads.append(workload_key)
+
+            if install_config.dev_mode:
+                return
+
             save_install_state(install_config, completed_workloads, workload_venvs, existing_cluster_config)
         except Exception as e:
             print(f"Warning: Could not update installation state: {e}")
@@ -2227,209 +2280,256 @@ class Installer:
         print("Installing Workloads")
         print("===================")
 
-        for dep_hash, workload_keys in dep_groups.items():
-            if dep_hash is None:  # Scripted workloads
-                print("\n[Individual Installations - Legacy Setup Scripts]")
-                print("-" * 60)
-                for workload_key in workload_keys:
-                    venv_path = install_scripted_workload(
-                        workload_key,
-                        filtered_workloads[workload_key],
-                        install_config.install_path,
-                        install_config.venv_type,
-                        install_config.environment_vars,
-                        install_config.gpu_type,
+        try:
+            for dep_hash, workload_keys in dep_groups.items():
+                if dep_hash is None:  # Scripted workloads
+                    print("\n[Individual Installations - Legacy Setup Scripts]")
+                    print("-" * 60)
+                    for workload_key in workload_keys:
+                        venv_path = install_scripted_workload(
+                            workload_key,
+                            filtered_workloads[workload_key],
+                            install_config.install_path,
+                            install_config.venv_type,
+                            install_config.environment_vars,
+                            install_config.gpu_type,
+                        )
+                        workload_venvs[workload_key] = venv_path
+                        # Execute any additional setup tasks defined for the workload
+                        run_setup_tasks(
+                            workload_key,
+                            filtered_workloads[workload_key],
+                            venv_path,
+                            install_config.venv_type,
+                            install_config.install_path,
+                            slurm_info,
+                            install_config.environment_vars,
+                            install_config.gpu_type,
+                        )
+
+                    # Track completion for scripted workloads (after all workloads in this group complete)
+                    self._save_installation_progress(
+                        install_config, workload_keys, completed_workloads, workload_venvs, existing_cluster_config
                     )
-                    workload_venvs[workload_key] = venv_path
-                    # Execute any additional setup tasks defined for the workload
-                    run_setup_tasks(
-                        workload_key,
-                        filtered_workloads[workload_key],
-                        venv_path,
-                        install_config.venv_type,
+
+                else:  # New dependency management
+                    venvs_dir = os.path.join(install_config.install_path, "venvs")
+
+                    # Use unified naming scheme for all dependency-based workloads
+                    venv_name = f"venv_{dep_hash[:12]}"
+
+                    # Check for existing venv with matching hash (incremental install)
+                    from llmb_install.environment.venv_utils import should_reuse_venv
+
+                    existing_venv_path = should_reuse_venv(dep_hash, venv_to_hash, validate_exists=True)
+
+                    if existing_venv_path:
+                        # REUSE EXISTING VENV
+                        if len(workload_keys) == 1:
+                            workload_key = workload_keys[0]
+                            print("\n[Reusing Existing Virtual Environment]")
+                            print(f"Installing: {workload_key}")
+                            print(f"Matching venv: {existing_venv_path}")
+                            print("-" * 70)
+                        else:
+                            print("\n[Reusing Existing Shared Virtual Environment]")
+                            print(f"Installing workloads: {', '.join(sorted(workload_keys))}")
+                            print(f"Matching venv: {existing_venv_path}")
+                            print("-" * 70)
+
+                        # Validate venv actually exists before reusing
+                        if not os.path.exists(existing_venv_path):
+                            print(f"\nError: Venv path in cluster config does not exist: {existing_venv_path}")
+                            print("Installation appears incomplete or corrupted.")
+                            print("Please verify the installation directory or reinstall.")
+                            raise SystemExit(EXIT_ERROR)
+
+                        venv_path = existing_venv_path
+
+                        # Clone repos and set up workload directories (dependencies already installed)
+                        # Each workload resolves its own deps for cloning, since clone-only
+                        # deps are excluded from the grouping hash and may differ per workload.
+                        for workload_key in workload_keys:
+                            workload_dir = os.path.join(install_config.install_path, "workloads", workload_key)
+                            os.makedirs(workload_dir, exist_ok=True)
+
+                            workload_deps = _resolve_dependencies(filtered_workloads[workload_key])
+                            git_deps_to_clone = workload_deps.get('git', {}) if workload_deps else {}
+
+                            if git_deps_to_clone:
+                                clone_git_repos(git_deps_to_clone, workload_dir, install_config.install_path)
+
+                            workload_venvs[workload_key] = venv_path
+
+                        # Run post-install scripts and setup tasks
+                        env = get_venv_environment(venv_path, install_config.venv_type)
+                        env['LLMB_INSTALL'] = install_config.install_path
+                        env['MANUAL_INSTALL'] = 'false'
+                        env['GPU_TYPE'] = install_config.gpu_type
+                        if install_config.environment_vars:
+                            env_vars_str = {k: str(v) for k, v in install_config.environment_vars.items()}
+                            env.update(env_vars_str)
+
+                        for workload_key in workload_keys:
+                            workload_data = filtered_workloads[workload_key]
+                            setup_config = workload_data.get('setup', {})
+                            setup_script = setup_config.get('setup_script')
+                            if setup_script:
+                                # Set workload-specific env var
+                                env['LLMB_WORKLOAD'] = os.path.join(
+                                    install_config.install_path, "workloads", workload_key
+                                )
+                                source_dir = workload_data['path']
+                                run_post_install_script(setup_script, source_dir, env)
+                            # Execute new-style setup tasks (if any)
+                            run_setup_tasks(
+                                workload_key,
+                                workload_data,
+                                venv_path,
+                                install_config.venv_type,
+                                install_config.install_path,
+                                slurm_info,
+                                install_config.environment_vars,
+                                install_config.gpu_type,
+                            )
+
+                        print("✓ Workloads installed successfully (reused venv)")
+
+                    else:
+                        # CREATE NEW VENV (normal flow)
+                        if len(workload_keys) == 1:
+                            # If group has only one workload, it's still an individual installation
+                            workload_key = workload_keys[0]
+                            print("\n[Individual Installation - Unique Dependencies]")
+                            print(f"Installing: {workload_key}")
+                            print("-" * 60)
+                        else:
+                            # Otherwise, use a shared name for the group
+                            print("\n[Shared Virtual Environment Group]")
+                            print(f"Installing workloads: {', '.join(sorted(workload_keys))}")
+                            print("-" * 70)
+
+                        # 1. Create one venv for this group
+                        venv_path = os.path.join(venvs_dir, venv_name)
+                        create_virtual_environment(venv_path, install_config.venv_type)
+
+                        # Get resolved dependencies from the first workload for venv installation
+                        first_workload_key = workload_keys[0]
+                        dependencies = _resolve_dependencies(filtered_workloads[first_workload_key])
+
+                        if dependencies is None:
+                            print(f"Warning: No dependencies found for workload group containing {first_workload_key}")
+                            continue
+
+                        # 2. For each workload, create its folder and clone any repos that need to be local.
+                        # Each workload resolves its own deps for cloning, since clone-only
+                        # deps are excluded from the grouping hash and may differ per workload.
+                        for workload_key in workload_keys:
+                            workload_dir = os.path.join(install_config.install_path, "workloads", workload_key)
+                            os.makedirs(workload_dir, exist_ok=True)
+
+                            workload_deps = _resolve_dependencies(filtered_workloads[workload_key])
+                            git_deps_to_clone = workload_deps.get('git', {}) if workload_deps else {}
+
+                            if git_deps_to_clone:
+                                clone_git_repos(git_deps_to_clone, workload_dir, install_config.install_path)
+                            workload_venvs[workload_key] = venv_path
+
+                        # 3. Install dependencies into the shared venv using the first workload's clones
+                        env = get_venv_environment(venv_path, install_config.venv_type)
+                        env['LLMB_INSTALL'] = install_config.install_path
+                        env['MANUAL_INSTALL'] = 'false'
+                        env['GPU_TYPE'] = install_config.gpu_type
+                        if install_config.environment_vars:
+                            env_vars_str = {k: str(v) for k, v in install_config.environment_vars.items()}
+                            env.update(env_vars_str)  # Ensure things like HF_TOKEN are set in the setup env.
+
+                        first_workload_dir = os.path.join(install_config.install_path, "workloads", first_workload_key)
+                        install_dependencies(venv_path, install_config.venv_type, dependencies, first_workload_dir, env)
+
+                        # 4. For each workload, run post-install script (if any)
+                        for workload_key in workload_keys:
+                            workload_data = filtered_workloads[workload_key]
+                            setup_config = workload_data.get('setup', {})
+                            setup_script = setup_config.get('setup_script')
+                            if setup_script:
+                                # Set workload-specific env var
+                                env['LLMB_WORKLOAD'] = os.path.join(
+                                    install_config.install_path, "workloads", workload_key
+                                )
+                                source_dir = workload_data['path']
+                                run_post_install_script(setup_script, source_dir, env)
+                            # Execute new-style setup tasks (if any)
+                            run_setup_tasks(
+                                workload_key,
+                                workload_data,
+                                venv_path,
+                                install_config.venv_type,
+                                install_config.install_path,
+                                slurm_info,
+                                install_config.environment_vars,
+                                install_config.gpu_type,
+                            )
+
+                    # Track completion for dependency-based workloads (after all workloads in this group complete)
+                    self._save_installation_progress(
+                        install_config, workload_keys, completed_workloads, workload_venvs, existing_cluster_config
+                    )
+        except Exception:
+            # Save config for successfully completed workloads
+            if completed_workloads:
+                try:
+                    all_venvs = dict(existing_workload_venvs) if existing_workload_venvs else {}
+                    all_venvs.update(workload_venvs)
+                    create_cluster_config(
                         install_config.install_path,
+                        self.root_dir,
+                        completed_workloads,
                         slurm_info,
                         install_config.environment_vars,
                         install_config.gpu_type,
+                        install_config.venv_type,
+                        all_venvs,
+                        node_architecture=install_config.node_architecture,
+                        install_method=install_config.install_method,
+                        image_folder=install_config.image_folder,
+                        existing_cluster_config=existing_cluster_config,
                     )
+                except Exception as config_err:
+                    self.logger.debug(f"Could not save partial cluster config: {config_err}")
 
-                # Track completion for scripted workloads (after all workloads in this group complete)
-                self._save_installation_progress(
-                    install_config, workload_keys, completed_workloads, workload_venvs, existing_cluster_config
-                )
+            failed_workloads = [w for w in install_config.selected_workloads if w not in completed_workloads]
+            write_install_summary_file(
+                status='failed',
+                install_path=install_config.install_path,
+                failed_workloads=failed_workloads,
+                logger=self.logger,
+            )
+            print("\n" + "=" * 60)
+            print("INSTALLATION INCOMPLETE")
+            print("=" * 60)
+            if completed_workloads:
+                print(f"  Succeeded: {', '.join(completed_workloads)}")
+            print(f"  Failed:    {', '.join(failed_workloads)}")
+            print("")
+            print("Re-run the installer to resume. You can retry or skip")
+            print("the failed workloads.")
+            print("=" * 60)
+            raise
 
-            else:  # New dependency management
-                venvs_dir = os.path.join(install_config.install_path, "venvs")
-
-                # Use unified naming scheme for all dependency-based workloads
-                venv_name = f"venv_{dep_hash[:12]}"
-
-                # Check for existing venv with matching hash (incremental install)
-                from llmb_install.environment.venv_utils import should_reuse_venv
-
-                existing_venv_path = should_reuse_venv(dep_hash, venv_to_hash, validate_exists=True)
-
-                if existing_venv_path:
-                    # REUSE EXISTING VENV
-                    if len(workload_keys) == 1:
-                        workload_key = workload_keys[0]
-                        print("\n[Reusing Existing Virtual Environment]")
-                        print(f"Installing: {workload_key}")
-                        print(f"Matching venv: {existing_venv_path}")
-                        print("-" * 70)
-                    else:
-                        print("\n[Reusing Existing Shared Virtual Environment]")
-                        print(f"Installing workloads: {', '.join(sorted(workload_keys))}")
-                        print(f"Matching venv: {existing_venv_path}")
-                        print("-" * 70)
-
-                    # Validate venv actually exists before reusing
-                    if not os.path.exists(existing_venv_path):
-                        print(f"\nError: Venv path in cluster config does not exist: {existing_venv_path}")
-                        print("Installation appears incomplete or corrupted.")
-                        print("Please verify the installation directory or reinstall.")
-                        raise SystemExit(1)
-
-                    venv_path = existing_venv_path
-
-                    # Get dependencies for repo cloning (no installation needed)
-                    first_workload_key = workload_keys[0]
-                    dependencies = _resolve_dependencies(filtered_workloads[first_workload_key])
-
-                    if dependencies is None:
-                        print(f"Warning: No dependencies found for workload group containing {first_workload_key}")
-                        continue
-
-                    # Clone repos and set up workload directories (dependencies already installed)
-                    git_deps_to_clone = dependencies.get('git', {})
-
-                    for workload_key in workload_keys:
-                        workload_dir = os.path.join(install_config.install_path, "workloads", workload_key)
-                        os.makedirs(workload_dir, exist_ok=True)
-
-                        # Clone all necessary git repos into the workload dir
-                        if git_deps_to_clone:
-                            clone_git_repos(git_deps_to_clone, workload_dir, install_config.install_path)
-
-                        workload_venvs[workload_key] = venv_path
-
-                    # Run post-install scripts and setup tasks
-                    env = get_venv_environment(venv_path, install_config.venv_type)
-                    env['LLMB_INSTALL'] = install_config.install_path
-                    env['MANUAL_INSTALL'] = 'false'
-                    env['GPU_TYPE'] = install_config.gpu_type
-                    if install_config.environment_vars:
-                        env_vars_str = {k: str(v) for k, v in install_config.environment_vars.items()}
-                        env.update(env_vars_str)
-
-                    for workload_key in workload_keys:
-                        workload_data = filtered_workloads[workload_key]
-                        setup_config = workload_data.get('setup', {})
-                        setup_script = setup_config.get('setup_script')
-                        if setup_script:
-                            # Set workload-specific env var
-                            env['LLMB_WORKLOAD'] = os.path.join(install_config.install_path, "workloads", workload_key)
-                            source_dir = workload_data['path']
-                            run_post_install_script(setup_script, source_dir, env)
-                        # Execute new-style setup tasks (if any)
-                        run_setup_tasks(
-                            workload_key,
-                            workload_data,
-                            venv_path,
-                            install_config.venv_type,
-                            install_config.install_path,
-                            slurm_info,
-                            install_config.environment_vars,
-                            install_config.gpu_type,
-                        )
-
-                    print("✓ Workloads installed successfully (reused venv)")
-
-                else:
-                    # CREATE NEW VENV (normal flow)
-                    if len(workload_keys) == 1:
-                        # If group has only one workload, it's still an individual installation
-                        workload_key = workload_keys[0]
-                        print("\n[Individual Installation - Unique Dependencies]")
-                        print(f"Installing: {workload_key}")
-                        print("-" * 60)
-                    else:
-                        # Otherwise, use a shared name for the group
-                        print("\n[Shared Virtual Environment Group]")
-                        print(f"Installing workloads: {', '.join(sorted(workload_keys))}")
-                        print("-" * 70)
-
-                    # 1. Create one venv for this group
-                    venv_path = os.path.join(venvs_dir, venv_name)
-                    create_virtual_environment(venv_path, install_config.venv_type)
-
-                    # Get resolved dependencies from the first workload in the group
-                    first_workload_key = workload_keys[0]
-                    dependencies = _resolve_dependencies(filtered_workloads[first_workload_key])
-
-                    if dependencies is None:
-                        print(f"Warning: No dependencies found for workload group containing {first_workload_key}")
-                        continue
-
-                    # 2. For each workload, create its folder and clone any repos that need to be local
-                    git_deps_to_clone = dependencies.get('git', {})
-
-                    for workload_key in workload_keys:
-                        workload_dir = os.path.join(install_config.install_path, "workloads", workload_key)
-                        os.makedirs(workload_dir, exist_ok=True)
-
-                        # Clone all necessary git repos into the workload dir
-                        clone_git_repos(git_deps_to_clone, workload_dir, install_config.install_path)
-                        workload_venvs[workload_key] = venv_path
-
-                    # 3. Install dependencies into the shared venv using the first workload's clones
-                    env = get_venv_environment(venv_path, install_config.venv_type)
-                    env['LLMB_INSTALL'] = install_config.install_path
-                    env['MANUAL_INSTALL'] = 'false'
-                    env['GPU_TYPE'] = install_config.gpu_type
-                    if install_config.environment_vars:
-                        env_vars_str = {k: str(v) for k, v in install_config.environment_vars.items()}
-                        env.update(env_vars_str)  # Ensure things like HF_TOKEN are set in the setup env.
-
-                    first_workload_dir = os.path.join(install_config.install_path, "workloads", first_workload_key)
-                    install_dependencies(venv_path, install_config.venv_type, dependencies, first_workload_dir, env)
-
-                    # 4. For each workload, run post-install script (if any)
-                    for workload_key in workload_keys:
-                        workload_data = filtered_workloads[workload_key]
-                        setup_config = workload_data.get('setup', {})
-                        setup_script = setup_config.get('setup_script')
-                        if setup_script:
-                            # Set workload-specific env var
-                            env['LLMB_WORKLOAD'] = os.path.join(install_config.install_path, "workloads", workload_key)
-                            source_dir = workload_data['path']
-                            run_post_install_script(setup_script, source_dir, env)
-                        # Execute new-style setup tasks (if any)
-                        run_setup_tasks(
-                            workload_key,
-                            workload_data,
-                            venv_path,
-                            install_config.venv_type,
-                            install_config.install_path,
-                            slurm_info,
-                            install_config.environment_vars,
-                            install_config.gpu_type,
-                        )
-
-                # Track completion for dependency-based workloads (after all workloads in this group complete)
-                self._save_installation_progress(
-                    install_config, workload_keys, completed_workloads, workload_venvs, existing_cluster_config
-                )
+        # Merge venvs from prior completed workloads with current run
+        all_venvs = dict(existing_workload_venvs) if existing_workload_venvs else {}
+        all_venvs.update(workload_venvs)
 
         create_cluster_config(
             install_config.install_path,
             self.root_dir,
-            install_config.selected_workloads,
+            completed_workloads,  # Includes all workloads (prior + current)
             slurm_info,
             install_config.environment_vars,
             install_config.gpu_type,
             install_config.venv_type,
-            workload_venvs,
+            all_venvs,  # Includes venvs for all completed workloads
             node_architecture=install_config.node_architecture,
             install_method=install_config.install_method,
             image_folder=install_config.image_folder,
@@ -2473,9 +2573,13 @@ class Installer:
                 print(f"  {line.ljust(max_len)}  ")
             print(f"{border}\n")
 
-        print("To run llmb-run from any directory, set the LLMB_INSTALL environment variable:")
+        print("To run benchmarks now:")
+        print(f"  cd {install_config.install_path}")
+        print("  llmb-run")
+        print("")
+        print("Optional: set LLMB_INSTALL if you want to run llmb-run from any directory:")
         print(f"  export LLMB_INSTALL={install_config.install_path}")
-        print("Consider adding this to your shell profile (e.g., ~/.bashrc or ~/.bash_aliases) for permanent access.")
+        print("Add this to your shell profile (e.g., ~/.bashrc or ~/.bash_aliases) if useful.")
 
         # Clear install state on successful completion
         if not install_config.dev_mode:
@@ -2483,3 +2587,10 @@ class Installer:
                 clear_install_state()
             except Exception as e:
                 print(f"Warning: Could not clear installation state: {e}")
+
+        write_install_summary_file(
+            status='success',
+            install_path=install_config.install_path,
+            async_jobs_submitted=async_jobs_submitted,
+            logger=self.logger,
+        )

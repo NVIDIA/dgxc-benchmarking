@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -27,7 +27,7 @@ import subprocess
 import sys
 from typing import Dict, Optional
 
-from llmb_install.constants import MAX_PYTHON_VERSION_TUPLE, MIN_PYTHON_VERSION_TUPLE
+from llmb_install.constants import EXIT_CANCELLED, MAX_PYTHON_VERSION_TUPLE, MIN_PYTHON_VERSION_TUPLE
 from llmb_install.environment.detector import (
     detect_virtual_environment,
     get_system_python_path,
@@ -104,7 +104,7 @@ def prompt_environment_type(ui: UIInterface, default: Optional[str] = None, expr
     if can_use_venv:
         options.append("venv")
     if can_use_conda:
-        options.append("conda")
+        options.append({"name": "conda (deprecated)", "value": "conda"})
 
     if not options:
         if not python_compatible and current_python_version is not None:
@@ -117,12 +117,15 @@ def prompt_environment_type(ui: UIInterface, default: Optional[str] = None, expr
             ui.log("Please install at least one of: uv, venv (Python standard library), or conda.")
         raise SystemExit(1)
 
+    def _option_value(opt):
+        return opt["value"] if isinstance(opt, dict) else opt
+
     # Display available options
     if len(options) > 1:
         ui.log("Multiple environment options available:")
 
         # Use provided default if valid, otherwise no default
-        if default and default in options:
+        if default and any(_option_value(o) == default for o in options):
             selected_default = default
             if express_mode:
                 ui.log(f"Using saved default: {default}")
@@ -133,9 +136,9 @@ def prompt_environment_type(ui: UIInterface, default: Optional[str] = None, expr
         if selected is None:
             # User cancelled (Ctrl-C)
             ui.log("\nInstallation cancelled by user.")
-            raise SystemExit(0)
+            raise SystemExit(EXIT_CANCELLED)
     else:
-        selected = options[0]
+        selected = _option_value(options[0])
         ui.log(f"Using {selected} (only available option)")
 
     # Validate selection and warn if necessary

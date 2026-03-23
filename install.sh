@@ -38,6 +38,7 @@ echo "════════════════════════�
 echo "🚀 LLM Benchmarking Collection - Quick Setup"
 echo "════════════════════════════════════════════════════════════════════"
 echo "This script will:"
+echo "  • Install uv $PINNED_UV_VERSION if not already present"
 echo "  • Set up a Python $RECOMMENDED_PYTHON_VERSION virtual environment (if needed)"
 echo "  • Install essential tools (llmb-run, llmb-install)"
 echo "  • Launch the main installer for benchmark configurations"
@@ -51,21 +52,15 @@ UV_WAS_ADDED_TO_PATH=false
 CREATED_VENV=false
 VENV_DIR=""
 MULTI_UV_WARNING_SHOWN=false
+REPLACED_INCOMPATIBLE_ENV=false
+SUMMARY_FILE=""
+SUMMARY_INSTALL_PATH=""
+SUMMARY_FAILED_WORKLOADS=""
+SUMMARY_ASYNC_JOBS_SUBMITTED=""
 
 # Function to check if a command exists
 command_exists() {
     command -v "$1" &> /dev/null
-}
-
-# Prompt user for a yes/no response; auto-selects default when not on a terminal
-prompt_user() {
-    local prompt="$1" default="$2"
-    if [ -t 0 ]; then
-        read -p "$prompt" -n 1 -r
-        echo
-    else
-        REPLY="$default"
-    fi
 }
 
 # Prefer user-level uv install path when present.
@@ -168,34 +163,64 @@ in_virtual_env() {
     [[ -n ${VIRTUAL_ENV:-} ]] || [[ -n ${CONDA_DEFAULT_ENV:-} ]]
 }
 
-# Reusable message functions
-show_uv_benefits() {
-    echo "⚡ uv - Recommended Python Package Manager"
-    echo ""
-    echo "  • Makes benchmark installations 2-5x faster"
-    echo "  • Automatically installs Python $RECOMMENDED_PYTHON_VERSION (required for recipes)"
-    echo "  • Lightweight tool (~10MB) with better dependency resolution"
-    echo "  • This release supports uv versions up to $PINNED_UV_VERSION for recipe compatibility"
-    echo ""
-    echo "⚠️ Note: Will download installer from https://astral.sh/uv (official source)"
+# Create a temporary summary file for llmb-install to write structured output.
+init_summary_file() {
+    local tmp_path=""
+    tmp_path=$(mktemp "${TMPDIR:-/tmp}/llmb-install-summary.XXXXXX" 2> /dev/null || true)
+    if [[ -n $tmp_path ]]; then
+        SUMMARY_FILE="$tmp_path"
+        export LLMB_INSTALL_SUMMARY_FILE="$SUMMARY_FILE"
+    fi
 }
 
-show_python_error() {
-    local current_version=$(get_python_version python3)
-    echo "❌ Cannot proceed: Python $current_version found (requires $MIN_PYTHON_VERSION)"
+# shellcheck disable=SC2317 # Invoked indirectly via trap
+cleanup_summary_file() {
+    if [[ -n $SUMMARY_FILE && -f $SUMMARY_FILE ]]; then
+        rm -f "$SUMMARY_FILE"
+    fi
+}
+
+# Parse summary file emitted by llmb-install (key=value format).
+load_installer_summary() {
+    local summary_path="$1"
+    [[ -n $summary_path && -f $summary_path ]] || return 0
+
+    while IFS= read -r line || [[ -n $line ]]; do
+        line="${line%$'\r'}"
+        [[ -z $line ]] && continue
+        [[ $line == *=* ]] || continue
+
+        local key="${line%%=*}"
+        # ${line#*=} strips through the first '=' only, so values containing '=' are safe.
+        local value="${line#*=}"
+
+        case "$key" in
+            version) ;;
+            install_path)
+                SUMMARY_INSTALL_PATH="$value"
+                ;;
+            failed_workloads)
+                SUMMARY_FAILED_WORKLOADS="$value"
+                ;;
+            async_jobs_submitted)
+                SUMMARY_ASYNC_JOBS_SUBMITTED="$value"
+                ;;
+        esac
+    done < "$summary_path"
+}
+
+show_uv_install_error() {
+    echo "❌ uv installation failed and uv is required."
     echo ""
-    echo "Options:"
-    echo "  1. Install 'uv $PINNED_UV_VERSION' (recommended) - automatically installs Python $RECOMMENDED_PYTHON_VERSION"
-    echo "  2. Use conda to create a Python $RECOMMENDED_PYTHON_VERSION environment"
-    echo "  3. Use pyenv or upgrade system Python to $RECOMMENDED_PYTHON_VERSION+"
+    echo "   Install uv manually:"
+    echo "     curl -LsSf https://astral.sh/uv/${PINNED_UV_VERSION}/install.sh | sh"
     echo ""
-    echo "Re-run this script after installing one of the above."
+    echo "   Re-run this script after installing uv."
     exit 1
 }
 
 # Install pinned uv version required by recipes in this release
 install_uv() {
-    echo "Installing uv $PINNED_UV_VERSION..."
     if ! curl -LsSf "https://astral.sh/uv/${PINNED_UV_VERSION}/install.sh" | sh; then
         echo "❌ uv installation failed"
         return 1
@@ -252,90 +277,41 @@ ensure_compatible_uv() {
 setup_environment() {
     echo "🔍 Checking Python environment..."
 
-    # Check if we're already in a good virtual environment
-    if in_virtual_env && check_python_version python3; then
-        local py_ver=$(get_python_version python3)
-        echo "✅ Using existing virtual environment with Python $py_ver"
-
-        # Offer uv installation for faster benchmark installs (optional for existing good venvs)
-        if ! command_exists uv; then
-            echo ""
-            echo "💡 Optional: Install 'uv $PINNED_UV_VERSION' for 2-5x faster benchmark installs"
-            echo "   (Your current environment is ready and will work fine)"
-            echo "   Downloads from https://astral.sh/uv (official source)"
-            echo ""
-            prompt_user "Install 'uv $PINNED_UV_VERSION' (recommended)? [y/N]: " "n"
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                install_uv
-            fi
-        elif ! ensure_compatible_uv; then
-            echo "❌ Cannot continue without a compatible uv installation."
-            exit 1
-        fi
-        return 0
-    fi
-
-    # Need to create a new virtual environment
-    echo "📦 Setting up new virtual environment..."
-
-    # If uv is available, use it (can handle any Python version)
+    # Step 1: Ensure uv is present (required)
     if command_exists uv; then
         if ! ensure_compatible_uv; then
             echo "❌ Cannot continue without a compatible uv installation."
             exit 1
         fi
-        echo "Using uv to create virtual environment with Python $RECOMMENDED_PYTHON_VERSION..."
-        create_venv_with_uv
-        return 0
-    fi
-
-    # No uv available - check system Python version
-    local sys_python_ver=$(get_python_version python3)
-
-    if check_python_version python3; then
-        # System Python is 3.12+ - offer choice
-        echo ""
-        echo "💡 Your system has Python $sys_python_ver"
-        echo ""
-        show_uv_benefits
-        echo ""
-        echo "Or use your system Python $sys_python_ver (will work, but slower installs)"
-        echo ""
-        prompt_user "Install 'uv $PINNED_UV_VERSION'? [Y/n]: " "y"
-
-        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-            if install_uv; then
-                create_venv_with_uv
-                return 0
-            else
-                echo "⚠️  uv installation failed, falling back to system Python..."
-            fi
-        fi
-
-        # Use system Python
-        echo "📦 Creating virtual environment with system Python $sys_python_ver..."
-        create_venv_with_python
-        return 0
     else
-        # System Python is too old - uv is required
-        echo ""
-        echo "⚠️  Your system has Python $sys_python_ver (recipes require $MIN_PYTHON_VERSION)"
-        echo ""
-        show_uv_benefits
-        echo ""
-        prompt_user "Install 'uv $PINNED_UV_VERSION'? [Y/n]: " "y"
-
-        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-            if install_uv; then
-                create_venv_with_uv
-                return 0
-            fi
-            # install_uv already printed error message
-            show_python_error
-        else
-            show_python_error
+        echo "Installing uv $PINNED_UV_VERSION (required)..."
+        if ! install_uv; then
+            show_uv_install_error
         fi
     fi
+
+    # Step 2: Check if we're already in a good virtual environment
+    local started_in_virtual_env=false
+    if in_virtual_env; then
+        started_in_virtual_env=true
+    fi
+
+    if [[ $started_in_virtual_env == true ]] && check_python_version python3; then
+        local py_ver=$(get_python_version python3)
+        echo "✅ Using existing virtual environment with Python $py_ver"
+        return 0
+    fi
+
+    # Step 3: Need a new virtual environment
+    if [[ $started_in_virtual_env == true ]]; then
+        REPLACED_INCOMPATIBLE_ENV=true
+        echo "⚠️  Active virtual environment is not compatible with recipe requirements."
+        echo "   A new Python $RECOMMENDED_PYTHON_VERSION environment will be created for this install."
+    fi
+
+    echo "📦 Setting up new virtual environment..."
+    echo "Using uv to create virtual environment with Python $RECOMMENDED_PYTHON_VERSION..."
+    create_venv_with_uv
 }
 
 # Create venv with uv (can specify Python version)
@@ -355,84 +331,92 @@ create_venv_with_uv() {
     echo "✅ Virtual environment created and activated (Python $RECOMMENDED_PYTHON_VERSION)"
 }
 
-# Create venv with system python3
-create_venv_with_python() {
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    VENV_DIR="$(realpath "$SCRIPT_DIR/../llmb_venv")"
-
-    echo "Creating virtual environment with system Python..."
-
-    # Temporarily disable strict error handling for venv creation
-    set +e
-    python3 -m venv --clear "$VENV_DIR"
-    venv_result=$?
-    set -e
-
-    if [ $venv_result -ne 0 ]; then
-        echo "❌ Failed to create venv with python3 (exit code: $venv_result)"
-        echo "DEBUG: Testing what went wrong..."
-        echo "Python path: $(command -v python3)"
-        echo "Python version: $(python3 --version)"
-        echo "Target directory: $VENV_DIR"
-        echo "Testing ensurepip: $(python3 -m ensurepip --help > /dev/null 2>&1 && echo 'OK' || echo 'FAILED')"
-        exit 1
+# Summarize environment and key next steps after running llmb-install
+print_postinstall_summary() {
+    local installer_status="$1"
+    local status_label="FAILED"
+    if [[ $installer_status -eq 0 ]]; then
+        status_label="SUCCESS"
     fi
 
-    source "$VENV_DIR/bin/activate"
-    CREATED_VENV=true
-    echo "✅ Virtual environment created and activated"
-}
-# Summarize environment and key next steps before launching llmb-install
-print_preinstall_summary() {
     echo ""
     echo "════════════════════════════════════════════════════════════════════"
-    echo "✅ Environment Ready"
+    echo "📋 Install Summary: $status_label"
     echo "════════════════════════════════════════════════════════════════════"
     echo ""
+
+    if [[ $installer_status -eq 0 ]]; then
+        echo "✅ Main installer completed."
+    else
+        echo "❌ Installation did not complete."
+    fi
+    echo ""
+
+    if [[ -n $SUMMARY_INSTALL_PATH ]]; then
+        echo "📁 Install Location (LLMB_INSTALL)"
+        echo "   $SUMMARY_INSTALL_PATH"
+        echo ""
+    fi
+
+    if [[ $installer_status -ne 0 && -n $SUMMARY_FAILED_WORKLOADS ]]; then
+        local failed_display="${SUMMARY_FAILED_WORKLOADS//,/, }"
+        echo "❌ Failed Workloads"
+        echo "   $failed_display"
+        echo ""
+    fi
 
     # Show venv info if we created one
     if [[ $CREATED_VENV == true ]]; then
-        echo "📦 Virtual Environment Created"
-        echo "   Location: $VENV_DIR"
-        echo "   Python:   $(get_python_version python3)"
+        if [[ $REPLACED_INCOMPATIBLE_ENV == true ]]; then
+            echo "📦 New Virtual Environment Created (existing env incompatible)"
+            echo "   Your active environment did not match Python $MIN_PYTHON_VERSION+ requirements."
+        else
+            echo "📦 Virtual Environment Created"
+        fi
+        echo "   $VENV_DIR"
         echo ""
-        echo "   To use this environment in future sessions:"
-        echo "   source $VENV_DIR/bin/activate"
+        if [[ $installer_status -eq 0 ]]; then
+            echo "   Activate this environment before running benchmarks:"
+            echo "   source $VENV_DIR/bin/activate"
+        else
+            echo "   Faster retry (skip tool reinstall):"
+            echo "   source $VENV_DIR/bin/activate"
+            echo "   llmb-install"
+        fi
         echo ""
     fi
 
-    # Show PATH info if we added uv to PATH
-    if [[ $UV_INSTALLED_NOW == true && $UV_WAS_ADDED_TO_PATH == true ]]; then
-        echo "⚡ uv Installed"
-        echo "   Location: $HOME/.local/bin/uv"
-        echo ""
-        echo "⚠️  IMPORTANT: Add uv to your PATH permanently"
-        echo "   Add this line to ~/.bashrc (or ~/.zshrc):"
-        echo ""
-        # shellcheck disable=SC2016 # Intentionally showing literal $PATH for user to copy
+    # Show PATH info only if we changed PATH for this session
+    if [[ $UV_WAS_ADDED_TO_PATH == true ]]; then
+        echo "⚡ uv Path Update"
+        echo "   uv is available in this shell."
+        echo "   To keep it available in new shells, add:"
         echo "   export PATH=\"$HOME/.local/bin:\$PATH\""
+        echo "   (add to ~/.bashrc or ~/.zshrc)"
         echo ""
-        echo "   Then run: source ~/.bashrc"
-        echo ""
-        echo "   Note: uv is already available in this session."
+    elif [[ $UV_INSTALLED_NOW == true ]]; then
+        echo "⚡ uv Installed"
+        echo "   uv $PINNED_UV_VERSION is installed and ready."
         echo ""
     fi
 
-    echo "────────────────────────────────────────────────────────────────────"
-    if [ -t 0 ]; then
-        echo "Press Enter to launch the main installer..."
-        read -r
+    if [[ $SUMMARY_ASYNC_JOBS_SUBMITTED == "true" ]]; then
+        echo "⏳ Background Jobs Submitted"
+        echo "   Some setup tasks are running as SLURM jobs."
+        echo "   Check status with: squeue -u $USER"
+        echo ""
     fi
-    echo ""
+
+    if [[ $installer_status -ne 0 ]]; then
+        echo "────────────────────────────────────────────────────────────────────"
+        echo "Address the error shown above, then retry:"
+        echo "  ./install.sh"
+        echo ""
+    fi
 }
+
 # Main execution: Setup environment and validate tools
 setup_environment
-
-# Determine which package manager to use for installation
-USE_UV=false
-if command_exists uv; then
-    USE_UV=true
-fi
 
 # Helper function to install a package
 install_package() {
@@ -440,13 +424,8 @@ install_package() {
     local package_dir="$2"
 
     pushd "$package_dir" > /dev/null
-    if [ "$USE_UV" = true ]; then
-        echo "  • Installing $package_name (with uv)..."
-        uv pip install --quiet .
-    else
-        echo "  • Installing $package_name..."
-        python3 -m pip install --quiet .
-    fi
+    echo "  • Installing $package_name..."
+    uv pip install --quiet .
     popd > /dev/null
 }
 
@@ -459,12 +438,24 @@ install_package "llmb-install" "cli/llmb-install"
 
 echo "✅ Core tools installed successfully"
 
-# Run the interactive installer (show summary only if we created a venv or installed uv)
-if [[ $CREATED_VENV == true || $UV_INSTALLED_NOW == true || $UV_WAS_ADDED_TO_PATH == true ]]; then
-    print_preinstall_summary
-fi
-
 echo ""
 echo "🚀 Launching main installer..."
 echo ""
-llmb-install "$@"
+
+init_summary_file
+# EXIT alone is sufficient: it fires on normal exit, explicit exit, and
+# signal-induced termination, so no need for separate INT/HUP/TERM traps.
+trap cleanup_summary_file EXIT
+
+installer_status=0
+if llmb-install "$@"; then
+    installer_status=0
+else
+    installer_status=$?
+fi
+
+load_installer_summary "$SUMMARY_FILE"
+if [[ $installer_status -ne 130 ]]; then
+    print_postinstall_summary "$installer_status"
+fi
+exit "$installer_status"

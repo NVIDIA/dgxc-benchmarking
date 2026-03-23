@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -43,8 +43,6 @@ export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh
 GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
 GPU_TYPE=${GPU_TYPE,,}
 JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
-CLUSTER_TYPE=${CLUSTER_TYPE:-slurm}
-CLUSTER_TYPE=${CLUSTER_TYPE,,}
 DTYPE=${DTYPE:-fp8}
 DTYPE=${DTYPE,,}
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
@@ -66,12 +64,7 @@ ADDITIONAL_SLURM_PARAMS=${ADDITIONAL_SLURM_PARAMS:-""}
 # Mount Hugging Face cache for tokenizers
 export HF_HOME="$LLMB_INSTALL/.cache/huggingface"
 
-# For Slurm, mount HF_HOME as a path; for Run:AI, use HF_TOKEN instead
-if [[ $CLUSTER_TYPE == "slurm" ]]; then
-    CONTAINER_MOUNTS="$HF_HOME"
-else
-    CONTAINER_MOUNTS=""
-fi
+CONTAINER_MOUNTS="$HF_HOME"
 
 if [[ -n ${RUN_CONF_MOUNTS:-""} ]]; then
     if [[ -n ${CONTAINER_MOUNTS} ]]; then
@@ -164,7 +157,6 @@ if [[ -n ${LOAD_CHECKPOINT_PATH-} ]]; then
     CONTAINER_MOUNTS+="${LOAD_CHECKPOINT_PATH}"
 fi
 
-# Add custom mounts for both Slurm and Run:AI
 if [[ -n ${CONTAINER_MOUNTS} ]]; then
     CONFIG_OVERRIDES+=" --custom_mounts $CONTAINER_MOUNTS"
 fi
@@ -175,46 +167,28 @@ fi
 
 pushd $LLMB_WORKLOAD/NeMo
 
-if [ $CLUSTER_TYPE = slurm ]; then
-    # After all overrides - STRONG_SCALING is significantly slower at 128 than weak scaling.
-    TIME_LIMIT=${TIME_LIMIT:-"00:25:00"}
+# After all overrides - STRONG_SCALING is significantly slower at 128 than weak scaling.
+TIME_LIMIT=${TIME_LIMIT:-"00:25:00"}
 
-    # Add additional SLURM parameters if provided
-    SLURM_ARGS=""
-    if [ -n "$ADDITIONAL_SLURM_PARAMS" ]; then
-        SLURM_ARGS="--additional_slurm_params ${ADDITIONAL_SLURM_PARAMS}"
-    fi
-
-    python3 -m scripts.performance.llm.pretrain_nemotron4_15b \
-        --gpu $GPU_TYPE \
-        --container_image $IMAGE \
-        --compute_dtype $DTYPE \
-        --num_gpus $JOB_TOTAL_GPUS \
-        --gpus_per_node $GPUS_PER_NODE \
-        --max_steps $MAX_STEPS \
-        $CONFIG_OVERRIDES \
-        slurm \
-        --account $SBATCH_ACCOUNT \
-        --partition $SBATCH_PARTITION \
-        --log_dir ${NEMORUN_HOME} \
-        --time_limit $TIME_LIMIT \
-        $SLURM_ARGS
-else
-    python3 -m scripts.performance.llm.pretrain_nemotron4_15b \
-        --gpu $GPU_TYPE \
-        --container_image nvcr.io/nvidia/nemo:$FW_VERSION \
-        --compute_dtype $DTYPE \
-        --num_gpus $JOB_TOTAL_GPUS \
-        --gpus_per_node $GPUS_PER_NODE \
-        --max_steps $MAX_STEPS \
-        --hf_token ${HF_TOKEN:?HF_TOKEN is required} \
-        $CONFIG_OVERRIDES \
-        runai \
-        --base_url $BASE_URL \
-        --app_id $APP_ID \
-        --app_secret $APP_SECRET \
-        --project_name $PROJECT_NAME \
-        --pvc_nemo_run_dir $PVC_DIR
+# Add additional SLURM parameters if provided
+SLURM_ARGS=""
+if [ -n "$ADDITIONAL_SLURM_PARAMS" ]; then
+    SLURM_ARGS="--additional_slurm_params ${ADDITIONAL_SLURM_PARAMS}"
 fi
+
+python3 -m scripts.performance.llm.pretrain_nemotron4_15b \
+    --gpu $GPU_TYPE \
+    --container_image $IMAGE \
+    --compute_dtype $DTYPE \
+    --num_gpus $JOB_TOTAL_GPUS \
+    --gpus_per_node $GPUS_PER_NODE \
+    --max_steps $MAX_STEPS \
+    $CONFIG_OVERRIDES \
+    slurm \
+    --account $SBATCH_ACCOUNT \
+    --partition $SBATCH_PARTITION \
+    --log_dir ${NEMORUN_HOME} \
+    --time_limit $TIME_LIMIT \
+    $SLURM_ARGS
 
 popd

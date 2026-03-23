@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -31,6 +31,7 @@ from typing import Any, Dict, Optional
 
 import yaml
 
+from llmb_run.config_manager import ClusterConfig
 from llmb_run.slurm_utils import get_cluster_name
 
 logger = logging.getLogger('llmb_run.run_config')
@@ -152,7 +153,7 @@ def config_to_bytes(config_data: Dict[str, Any]) -> bytes:
         Normalized bytes representation
     """
     # Convert to JSON with sorted keys for consistent ordering
-    normalized_json = json.dumps(config_data, sort_keys=True, separators=(',', ':'))
+    normalized_json = json.dumps(config_data, sort_keys=True, separators=(',', ':'), default=str)
     return normalized_json.encode('utf-8')
 
 
@@ -251,7 +252,7 @@ def resolve_container_images(images_field: Any, gpu_type: str) -> list:
     return []
 
 
-def create_llmb_config(task, job_id, workdir, config, workloads):
+def create_llmb_config(task, job_id, workdir, config: ClusterConfig, workloads):
     """Create llmb-config.yaml file in the experiment's folder.
 
     Args:
@@ -271,7 +272,7 @@ def create_llmb_config(task, job_id, workdir, config, workloads):
             config_dir = workdir
         else:
             # For other launchers, use the installed workload directory
-            llmb_install = config['launcher']['llmb_install']
+            llmb_install = config.llmb_install
             workload_key = task.workload_key
             config_dir = os.path.join(llmb_install, 'workloads', workload_key)
 
@@ -289,7 +290,7 @@ def create_llmb_config(task, job_id, workdir, config, workloads):
         return None
 
     # Resolve container images and extract framework version
-    gpu_type = config.get('launcher', {}).get('gpu_type', 'unknown')
+    gpu_type = config.gpu_type
     images_field = metadata.get('container', {}).get('images', [])
     resolved_images = resolve_container_images(images_field, gpu_type)
 
@@ -301,12 +302,12 @@ def create_llmb_config(task, job_id, workdir, config, workloads):
             logger.error(f"Failed to parse image version: {e}. resolved_images={resolved_images}")
             fw_version = 'unknown'
     else:
-        logger.warning(f"No container images resolved for gpu_type '{gpu_type}', images_field={images_field}")
+        logger.debug(f"No container images resolved for gpu_type '{gpu_type}', images_field={images_field}")
         fw_version = 'unknown'
 
     # Validate cluster name
     try:
-        cluster_name = config.get('launcher', {}).get('cluster_name')
+        cluster_name = config.cluster_name
         if not cluster_name:
             cluster_name = get_cluster_name()
             if cluster_name:
@@ -316,7 +317,7 @@ def create_llmb_config(task, job_id, workdir, config, workloads):
                     f"   Using '{cluster_name}' detected from SLURM configuration.\n"
                     f"   To fix this, add the following to your cluster_config.yaml:\n"
                     f"   \n"
-                    f"   launcher.cluster_name: {cluster_name}\n"
+                    f"   cluster_name: {cluster_name}\n"
                     f"{'='*80}"
                 )
             if _internal_modules_available and not cluster_name:
@@ -335,10 +336,11 @@ def create_llmb_config(task, job_id, workdir, config, workloads):
         experiment_id = None
 
     # Get llmb_version from release.yaml (new format) with fallback to metadata.yaml (legacy)
-    repo_root = config.get('launcher', {}).get('llmb_repo')
+    repo_root = config.llmb_repo
     llmb_version = load_llmb_version(repo_root) or metadata.get('general', {}).get('gsw_version') or 'unknown'
 
     # Build configuration dictionary
+    gpu_slurm_env = config.slurm.env(target='gpu')
     llmb_config = {
         'job_info': {
             'job_id': job_id,
@@ -361,18 +363,19 @@ def create_llmb_config(task, job_id, workdir, config, workloads):
         },
         'cluster_info': {
             'cluster_name': cluster_name,
-            'gpus_per_node': config.get('slurm', {}).get('gpu_gres', ''),
-            'llmb_install': config.get('launcher', {}).get('llmb_install', ''),
-            'llmb_repo': config.get('launcher', {}).get('llmb_repo', ''),
-            'slurm_account': config.get('slurm', {}).get('account', ''),
-            'slurm_gpu_partition': config.get('slurm', {}).get('gpu_partition', ''),
-            'slurm_cpu_partition': config.get('slurm', {}).get('cpu_partition', ''),
+            'gpus_per_node': config.slurm.gpus_per_node(target='gpu'),
+            'llmb_install': config.llmb_install,
+            'llmb_repo': config.llmb_repo,
+            'slurm_account': gpu_slurm_env.get('SBATCH_ACCOUNT', ''),
+            'slurm_gpu_partition': config.slurm.partition(target='gpu'),
+            'slurm_cpu_partition': config.slurm.partition(target='cpu'),
         },
         'container_info': {
             'images': resolved_images,
         },
         'job_config': {
             'profile_enabled': task.profile,
+            'proxy': task.proxy,
             'strong_scaling': os.getenv('STRONG_SCALING', 'false').lower() == 'true',
             'env_overrides': task.env_overrides,
             'model_overrides': task.model_overrides,

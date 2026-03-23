@@ -1,33 +1,13 @@
 # Overview
+
 This recipe provides instructions for running microbenchmarks that measure CPU overhead on single node.
 
 We consider two CPU overhead scenarios:
+
 - **Pytorch kernel launch latency**: In this test, we measure how fast the CPU can push tiny kernels into the GPU. The higher the average execution time per benchmark, the worse the CPU overhead.
 - **Tokenization throughput**: This test measures CPU-only performance through the tokenization step used in inference and RL. The higher the time taken to generate N tokens, the worse the CPU overhead.
 
-The script uses TRT-LLM release containers to benchmark tokenization throughput for the [GPT-OSS-120B](https://huggingface.co/openai/gpt-oss-120b) model on H100/B200/GB200 platforms. 
-
-# Performance Measurement and Analysis 
-Below, we list the test configuration and performance of the kernel launch and tokenization tests on GB200, B200 and H100.
-
-## Pytorch kernel launch test
-
-| GEMM M size | GB200 (usec) | B200 (usec) | H100 (usec) |
-|:------------|:------------:|:-----------:|:-----------:|
-| 4           |   11.3       | 6.4         | 6.8         |
-| 8           |   13.0       | 6.8         | 6.8         |
-| 16          |   13.0       | 6.8         | 6.8         |
-| 32          |   17.7       | 9.2         | 9.1         |
-| 64          |   17.7       | 9.2         | 9.1         |
-| 128         |   13.0       | 6.8         | 6.8         |
-| 256         |   13.0       | 6.8         | 6.8         |
-| 512         |   17.7       | 9.2         | 9.1         |
-
-## Tokenization throughput test
-
-| Num prompts | GB200 (sec) | B200 (sec) | H100 (sec) |
-|:------------|:-----------:|:----------:|:----------:|
-| 100000      |   39        | 34         | 34         |
+The script uses TRT-LLM release containers to benchmark tokenization throughput for the [GPT-OSS-120B](https://huggingface.co/openai/gpt-oss-120b) model on GB300/GB200/B200/H100 platforms.
 
 # Prerequisites
 
@@ -48,6 +28,7 @@ The following directory layout and key variables are used in the recipe:
 We reference a number of Slurm commands and parameters in this document. A brief summary is included below. It's important to note these are a guide and might not be applicable to all environments. Please consult with your system administrator for the parameters that are specific to your system.
 
 **Common parameters:**
+
 - `SBATCH_PARTITION` or `-p` - Partition (or queue) to use.
 - `SBATCH_ACCOUNT` or `-A` - Slurm account to associate with your job, different from your user. Meant for accounting purposes.
 - `SBATCH_GPUS_PER_NODE` or `--gres=gpu:<num gpus>` - If your cluster is configured with GRES this should be set to all GPUs in a node. Ignore if not configured.
@@ -66,19 +47,19 @@ cd $LLMB_INSTALL
 # Run a benchmark with llmb-run per use case (** Recommended **)
 
 # Run both CPU overhead tests
-llmb-run submit -w microbenchmark_cpu_overhead -s 120b --dtype mxfp4 --scale 1
+llmb-run submit -w microbenchmark_cpu_overhead --dtype mxfp4 --scale 1
  
 # Run the pytorch kernel launch test
-USE_CASES="kernel_launch" llmb-run submit -w microbenchmark_cpu_overhead -s 120b --dtype mxfp4 --scale 1
+USE_CASES="kernel_launch" llmb-run submit -w microbenchmark_cpu_overhead --dtype mxfp4 --scale 1
 
 # Run the tokenization throughput test
-USE_CASES="tokenization" llmb-run submit -w microbenchmark_cpu_overhead -s 120b --dtype mxfp4 --scale 1
+USE_CASES="tokenization" llmb-run submit -w microbenchmark_cpu_overhead --dtype mxfp4 --scale 1
 ```
-
 
 For more details on llmb-run usage, see the [llmb-run documentation](../../cli/llmb-run/README.md).
 
-### Results/Log files 
+### Results/Log files
+
 Results for the workload are stored at `$LLMB_INSTALL/workloads/microbenchmark_cpu_overhead/experiments/cpu_overhead_tests`
 
 You should expect to see separate logs for each use case:
