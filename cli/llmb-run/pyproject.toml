@@ -4,14 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "llmb-run"
-version = "1.7.0"
+
+version = "1.10.7"
 description = "Lightweight tool for automating large batches of LLM benchmarking workloads"
 requires-python = ">=3.10"
 dependencies = [
-    "pyyaml>=6.0",
-    "rich>=10.0.0",
-    "typer>=0.12.0",
-    "shellingham>=1.5.0"
+    "pyyaml~=6.0",
+    "rich>=10.0.0,<15",
+    "typer~=0.12",
+    "shellingham~=1.5",
+    "zstandard~=0.23"
 ]
 
 [project.scripts]
@@ -22,8 +24,8 @@ dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "pytest-mock",
-    "black",
-    "ruff"
+    "black~=26.1",
+    "ruff~=0.15"
 ]
 
 [tool.setuptools.packages.find]

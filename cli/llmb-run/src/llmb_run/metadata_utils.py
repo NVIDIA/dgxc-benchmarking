@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -64,30 +64,33 @@ _KNOWN_DTYPES = {"fp8", "bf16", "nvfp4", "mxfp4"}
 def normalize_model_dtype_config(model_config: dict) -> Dict[str, Dict[str, object]]:
     """Normalize a model_config's dtype/scales definition.
 
-    Returns a mapping of dtype -> { 'scales': list[int], 'exact_scales': bool }
+    Returns a mapping of dtype -> { 'scales': list[int], 'exact_scales': bool, 'proxy_scales': list[int] }
 
     Accepted input forms on the model_config:
       1) Legacy form
          dtypes: ['fp8','bf16'] | 'fp8'
          scales: [128,256]
          exact_scales: bool (optional)
+         proxy_scales: [8,16] (optional)
 
       2) Mapping form (per-dtype config)
          dtypes:
            fp8: [128, 256]                 # short form = scales only
-           bf16: { scales: [256, 512], exact_scales: true }
+           bf16: { scales: [256, 512], exact_scales: true, proxy_scales: [16, 32] }
 
     Notes:
       - If mapping form is used but contains non-dtype keys (e.g., mistakenly
         nested 'scales' or 'exact_scales' under 'dtypes'), those keys are
         ignored with a debug log.
       - If mapping form is used, any top-level scales are ignored.
+      - proxy_scales are always treated as exact (no power-of-2 expansion).
     """
     normalized: Dict[str, Dict[str, object]] = {}
 
     dtypes_value = model_config.get("dtypes")
     model_scales = model_config.get("scales", [])
     model_exact = bool(model_config.get("exact_scales", False))
+    model_proxy_scales = model_config.get("proxy_scales", [])
 
     # Mapping form
     if isinstance(dtypes_value, dict):
@@ -101,13 +104,16 @@ def normalize_model_dtype_config(model_config: dict) -> Dict[str, Dict[str, obje
                 normalized[key] = {
                     "scales": [int(s) for s in val],
                     "exact_scales": model_exact,
+                    "proxy_scales": [int(s) for s in model_proxy_scales],
                 }
             elif isinstance(val, dict):
                 dtype_scales = [int(s) for s in val.get("scales", [])]
                 dtype_exact = bool(val.get("exact_scales", model_exact))
+                dtype_proxy_scales = [int(s) for s in val.get("proxy_scales", model_proxy_scales)]
                 normalized[key] = {
                     "scales": dtype_scales,
                     "exact_scales": dtype_exact,
+                    "proxy_scales": dtype_proxy_scales,
                 }
             else:
                 logger.debug(
@@ -129,6 +135,7 @@ def normalize_model_dtype_config(model_config: dict) -> Dict[str, Dict[str, obje
         normalized[dt] = {
             "scales": [int(s) for s in model_scales],
             "exact_scales": model_exact,
+            "proxy_scales": [int(s) for s in model_proxy_scales],
         }
 
     return normalized

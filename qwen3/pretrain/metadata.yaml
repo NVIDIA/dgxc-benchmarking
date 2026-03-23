@@ -27,7 +27,7 @@ general:
 
 container:
   images: 
-    - 'nvcr.io#nvidia/nemo:25.11.01'
+    - 'nvcr.io#nvidia/nemo:26.02.00'
 
 downloads:
   huggingface:
@@ -37,10 +37,10 @@ downloads:
 repositories:
   megatron_bridge:
     url: "https://github.com/NVIDIA-NeMo/Megatron-Bridge.git"
-    commit: "4df8c97392bc9c3906739e658f203f6810008821"
+    commit: "6b3b5ba7ef64182caba23faa8d7abc0125aa3807"
   nemo_run:
     url: "https://github.com/NVIDIA-NeMo/Run.git"
-    commit: "01a9a8ba360f7b2908728ad0516e0ad9d936966d"
+    commit: "ab0c4328275c4c731f1bdea3ceb0e68a9a17a6a2"
 
 setup:
   venv_req: true
@@ -64,35 +64,41 @@ run:
     gb300:
       model_configs:
         - model_size: '235b'
-          dtypes: ['bf16', 'fp8']
-          scales: [64,128,256,512]
+          dtypes: ['bf16']
+          scales: [256,512]
         - model_size: '30b'
-          dtypes: ['bf16', 'fp8']
+          dtypes: ['bf16']
           scales: [8,16,32,64]
 
     gb200:
       model_configs:
         - model_size: '235b'
-          dtypes: ['bf16', 'fp8']
-          scales: [64,128,256,512]
+          dtypes: ['bf16']
+          scales: [256,512]
         - model_size: '30b'
-          dtypes: ['bf16', 'fp8']
+          dtypes: ['bf16']
+          scales: [8,16,32,64]
+
+    b300:
+      model_configs:
+        - model_size: '30b'
+          dtypes: ['bf16']
           scales: [8,16,32,64]
 
     b200:
       model_configs:
         - model_size: '235b'
-          dtypes: ['bf16', 'fp8']
-          scales: [64,128,256,512]
+          dtypes: ['bf16']
+          scales: [256,512]
         - model_size: '30b'
-          dtypes: ['bf16', 'fp8']
+          dtypes: ['bf16']
           scales: [8,16,32,64]
 
     h100:
       model_configs:
         - model_size: '235b'
-          dtypes: ['bf16', 'fp8']
+          dtypes: ['bf16']
           scales: [256,512]
         - model_size: '30b'
-          dtypes: ['bf16', 'fp8']
-          scales: [16,32,64,128]
+          dtypes: ['bf16']
+          scales: [16,32,64]

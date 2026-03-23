@@ -25,6 +25,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+from llmb_run.config_manager import ClusterConfig
 from llmb_run.metadata_utils import normalize_model_dtype_config
 from llmb_run.task_loader import (
     flatten_yaml_tasks,
@@ -47,7 +48,7 @@ class TaskGenerationRequest:
     """Encapsulates all task generation parameters."""
 
     workloads: Dict[str, Any]
-    cluster_config: Dict[str, Any]
+    cluster_config: ClusterConfig
 
     # Specification methods
     workload: Optional[str] = None  # Single or comma-separated
@@ -62,6 +63,7 @@ class TaskGenerationRequest:
     # Modifiers
     repeats: int = 1
     profile: bool = False
+    proxy: bool = False
     extra_slurm_params: Optional[Dict[str, Any]] = None
 
     def validate(self) -> None:
@@ -171,6 +173,7 @@ def _generate_explicit_workload_with_scale_discovery(request: TaskGenerationRequ
         workload_filter=workload_filter,
         specific_scales=specific_scales,
         extra_slurm_params=request.extra_slurm_params,
+        proxy=request.proxy,
     )
 
 
@@ -200,6 +203,7 @@ def _generate_discovery_tasks(request: TaskGenerationRequest) -> List[WorkloadTa
         workload_filter=workload_filter,
         specific_scales=specific_scales,
         extra_slurm_params=request.extra_slurm_params,
+        proxy=request.proxy,
     )
 
 
@@ -223,7 +227,7 @@ def _generate_from_file(request: TaskGenerationRequest) -> List[WorkloadTask]:
 
 def generate_submit_all_tasks(
     workloads,
-    cluster_config,
+    cluster_config: ClusterConfig,
     max_scale,
     repeats=1,
     profile=False,
@@ -233,6 +237,7 @@ def generate_submit_all_tasks(
     workload_filter=None,
     specific_scales=None,
     extra_slurm_params: Optional[Dict[str, Any]] = None,
+    proxy=False,
 ):
     """Generate tasks for all installed workloads up to max_scale.
 
@@ -252,13 +257,14 @@ def generate_submit_all_tasks(
         workload_filter: List of workloads to filter by, or None for all (default: None)
         specific_scales: List of specific scales to run, or None to use max_scale/min_scale logic (default: None)
         extra_slurm_params: Optional dictionary of extra Slurm parameters to apply to jobs.
+        proxy: If True, use proxy_scales instead of production scales (default: False)
 
     Returns:
         list: List of WorkloadTask objects for all valid configurations
     """
     # Get configuration details
-    installed_workloads = cluster_config.get('workloads', {}).get('installed', [])
-    cluster_gpu_type = cluster_config.get('launcher', {}).get('gpu_type')
+    installed_workloads = cluster_config.workloads.installed
+    cluster_gpu_type = cluster_config.gpu_type
 
     if not cluster_gpu_type:
         logger.error("No GPU type specified in cluster configuration")
@@ -324,6 +330,7 @@ def generate_submit_all_tasks(
             workload_filter=workload_filter,
             specific_scales=specific_scales,
             extra_slurm_params=extra_slurm_params,
+            proxy=proxy,
         )
 
     logger.debug(f"Generated {len(task_list)} tasks across {len(filtered_workloads)} workloads")
@@ -344,6 +351,7 @@ def _generate_workload_tasks(
     workload_filter=None,
     specific_scales=None,
     extra_slurm_params: Optional[Dict[str, Any]] = None,
+    proxy=False,
 ):
     """Generate tasks for a single workload and add them to task_list.
 
@@ -361,6 +369,7 @@ def _generate_workload_tasks(
         workload_filter: List of workload filters, may include workload_modelsize (default: None)
         specific_scales: List of specific scales to run, or None to use max_scale/min_scale logic (default: None)
         extra_slurm_params: Optional dictionary of extra Slurm parameters to apply to jobs.
+        proxy: If True, use proxy_scales instead of production scales (default: False)
     """
     metadata = workload_data['metadata']
     gpu_configs = metadata.get('run', {}).get('gpu_configs', {})
@@ -405,14 +414,26 @@ def _generate_workload_tasks(
                 logger.debug(f"Skipping {workload_key}_{model_size} dtype={dtype}: not in dtype filter {dtype_filter}")
                 continue
 
-            dtype_scales = cfg.get('scales', [])
-            metadata_exact_scales = cfg.get('exact_scales', model_config.get('exact_scales', False))
-            # Logical OR: if runtime flag is set OR metadata says exact, then use exact scales
-            effective_exact_scales = runtime_exact_scales or metadata_exact_scales
+            # Select scales based on proxy mode
+            if proxy:
+                # In proxy mode, use proxy_scales and treat as exact (no power-of-2 expansion)
+                dtype_scales = cfg.get('proxy_scales', [])
+                effective_exact_scales = True  # Proxy scales are always treated as exact
 
-            if not dtype_scales:
-                logger.warning(f"Skipping {workload_key}_{model_size} dtype={dtype}: no scales defined")
-                continue
+                # Skip if no proxy_scales defined for this dtype
+                if not dtype_scales:
+                    logger.debug(f"Skipping {workload_key}_{model_size} dtype={dtype}: no proxy_scales defined")
+                    continue
+            else:
+                # In production mode, use regular scales
+                dtype_scales = cfg.get('scales', [])
+                metadata_exact_scales = cfg.get('exact_scales', model_config.get('exact_scales', False))
+                # Logical OR: if runtime flag is set OR metadata says exact, then use exact scales
+                effective_exact_scales = runtime_exact_scales or metadata_exact_scales
+
+                if not dtype_scales:
+                    logger.warning(f"Skipping {workload_key}_{model_size} dtype={dtype}: no scales defined")
+                    continue
 
             if specific_scales is not None:
                 # Use specific scales, but only those supported by the workload
@@ -482,6 +503,7 @@ def _generate_workload_tasks(
                             dtype=dtype,
                             scale=scale,
                             profile=profile,
+                            proxy=proxy,
                             extra_slurm_params=extra_slurm_params or {},
                         )
                     )

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -27,7 +27,7 @@ general:
 
 container:
   images: 
-    - 'nvcr.io#nvidia/nemo:25.09.00'
+    - 'nvcr.io#nvidia/nemo:26.02.00'
 
 repositories:
   comms-perf:
@@ -54,19 +54,29 @@ run:
   launch_script: 'launch.sh'
 
   gpu_configs:
+    gb300:
+      model_configs:
+        - model_size: 'nccl'
+          dtypes: ['fp8']
+          scales: [4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
     gb200:
       model_configs:
         - model_size: 'nccl'
           dtypes: ['fp8']
-          scales: [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
+          scales: [4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
     b200:
       model_configs:
         - model_size: 'nccl'
           dtypes: ['fp8']
-          scales: [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
+          scales: [8, 16, 32, 64, 128, 256, 512, 1024, 2048]
+    b300:
+      model_configs:
+        - model_size: 'nccl'
+          dtypes: ['fp8']
+          scales: [8, 16, 32, 64, 128, 256, 512, 1024, 2048]
     h100:
       model_configs:
         - model_size: 'nccl'
           dtypes: ['fp8']
-          scales: [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
+          scales: [8, 16, 32, 64, 128, 256, 512, 1024, 2048]
   

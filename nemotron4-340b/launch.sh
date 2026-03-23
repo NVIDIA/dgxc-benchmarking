@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -49,8 +49,6 @@ fi
 export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh}
 
 JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
-CLUSTER_TYPE=${CLUSTER_TYPE:-slurm}
-CLUSTER_TYPE=${CLUSTER_TYPE,,}
 DTYPE=${DTYPE:-fp8}
 DTYPE=${DTYPE,,}
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
@@ -179,36 +177,26 @@ TIME_LIMIT=${TIME_LIMIT:-"00:25:00"}
 
 pushd $LLMB_WORKLOAD/NeMo
 
-if [ $CLUSTER_TYPE = slurm ]; then
-    python3 -m scripts.performance.llm.pretrain_nemotron4_340b \
-        --gpu $GPU_TYPE \
-        --container_image $IMAGE \
-        --compute_dtype $DTYPE \
-        --num_gpus $JOB_TOTAL_GPUS \
-        --gpus_per_node $GPUS_PER_NODE \
-        --max_steps $MAX_STEPS \
-        $CONFIG_OVERRIDES \
-        slurm \
-        --account $SBATCH_ACCOUNT \
-        --partition $SBATCH_PARTITION \
-        --log_dir ${NEMORUN_HOME} \
-        --time_limit $TIME_LIMIT
-else
-    python3 -m scripts.performance.llm.pretrain_nemotron4_340b \
-        --gpu $GPU_TYPE \
-        --container_image nvcr.io/nvidia/nemo:$FW_VERSION \
-        --compute_dtype $DTYPE \
-        --num_gpus $JOB_TOTAL_GPUS \
-        --gpus_per_node $GPUS_PER_NODE \
-        --max_steps $MAX_STEPS \
-        --hf_token ${HF_TOKEN:?HF_TOKEN is required} \
-        $CONFIG_OVERRIDES \
-        runai \
-        --base_url $BASE_URL \
-        --app_id $APP_ID \
-        --app_secret $APP_SECRET \
-        --project_name $PROJECT_NAME \
-        --pvc_nemo_run_dir $PVC_DIR
+# Add additional SLURM parameters if provided
+ADDITIONAL_SLURM_PARAMS=${ADDITIONAL_SLURM_PARAMS:-""}
+SLURM_ARGS=""
+if [ -n "$ADDITIONAL_SLURM_PARAMS" ]; then
+    SLURM_ARGS="--additional_slurm_params ${ADDITIONAL_SLURM_PARAMS}"
 fi
+
+python3 -m scripts.performance.llm.pretrain_nemotron4_340b \
+    --gpu $GPU_TYPE \
+    --container_image $IMAGE \
+    --compute_dtype $DTYPE \
+    --num_gpus $JOB_TOTAL_GPUS \
+    --gpus_per_node $GPUS_PER_NODE \
+    --max_steps $MAX_STEPS \
+    $CONFIG_OVERRIDES \
+    slurm \
+    --account $SBATCH_ACCOUNT \
+    --partition $SBATCH_PARTITION \
+    --log_dir ${NEMORUN_HOME} \
+    --time_limit $TIME_LIMIT \
+    $SLURM_ARGS
 
 popd

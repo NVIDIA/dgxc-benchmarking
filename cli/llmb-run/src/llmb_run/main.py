@@ -22,11 +22,14 @@
 import logging
 import os
 import sys
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as package_version
 from typing import Annotated, Optional
 
 import typer
 
-from llmb_run.config_manager import get_cluster_config
+from llmb_run.archive import run_archive
+from llmb_run.config_manager import ClusterConfig, get_cluster_config
 from llmb_run.exemplar import generate_exemplar_tasks
 from llmb_run.job_launcher import run_tests
 from llmb_run.metadata_utils import parse_workload_name
@@ -91,9 +94,19 @@ class AppContext:
     """Context object to share configuration across commands."""
 
     def __init__(self):
-        self.cluster_config = None
+        self.cluster_config: ClusterConfig | None = None
         self.workloads = None
         self.verbose = False
+
+
+def version_callback(value: bool):
+    if value:
+        try:
+            version = package_version("llmb-run")
+        except PackageNotFoundError:
+            version = "unknown"
+        typer.echo(f"llmb-run {version}")
+        raise typer.Exit()
 
 
 @app.callback()
@@ -102,6 +115,10 @@ def main_callback(
     verbose: Annotated[
         bool, typer.Option('-v', '--verbose', help='Enable verbose output including debug information.')
     ] = False,
+    version: Annotated[
+        Optional[bool],
+        typer.Option('--version', help='Show version and exit.', callback=version_callback, is_eager=True),
+    ] = None,
 ):
     """
     Main callback that runs before any command.
@@ -132,6 +149,20 @@ def main_callback(
         logger.error(f"Configuration error: {e}")
         raise typer.Exit(code=EXIT_VALIDATION_ERROR) from e
 
+    # Best-effort gsw-common image freshness check
+    try:
+        from llmb_run.internal.image_updater import check_gsw_common_update
+
+        check_gsw_common_update(app_ctx.cluster_config)
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.debug(f"gsw-common update check skipped: {e}")
+
+    # Archive only requires cluster config; skip workload metadata loading.
+    if ctx.invoked_subcommand == 'archive':
+        return
+
     # Load workloads
     try:
         app_ctx.workloads = get_workloads(app_ctx.cluster_config)
@@ -147,7 +178,7 @@ def validate_bulk_tasks(task_list, workloads, cluster_config):
         tuple: (validated_tasks, validation_summary)
             where validation_summary is a dict with error counts and unique error types
     """
-    cluster_gpu_type = cluster_config.get('launcher', {}).get('gpu_type')
+    cluster_gpu_type = cluster_config.gpu_type
     validated_tasks = []
     error_summary = {}
 
@@ -160,6 +191,7 @@ def validate_bulk_tasks(task_list, workloads, cluster_config):
             scale=task.scale,
             cluster_gpu_type=cluster_gpu_type,
             cluster_config=cluster_config,
+            proxy=task.proxy,
         )
         if is_valid:
             validated_tasks.append(task)
@@ -206,7 +238,7 @@ def _handle_no_tasks_error(app_ctx: AppContext, request: TaskGenerationRequest):
         print_avail_workloads(
             app_ctx.workloads,
             app_ctx.cluster_config,
-            cluster_gpu_type=app_ctx.cluster_config.get('launcher', {}).get('gpu_type'),
+            cluster_gpu_type=app_ctx.cluster_config.gpu_type,
             verbose=True,
             workload_filter=workload_filter,
         )
@@ -222,7 +254,7 @@ def report_validation_results(validated_tasks, error_summary, task_list, cluster
         cluster_config: Cluster configuration
         mode_name: Name of the mode for error messages (e.g., "bulk", "submit-all")
     """
-    cluster_gpu_type = cluster_config.get('launcher', {}).get('gpu_type')
+    cluster_gpu_type = cluster_config.gpu_type
 
     if error_summary:
         total_errors = sum(err['count'] for err in error_summary.values())
@@ -350,6 +382,7 @@ def submit(
     ] = None,
     repeats: Annotated[int, typer.Option('-r', '--repeats', help='Number of repeats for each test configuration.')] = 1,
     profile: Annotated[bool, typer.Option('-p', '--profile', help='Enable Profiling for jobs.')] = False,
+    proxy: Annotated[bool, typer.Option('--proxy', help='Use proxy scales.')] = False,
     dryrun: Annotated[
         bool,
         typer.Option('--dry-run', help='List jobs without submitting them.'),
@@ -380,6 +413,7 @@ def submit(
         file_path=file_path,
         repeats=repeats,
         profile=profile,
+        proxy=proxy,
         extra_slurm_params=extra_slurm_params,
     )
 
@@ -397,7 +431,7 @@ def list_workloads(
     List available workloads and their configurations.
     """
     app_ctx: AppContext = ctx.obj
-    cluster_gpu_type = app_ctx.cluster_config.get('launcher', {}).get('gpu_type')
+    cluster_gpu_type = app_ctx.cluster_config.gpu_type
 
     # Always use print_avail_workloads, with workload_filter if specified
     result = print_avail_workloads(
@@ -585,6 +619,7 @@ def exemplar(
         typer.Option(
             '-r',
             '--repeats',
+            min=1,
             help='Number of repeats for each test configuration. If not provided, uses value from exemplar.yaml config.repeats (default: 3).',
         ),
     ] = None,
@@ -595,7 +630,8 @@ def exemplar(
     Runs workloads listed in exemplar.yaml for your cluster's GPU type.
     All workloads must be installed.
 
-    Defaults: scale=512, profile=true, repeats=3 (override with -r)
+    Defaults: scale=512, profile=true, repeats=3 (override with -r).
+    If profile=true, the last repeat is profiled and earlier repeats are non-profiled.
     """
     app_ctx: AppContext = ctx.obj
 
@@ -618,6 +654,9 @@ def exemplar(
 
         # Print the concrete jobs we're about to submit
         logger.info(f"Exemplar Certification Jobs ({len(validated_tasks)}):")
+        profiled_count = sum(1 for task in validated_tasks if task.profile)
+        normal_count = len(validated_tasks) - profiled_count
+        logger.info(f"Profiling plan: {normal_count} standard jobs, {profiled_count} profiling-enabled jobs.")
         for task in validated_tasks:
             logger.info(format_task_output(task, prefix="  - "))
 
@@ -633,6 +672,33 @@ def exemplar(
         raise
     except Exception as e:
         logger.error(f"Exemplar submission error: {e}")
+        raise typer.Exit(code=EXIT_SYSTEM_ERROR) from e
+
+
+@app.command()
+def archive(
+    ctx: typer.Context,
+    output: Annotated[
+        Optional[str],
+        typer.Option(
+            '--output', help='Path to output .tar.zst file. Defaults to $LLMB_INSTALL/llmb-archive-<timestamp>.tar.zst.'
+        ),
+    ] = None,
+):
+    """Archive workload experiment logs under $LLMB_INSTALL/workloads/*/experiments into a single .tar.zst file."""
+    app_ctx: AppContext = ctx.obj
+
+    try:
+        stats = run_archive(app_ctx.cluster_config, output)
+        logger.info(f"Archive created: {stats.output_path}")
+        logger.info(f"Archived {stats.experiment_count} experiments.")
+    except ValueError as e:
+        logger.error(str(e))
+        raise typer.Exit(code=EXIT_VALIDATION_ERROR) from e
+    except typer.Exit:
+        raise
+    except Exception as e:
+        logger.error(f"Archive failed: {e}")
         raise typer.Exit(code=EXIT_SYSTEM_ERROR) from e
 
 

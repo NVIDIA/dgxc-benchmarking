@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -22,5 +22,5 @@
 # Top-level release metadata for the LLM Benchmarking Collection
 # This file centralizes version management across all recipes
 
-llmb_version: '25.12'
+llmb_version: '26.02'
 

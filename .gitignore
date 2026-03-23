@@ -2,7 +2,7 @@
 *.pyc
 *.egg-info
 __pycache__/
-.venv/
+**/.venv/
 .tox/
 .pytest_cache/
 .coverage
@@ -33,7 +33,6 @@ scripts/nvdf/
 # Cloudperf scripts
 recipe-directories.txt
 
-# Run AI deploy script
 generated/
 **/mysetup.sh
 nsys_analysis_build/

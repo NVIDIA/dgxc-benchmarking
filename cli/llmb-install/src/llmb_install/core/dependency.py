@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -52,7 +52,9 @@ def _canonicalize_dependencies_for_grouping(dependencies: Optional[Dict[str, Any
           • Dicts with url+commit collapse to canonical triplets, ignoring
             editable/install_target/repo_key differences.
       - For git entries:
-          • Collapse to canonical url+commit pairs, ignoring install_method.
+          • Clone-only deps (install_method.type == 'clone') are excluded
+            since they don't modify the venv.
+          • Remaining deps collapse to canonical url+commit pairs.
       - Return an object with sorted, deduplicated lists for stable hashing.
     """
     if not dependencies:
@@ -77,8 +79,11 @@ def _canonicalize_dependencies_for_grouping(dependencies: Optional[Dict[str, Any
                 # This ensures different dicts don't get incorrectly grouped together
                 canonical_pip.add(f"pip-dict|{json.dumps(item, sort_keys=True)}")
 
-    # Git normalization
+    # Git normalization — only include deps that modify the venv
     for _name, git_info in dependencies.get('git', {}).items():
+        install_method = git_info.get('install_method', {})
+        if install_method.get('type') == 'clone':
+            continue
         url = git_info.get('url')
         commit = git_info.get('commit')
         if url and commit:

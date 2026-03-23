@@ -4,13 +4,13 @@ Deploy and benchmark the GPT-OSS 120B model using NVIDIA's Dynamo framework with
 
 ## 📋 Version Information
 
-| Component | Version | Details |
-|-----------|---------|---------|
-| **NVIDIA Dynamo** | `0.5.1` | Platform orchestration framework |
-| **TensorRT-LLM** | `1.1.0rc2.post2` (uses image :`nvcr.io/nvidia/ai-dynamo/tensorrtllm-runtime:0.5.1-rc0.pre3`) | High-performance inference engine |
-| **AI Perf** | `pip install aiperf==0.1.1` | NVIDIA benchmarking tool for LLM performance testing |
-| **Model** | [`openai/gpt-oss-120b`](https://huggingface.co/openai/gpt-oss-120b) | GPT-OSS 120B parameter model (117B params, 5.1B active) |
-| **Target Hardware** | `4x+ NVIDIA GB200` | Minimum 4 GPUs, scales horizontally (189GB VRAM per GPU) |
+| Component           | Version                                                                                      | Details                                                  |
+| ------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| **NVIDIA Dynamo**   | `0.5.1`                                                                                      | Platform orchestration framework                         |
+| **TensorRT-LLM**    | `1.1.0rc2.post2` (uses image :`nvcr.io/nvidia/ai-dynamo/tensorrtllm-runtime:0.5.1-rc0.pre3`) | High-performance inference engine                        |
+| **AI Perf**         | `pip install aiperf==0.1.1`                                                                  | NVIDIA benchmarking tool for LLM performance testing     |
+| **Model**           | [`openai/gpt-oss-120b`](https://huggingface.co/openai/gpt-oss-120b)                          | GPT-OSS 120B parameter model (117B params, 5.1B active)  |
+| **Target Hardware** | `4x+ NVIDIA GB200`                                                                           | Minimum 4 GPUs, scales horizontally (189GB VRAM per GPU) |
 
 **💡 Note:** You can deploy and test the model without running any benchmarking if you choose - just skip the benchmarking steps. See the [Test the Deployment](#-test-the-deployment) section below for manual testing instructions.
 
@@ -59,6 +59,7 @@ External Access (Testing):
 ```
 
 **Components:**
+
 - **Frontend**: HTTP API server (OpenAI-compatible)
 - **Backend**: TensorRT-LLM inference engine
 - **Storage**: Shared file system for model caching
@@ -66,15 +67,16 @@ External Access (Testing):
 
 </details>
 
-
 ## 📋 Requirements
 
 ### Local Tools
+
 - **kubectl CLI**: Kubernetes command-line tool ([installation guide](https://kubernetes.io/docs/tasks/tools/))
 - **helm CLI**: Version 3.0+ for Dynamo platform installation ([installation guide](https://helm.sh/docs/intro/install/))
 - **NGC API Key**: Get from [NGC Catalog](https://catalog.ngc.nvidia.com/) → User Account → Setup
 
 ### Kubernetes Cluster Requirements
+
 - **GPUs**: 4+ NVIDIA GB200 or equivalent (160GB+ VRAM total)
 - **Storage**: Persistent storage for model caching (see [Storage Configuration](#storage-configuration) below)
 - **Network**: Internet access for model download from HuggingFace
@@ -84,12 +86,13 @@ External Access (Testing):
 
 **⚠️ IMPORTANT: Check with your cluster administrator for the correct storage class and access mode.**
 
-| Storage Type | When to Use | Benefits | Limitations | Example Classes |
-|---|---|---|---|---|
-| **ReadWriteMany (RWX)** | **Recommended** - Multiple replicas | • Shared model cache<br>• Horizontal scaling<br>• Best performance | • Requires file storage<br>• May cost more | `efs-sc`, `filestore-csi`, `oci-fss` |
-| **ReadWriteOnce (RWO)** | Single replica only | • Works with block storage<br>• Simpler setup<br>• Lower cost | • Single replica limit<br>• No cache sharing | `gp2`, `pd-standard`, `oci-bv` |
+| Storage Type            | When to Use                         | Benefits                                                           | Limitations                                  | Example Classes                      |
+| ----------------------- | ----------------------------------- | ------------------------------------------------------------------ | -------------------------------------------- | ------------------------------------ |
+| **ReadWriteMany (RWX)** | **Recommended** - Multiple replicas | • Shared model cache<br>• Horizontal scaling<br>• Best performance | • Requires file storage<br>• May cost more   | `efs-sc`, `filestore-csi`, `oci-fss` |
+| **ReadWriteOnce (RWO)** | Single replica only                 | • Works with block storage<br>• Simpler setup<br>• Lower cost      | • Single replica limit<br>• No cache sharing | `gp2`, `pd-standard`, `oci-bv`       |
 
 **Find your storage class:**
+
 ```bash
 # List available storage classes
 kubectl get storageclass
@@ -98,7 +101,7 @@ kubectl get storageclass
 kubectl describe storageclass <storage-class-name> | grep -i access
 ```
 
----
+______________________________________________________________________
 
 ## 🚀 Installation Steps
 
@@ -164,7 +167,7 @@ kubectl get dynamographdeployment --all-namespaces
 
 > **💡 Troubleshooting verification:** If commands fail due to permissions, you may not have the necessary cluster access. Contact your cluster administrator or check if you're connected to the right cluster with `kubectl config current-context`.
 
----
+______________________________________________________________________
 
 ### Step 2c: 🔧 NVIDIA Dynamo Installation (Only if Not Already Installed)
 
@@ -190,6 +193,7 @@ kubectl get storageclass $STORAGE_CLASS -o custom-columns=NAME:.metadata.name,PR
 ```
 
 **⚠️ Important Notes for Next Steps:**
+
 - If you see **mixed arm64/amd64 architecture**: You'll need to apply architecture fixes in [Step 2e: Apply Cluster-Specific Fixes (If Needed)](#step-2e-apply-cluster-specific-fixes-if-needed)
 - If you see **"dedicated: user-workload" taints**: You'll need to apply toleration fixes in [Step 2e: Apply Cluster-Specific Fixes (If Needed)](#step-2e-apply-cluster-specific-fixes-if-needed)
 - If storage class doesn't exist: Contact your cluster administrator before proceeding
@@ -199,11 +203,13 @@ kubectl get storageclass $STORAGE_CLASS -o custom-columns=NAME:.metadata.name,PR
 ### Step 2d: Install NVIDIA Dynamo Platform
 
 **Prerequisites** (verify with your cluster admin):
+
 - Kubernetes cluster version 1.24 or later
 - Helm 3.0+ installed
 - Cluster admin privileges for CRD installation
 
 **Production Installation**
+
 ```bash
 # Set Dynamo version - see version info below
 export RELEASE_VERSION="0.5.1"  # Current stable version (0.3.2+ supported)
@@ -226,6 +232,7 @@ helm install dynamo-platform dynamo-platform-${RELEASE_VERSION}.tgz \
 > **📖 For comprehensive installation options**, including local development (Minikube), custom builds, troubleshooting, and advanced configurations, see the official [NVIDIA Dynamo Installation Guide](https://docs.nvidia.com/dynamo/latest/index.html) and the [Step 2c: NVIDIA Dynamo Installation](#step-2c--nvidia-dynamo-installation-only-if-not-already-installed) section.
 
 **Verify Dynamo Installation:**
+
 ```bash
 # Check that CRDs are installed
 kubectl get crd | grep dynamo
@@ -348,6 +355,7 @@ kubectl get dynamographdeployment -n $NAMESPACE
 
 [yq](https://github.com/mikefarah/yq) is a command-line editor for processing YAMLs.
 Please follow the installation instructions [here](https://github.com/mikefarah/yq?tab=readme-ov-file#install) for your specific platform and architecture.
+
 ```bash
 # Test the installation of yq
 yq --version
@@ -355,7 +363,7 @@ yq --version
 # yq (https://github.com/mikefarah/yq/) version v4.48.1
 ```
 
----
+______________________________________________________________________
 
 ### 📁 Create Model Storage
 
@@ -427,6 +435,7 @@ kubectl wait --for=condition=ready pod $(kubectl get pods -n $NAMESPACE | grep '
 #### What You Should See During Deployment
 
 **Phase 1: DynamoGraphDeployment Creation (30 seconds)**
+
 ```bash
 kubectl get dynamographdeployment -n $NAMESPACE
 # Example output:
@@ -435,6 +444,7 @@ kubectl get dynamographdeployment -n $NAMESPACE
 ```
 
 **Phase 2: Pod Creation and Initialization (2-5 minutes)**
+
 ```bash
 kubectl get pods -n $NAMESPACE
 # Example output:
@@ -456,6 +466,7 @@ kubectl get pods -n $NAMESPACE
 
 **Key log messages to look for:**
 Logs in trtllm worker
+
 ```bash
 # Initial startup
 [10/21/2025-23:23:13] [TRT-LLM] [I] TensorRT-LLM inited.
@@ -481,6 +492,7 @@ Logs in trtllm worker
 ```
 
 Logs for the frontend worker should show
+
 ```
 # Frontend startup
 2025-10-21T23:22:52.381069Z  INFO dynamo_llm::entrypoint::input::http: Watching for remote model at models
@@ -499,6 +511,7 @@ Logs for the frontend worker should show
 **Phase 4: Ready State**
 
 DynamoGraphDeployment shows `READY=True`:
+
 ```bash
 kubectl get dynamographdeployment -n $NAMESPACE
 # Example output:
@@ -507,6 +520,7 @@ kubectl get dynamographdeployment -n $NAMESPACE
 ```
 
 Pod shows `READY=1/1`:
+
 ```bash
 kubectl get pods -n $NAMESPACE
 # Example output:
@@ -515,6 +529,7 @@ kubectl get pods -n $NAMESPACE
 ```
 
 Service has endpoints:
+
 ```bash
 kubectl get endpoints -n $NAMESPACE
 # Example output:
@@ -526,6 +541,7 @@ kubectl get endpoints -n $NAMESPACE
 <summary><b>🔧 Troubleshooting Common Issues</b></summary>
 
 **Pod stuck in `Pending`:**
+
 ```bash
 kubectl describe pod <pod-name> -n $NAMESPACE
 # Common causes:
@@ -535,6 +551,7 @@ kubectl describe pod <pod-name> -n $NAMESPACE
 ```
 
 **Pod in `CrashLoopBackOff`:**
+
 ```bash
 kubectl logs <pod-name> -n $NAMESPACE
 # Common causes:
@@ -544,6 +561,7 @@ kubectl logs <pod-name> -n $NAMESPACE
 ```
 
 **Model loading stuck:**
+
 ```bash
 # If logs stop updating for >10 minutes, check:
 kubectl describe pod <pod-name> -n $NAMESPACE | grep Events
@@ -555,18 +573,18 @@ kubectl top pod <pod-name> -n $NAMESPACE  # Check resource usage
 <details>
 <summary><b>📋 Expected Timeline</b></summary>
 
-| Phase | Duration | What's Happening |
-|-------|----------|------------------|
-| **Pod Creation** | 30s-2min | K8s scheduling, image pull |
-| **Model Download** | 5-10min | HuggingFace download (first time only) |
-| **Engine Build** | 10-15min | TensorRT optimization |
-| **Model Loading** | 2-3min | GPU memory allocation |
-| **Total (first time)** | **20-30min** | **Full cold start** |
-| **Total (cached)** | **5-10min** | **Subsequent deployments** |
+| Phase                  | Duration     | What's Happening                       |
+| ---------------------- | ------------ | -------------------------------------- |
+| **Pod Creation**       | 30s-2min     | K8s scheduling, image pull             |
+| **Model Download**     | 5-10min      | HuggingFace download (first time only) |
+| **Engine Build**       | 10-15min     | TensorRT optimization                  |
+| **Model Loading**      | 2-3min       | GPU memory allocation                  |
+| **Total (first time)** | **20-30min** | **Full cold start**                    |
+| **Total (cached)**     | **5-10min**  | **Subsequent deployments**             |
 
 </details>
 
----
+______________________________________________________________________
 
 ## 🧪 Test the Deployment
 
@@ -600,6 +618,7 @@ pkill -f "kubectl port-forward"
 <summary><b>🔧 Port Forwarding Troubleshooting</b></summary>
 
 **Issue**: `error: flag needs an argument: 'n' in -n`
+
 ```bash
 # ❌ This fails with background processes:
 kubectl port-forward service/gpt-oss-agg-frontend 8000:8000 -n $NAMESPACE &
@@ -609,6 +628,7 @@ kubectl port-forward service/gpt-oss-agg-frontend 8000:8000 --namespace=gpt-oss-
 ```
 
 **Issue**: `curl: (7) Failed to connect to localhost port 8000`
+
 ```bash
 # Check if port forwarding is active:
 ps aux | grep "kubectl port-forward"
@@ -619,6 +639,7 @@ sleep 3
 ```
 
 **Issue**: `namespace "..." not found`
+
 ```bash
 # Verify your namespace exists and is correctly named:
 kubectl get namespaces | grep gpt-oss
@@ -630,7 +651,7 @@ kubectl get pods --namespace=gpt-oss-120b
 
 </details>
 
----
+______________________________________________________________________
 
 ## 📊 Run Benchmark (25-30 minutes)
 
@@ -650,6 +671,7 @@ kubectl logs -f job/oss-gpt120b-bench -n $NAMESPACE
 ### 📊 Getting Benchmark Results
 
 **Check benchmark completion:**
+
 ```bash
 # Check if benchmark is complete
 kubectl get jobs -n $NAMESPACE
@@ -657,6 +679,7 @@ kubectl get jobs -n $NAMESPACE
 ```
 
 **View results in terminal:**
+
 ```bash
 # Benchmark pod may finish, use the trtllm worker pod to access results from the volume
 POD_NAME=$(kubectl get pods -n $NAMESPACE | grep 'gpt-oss-agg.*trtllmworker' | awk '{print $1}')
@@ -671,6 +694,7 @@ kubectl exec $POD_NAME -n $NAMESPACE -- cat /model-store/perf/$PERF_DIR/$CONCURR
 ```
 
 **Download result files (optional):**
+
 ```bash
 # Copy CSV results file to local machine
 kubectl cp $POD_NAME:/model-store/perf/$PERF_DIR/$CONCURRENCY_DIR/profile_export_aiperf.csv ./benchmark_results.csv -n $NAMESPACE
@@ -679,7 +703,7 @@ kubectl cp $POD_NAME:/model-store/perf/$PERF_DIR/$CONCURRENCY_DIR/profile_export
 kubectl cp $POD_NAME:/model-store/perf/$PERF_DIR/$CONCURRENCY_DIR/profile_export_aiperf.json ./benchmark_results.json -n $NAMESPACE
 ```
 
----
+______________________________________________________________________
 
 <details>
 <summary><b>⚙️ Additional Configurations for Specific Clusters</b></summary>
@@ -724,7 +748,7 @@ kubectl patch deployment dynamo-platform-dynamo-operator-controller-manager -n $
 
 </details>
 
----
+______________________________________________________________________
 
 <details>
 <summary><b>🚨 Troubleshooting</b></summary>
@@ -734,12 +758,14 @@ kubectl patch deployment dynamo-platform-dynamo-operator-controller-manager -n $
 **🔥 Dynamo Operator CrashLoopBackOff (Grove CRD Issue)**
 
 **Symptoms:**
+
 ```bash
 kubectl get pods -n $NAMESPACE | grep dynamo-operator
 # Shows: CrashLoopBackOff instead of Running
 ```
 
 **Diagnosis:**
+
 ```bash
 kubectl logs deployment/dynamo-platform-dynamo-operator-controller-manager -n $NAMESPACE --tail=10
 # Look for: "no matches for kind \"PodGangSet\" in version \"grove.io/v1alpha1\""
@@ -747,6 +773,7 @@ kubectl logs deployment/dynamo-platform-dynamo-operator-controller-manager -n $N
 
 **Fix:**
 This is a Grove CRD compatibility issue. Apply the fix from Step 3:
+
 ```bash
 kubectl get crd podgangs.scheduler.grove.io -o yaml | \
   sed 's/scheduler\.grove\.io/grove.io/g; s/PodGang/PodGangSet/g; s/podgangs/podgangsets/g' | \
@@ -757,24 +784,28 @@ kubectl rollout restart deployment/dynamo-platform-dynamo-operator-controller-ma
 ### Common Issues
 
 **Pod stuck in `Pending`:**
+
 ```bash
 kubectl describe pod <pod-name> -n $NAMESPACE
 # Check for: insufficient GPUs, PVC binding issues, node taints
 ```
 
 **Service has no endpoints:**
+
 ```bash
 kubectl get endpoints -n $NAMESPACE
 # If empty, check service selector matches pod labels
 ```
 
 **Model loading fails:**
+
 ```bash
 kubectl logs <pod-name> -n $NAMESPACE
 # Check for: authentication errors, storage issues, memory problems
 ```
 
 **Benchmark architecture errors:**
+
 ```bash
 # Ensure benchmark runs on x86_64 CPU nodes (already configured in bench.yaml)
 kubectl describe pod <benchmark-pod> -n $NAMESPACE | grep "Node:"
@@ -795,7 +826,7 @@ kubectl top nodes
 
 </details>
 
----
+______________________________________________________________________
 
 ## 🗑️ Cleanup
 
@@ -813,7 +844,7 @@ kubectl delete pvc model-cache -n $NAMESPACE
 kubectl delete namespace $NAMESPACE
 ```
 
----
+______________________________________________________________________
 
 ## 🚀 Scaling Guide
 
@@ -901,15 +932,15 @@ echo "📉 Scaled back to single node"
 ```
 
 ### 💡 Performance Tips
-- **🎯 Run-to-run variability**: You can tune the `--request-rate` flag in `bench.yaml`. A rate of \(R\) over concurrency \(C\) means the load generator takes \(C/R\) seconds to ramp. We’ve found tuning this helps at higher concurrencies.
+
+- **🎯 Run-to-run variability**: You can tune the `--request-rate` flag in `bench.yaml`. A rate of (R) over concurrency (C) means the load generator takes (C/R) seconds to ramp. We’ve found tuning this helps at higher concurrencies.
 - **📈 Linear scaling**: Performance scales linearly with GPU count
 - **⏱️ Warmup time**: Increases with scale (allow extra time for large deployments)
 - **⚡ Stable concurrency**: 1k per node avoids connection timeouts
 - **🔧 Connection limits**: Auto-adjusted for scales >8 nodes
 - **📊 Monitoring**: Use `kubectl top nodes` to monitor cluster resource utilization
 
----
-
+______________________________________________________________________
 
 ## 📚 Additional Resources
 
@@ -917,6 +948,3 @@ echo "📉 Scaled back to single node"
 - **NVIDIA Dynamo**: [Documentation](https://docs.nvidia.com/dynamo/latest/index.html)
 - **TensorRT-LLM**: [GitHub Repository](https://github.com/NVIDIA/TensorRT-LLM)
 - **Kubernetes**: [Official Documentation](https://kubernetes.io/docs/home/)
-
-
-

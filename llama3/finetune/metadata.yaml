@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -23,67 +23,62 @@
 general:
   workload: llama3
   workload_type: finetune
-  framework: nemo2
+  framework: megatron_bridge
 
 container:
   images: 
-    - 'nvcr.io#nvidia/nemo:25.09.00'
+    - 'nvcr.io#nvidia/nemo:26.02.00'
 
 repositories:
-  nemo:
-    url: "https://github.com/NVIDIA-NeMo/NeMo.git"
-    commit: "032e4de5b7b69d2a53ca76397cf79ff0941951b1"
-  megatron_core:
-    url: "https://github.com/NVIDIA/Megatron-LM.git"
-    commit: "20d73fe76eb03672c02f637e9b47e562b9010d4c"
+  megatron_bridge:
+    url: "https://github.com/NVIDIA-NeMo/Megatron-Bridge.git"
+    commit: "6b3b5ba7ef64182caba23faa8d7abc0125aa3807"
   nemo_run:
-    url: "https://github.com/NVIDIA/NeMo-Run.git"
-    commit: "04f900a9c1cde79ce6beca6a175b4c62b99d7982"
+    url: "https://github.com/NVIDIA-NeMo/Run.git"
+    commit: "ab0c4328275c4c731f1bdea3ceb0e68a9a17a6a2"
 
 setup:
   venv_req: true
   dependencies:
+    git:
+      megatron_bridge:
+        repo_key: megatron_bridge
+        install_method:
+          type: clone
     pip:
-      - package: nemo
-        repo_key: nemo
-        install_target: '.[nlp]'
-      - 'scipy<1.13.0'
-      - 'bitsandbytes==0.46.0'
-      - 'nvidia-modelopt==0.35.1'
-      - package: megatron-core
-        repo_key: megatron_core
       - package: nemo_run
         repo_key: nemo_run
   tasks:
     - name: checkpoint_dataset_download
       cmd: './download_ckpt_dataset.sh'
-      job_type: nemo2
+      job_type: srun
       requires_gpus: true
 
-tools:
-  cuda_cupti_lib:
-    by_gpu:
-      gb200: "13.0.85"
+  
 # Run
 run:
-  launcher_type: 'nemo'
+  launcher_type: 'megatron_bridge'
   launch_script: 'launch.sh'
 
   gpu_configs:
+    gb300:
+      model_configs:
+        - model_size: '70b'
+          dtypes: ['bf16', 'fp8']
+          scales: [8, 16]
+          exact_scales: true
+
     gb200:
       model_configs:
         - model_size: '70b'
-          dtypes: ['fp8', 'bf16']
-          scales: [8, 16, 32]
-    b200:
-      model_configs:
-        - model_size: '70b'
-          dtypes: ['fp8', 'bf16']
-          scales: [8, 16, 32]
+          dtypes: ['bf16', 'fp8']
+          scales: [8, 16]
+          exact_scales: true
 
     h100:
       model_configs:
         - model_size: '70b'
-          dtypes: ['fp8', 'bf16']
-          scales: [8, 16, 32]
+          dtypes: ['bf16', 'fp8']
+          scales: [8, 16]
+          exact_scales: true
 

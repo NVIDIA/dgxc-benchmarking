@@ -21,6 +21,13 @@
 
 """Central constants for LLMB installer - single source of truth."""
 
+# Process exit codes
+EXIT_SUCCESS = 0
+EXIT_ERROR = 1
+# Used for user-initiated early termination (Ctrl-C or explicit cancel/exit
+# choices) so wrapper scripts can suppress post-install summaries.
+EXIT_CANCELLED = 130
+
 # Python version requirements for virtual environments
 MIN_PYTHON_VERSION = "3.12"
 MAX_PYTHON_VERSION = "3.13"

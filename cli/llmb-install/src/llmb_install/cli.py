@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -25,6 +25,8 @@ This module handles CLI argument parsing and provides the entry point for the in
 """
 
 import argparse
+
+from llmb_install.constants import EXIT_CANCELLED
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -160,6 +162,7 @@ def main() -> None:
         installer.run(args)
     except KeyboardInterrupt:
         print("\n\nInstallation cancelled by user.")
+        raise SystemExit(EXIT_CANCELLED) from None
     except Exception as e:
         print(f"\nError: {e}")
         raise SystemExit(1) from e

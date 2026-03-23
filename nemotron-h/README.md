@@ -1,43 +1,43 @@
 # Overview
 
-This recipe contains information and scripts to produce performance results for the Nemotron-H pre-training workloads. The scripts help perform environment setup and launch benchmark jobs.
+This recipe contains information and scripts to produce performance results for the Nemotron-H pre-training workloads. The scripts help perform environment setup and launch benchmark jobs. Configurations use weak scaling methodology (global batch size scales proportionally with GPU count).
 
-The recipes listed below progressively increase GPU count, with configurations weak-scaled to match.
-
-## GB300 and GB200
+## GB300, GB200 and B300
 
 | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
-|------|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
-| FP8 | 32 | 8192 | 118 | 2 | 1 | 1 | 1 | 16 | 1 | 1 | 96 | 6 |
-| FP8 | 64 | 8192 | 118 | 2 | 1 | 1 | 1 | 32 | 1 | 1 | 192 | 6 |
-| FP8 | 128 | 8192 | 118 | 2 | 1 | 1 | 1 | 64 | 1 | 1 | 384 | 6 |
-| FP8 | 256 | 8192 | 118 | 2 | 1 | 1 | 1 | 128 | 1 | 1 | 768 | 6 |
-| FP8 | 512 | 8192 | 118 | 2 | 1 | 1 | 1 | 256 | 1 | 1 | 1536 | 6 |
+| --------- | :--: | :----: | :----: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :--: | :-: |
+| FP8       |  32  |  8192  |  118   |  2  |  1  |  1  |  1  | 16  | N/A |  1  |  96  |  6  |
+| FP8       |  64  |  8192  |  118   |  2  |  1  |  1  |  1  | 32  | N/A |  1  | 192  |  6  |
+| FP8       | 128  |  8192  |  118   |  2  |  1  |  1  |  1  | 64  | N/A |  1  | 384  |  6  |
+| FP8       | 256  |  8192  |  118   |  2  |  1  |  1  |  1  | 128 | N/A |  1  | 768  |  6  |
+| FP8       | 512  |  8192  |  118   |  2  |  1  |  1  |  1  | 256 | N/A |  1  | 1536 |  6  |
 
 ## B200
 
 | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
-|------|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
-| FP8 | 64 | 8192 | 118 | 2 | 1 | 1 | 1 | 32 | 1 | 1 | 192 | 6 |
-| FP8 | 128 | 8192 | 118 | 2 | 1 | 1 | 1 | 64 | 1 | 1 | 384 | 6 |
-| FP8 | 256 | 8192 | 118 | 2 | 1 | 1 | 1 | 128 | 1 | 1 | 768 | 6 |
-| FP8 | 512 | 8192 | 118 | 2 | 1 | 1 | 1 | 256 | 1 | 1 | 1536 | 6 |
+| --------- | :--: | :----: | :----: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :--: | :-: |
+| FP8       |  32  |  8192  |  118   |  4  |  1  |  1  |  1  |  8  | N/A |  2  |  96  |  6  |
+| FP8       |  64  |  8192  |  118   |  2  |  1  |  1  |  1  | 32  | N/A |  1  | 192  |  6  |
+| FP8       | 128  |  8192  |  118   |  2  |  1  |  1  |  1  | 64  | N/A |  1  | 384  |  6  |
+| FP8       | 256  |  8192  |  118   |  2  |  1  |  1  |  1  | 128 | N/A |  1  | 768  |  6  |
+| FP8       | 512  |  8192  |  118   |  2  |  1  |  1  |  1  | 256 | N/A |  1  | 1536 |  6  |
 
 ## H100
 
 | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
-|------|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
-| FP8 | 64 | 8192 | 118 | 8 | 1 | 1 | 1 | 8 | 1 | 1 | 192 | 24 |
-| FP8 | 128 | 8192 | 118 | 8 | 1 | 1 | 1 | 16 | 1 | 1 | 384 | 24 |
-| FP8 | 256 | 8192 | 118 | 8 | 1 | 1 | 1 | 32 | 1 | 1 | 768 | 24 |
-| FP8 | 512 | 8192 | 118 | 8 | 1 | 1 | 1 | 64 | 1 | 1 | 1536 | 24 |
-| FP8 | 1024 | 8192 | 118 | 8 | 1 | 1 | 1 | 128 | 1 | 1 | 3072 | 24 |
+| --------- | :--: | :----: | :----: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :--: | :-: |
+| FP8       |  32  |  8192  |  118   |  8  |  1  |  1  |  1  |  4  | N/A |  1  |  96  | 24  |
+| FP8       |  64  |  8192  |  118   |  8  |  1  |  1  |  1  |  8  | N/A |  1  | 192  | 24  |
+| FP8       | 128  |  8192  |  118   |  8  |  1  |  1  |  1  | 16  | N/A |  1  | 384  | 24  |
+| FP8       | 256  |  8192  |  118   |  8  |  1  |  1  |  1  | 32  | N/A |  1  | 768  | 24  |
+| FP8       | 512  |  8192  |  118   |  8  |  1  |  1  |  1  | 64  | N/A |  1  | 1536 | 24  |
+| FP8       | 1024 |  8192  |  118   |  8  |  1  |  1  |  1  | 128 | N/A |  1  | 3072 | 24  |
 
 # Performance Measurement and Analysis
 
-Performance for Nemotron-H training is measured by seconds per iteration, or in other words seconds per training step. This metric is logged for every training step in the main training log file [see Output Locations](#output-locations).
+Performance for Nemotron-H training is measured by the achieved GPU FLOPS via the `TFLOPS_per_GPU` metric, which indicates computational throughput efficiency. Additionally, training step timing (seconds per iteration) is captured and logged for every training step in the main training log file [see Output Locations](#output-locations).
 
-Since the early training steps typically take much longer time (with input prefetch, activation memory allocation, and JIT compilation), we use the `parse_train_timing.sh` script to analyze iterations 35-44 and calculate mean and standard deviation for reliable performance metrics.
+Since the early training steps typically take much longer time (with input prefetch, activation memory allocation, and JIT compilation), we use the `parse_train_timing.sh` script to analyze iterations 35-44 and calculate mean and standard deviation for reliable performance metrics for both TFLOPS per GPU and timing measurements.
 
 ### Running the parse_train_timing.sh script
 
@@ -61,6 +61,7 @@ $LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh --full-names
 ```
 
 Example output:
+
 ```shell
 Train Step Timing and TFLOPS Analysis (iterations 35-44)
 ================================================================================
@@ -69,20 +70,24 @@ Experiment                                                                      
 pretrain_nemotronh_56b_fp8_gpus128_tp4_pp1_cp1_vpNone_mbs2_gbs384_1063626                   Success         5.310        0.007             1961.50               2.80
 ```
 
-To obtain throughput as a tokens per second measurement, follow this formula: 
+To obtain throughput as a tokens per second measurement, follow this formula:
+
 ```shell
 (throughput in tokens per second) = (sequence length) * (global batch size) / training_step_timing
 ```
+
 E.g. 8192 * 384 / 5.310 = 592415
 
 To calculate time to train estimate:
+
 ```shell
 (time to train in days) = (total tokens) / (throughput in tokens per second) / (number of seconds in a day)
 ```
+
 E.g. 1e12 / 592415 / 86400 = 19.54 days
 
-
 To calculate the model flops utilization (MFU):
+
 ```shell
 MFU = (achieved TFLOPS_per_GPU) / (peak GPU FLOPS)
 ```
@@ -90,8 +95,9 @@ MFU = (achieved TFLOPS_per_GPU) / (peak GPU FLOPS)
 The peak theoretical throughput for GB200 FP8 is **4.9** PFLOPS.
 
 E.g. Nemotron-H 56B FP8 on 128x GB200 GPUs
+
 ```shell
-peak FLOPS for H100 FP8 = 4.9 PFLOPS
+peak FLOPS for GB200 FP8 = 4.9 PFLOPS
 achieved TFLOPS_per_GPU = 1961.50 TFLOPS
 
 MFU =  1961.50e+12 / 4.9e+15 = 40.03%
@@ -99,9 +105,7 @@ MFU =  1961.50e+12 / 4.9e+15 = 40.03%
 
 **Peak theoretical throughput across GPUs and Data Types (in TFLOPS)**
 
-| Data Type | GB300 | GB200 | B200 | H100 |
-| --------  | :---: | :---: | :---:| :---:|
-| FP8       | 4900  | 4900  | 4500 | 1979 |  
+For peak theoretical throughput values used in MFU calculations, see the [Peak Theoretical Throughput](../README.md#peak-theoretical-throughput) section in the main README.
 
 # Prerequisites
 
@@ -116,6 +120,7 @@ No special access required to run this benchmark.
 We reference a number of Slurm commands and parameters in this document. A brief summary is included below. It's important to note these are a guide and might not be applicable to all environments. Please consult with your system administrator for the parameters that are specific to your system.
 
 **Common parameters:**
+
 - `SBATCH_PARTITION` or `-p` - Partition (or queue) to use.
 - `SBATCH_ACCOUNT` or `-A` - Slurm account to associate with your job, different from your user. Meant for accounting purposes.
 - `SBATCH_GPUS_PER_NODE` or `--gres=gpu:<num gpus>` - If your cluster is configured with GRES this should be set to all GPUs in a node. Ignore if not configured.
@@ -133,9 +138,8 @@ The following directory layout and key variables are used in the recipe:
 - `LLMB_WORKLOAD`: Workload-specific directory, e.g. `${LLMB_INSTALL}/workloads/pretrain_nemotron-h`.
 - Results, logs, and checkpoints are stored under subfolders of `LLMB_WORKLOAD` (see below).
 
-
-
 # Prepare Dataset
+
 Since Nemotron-H training only uses synthetic datasets, this step is omitted.
 
 # Run Training
@@ -151,10 +155,36 @@ The easiest way to run benchmarks is using the llmb-run launcher tool. This meth
 cd $LLMB_INSTALL
 
 # Run a benchmark with llmb-run
-llmb-run submit -w pretrain_nemotron-h -s 56b --dtype fp8 --scale 128
+llmb-run submit -w pretrain_nemotron-h --dtype fp8 --scale 128
 
 # Example with different scale
-llmb-run submit -w pretrain_nemotron-h -s 56b --dtype fp8 --scale 1024
+llmb-run submit -w pretrain_nemotron-h --dtype fp8 --scale 1024
+```
+
+### Additional SLURM Parameters
+
+Use a SLURM reservation:
+
+```bash
+ADDITIONAL_SLURM_PARAMS="reservation=my_reservation" llmb-run submit -w pretrain_nemotron-h --dtype fp8 --scale 128
+```
+
+Run on specific nodes:
+
+```bash
+ADDITIONAL_SLURM_PARAMS="nodelist=node001,node002" llmb-run submit -w pretrain_nemotron-h --dtype fp8 --scale 128
+```
+
+Exclude specific nodes:
+
+```bash
+ADDITIONAL_SLURM_PARAMS="exclude=node003,node004" llmb-run submit -w pretrain_nemotron-h --dtype fp8 --scale 128
+```
+
+Combine multiple parameters (semicolon-separated):
+
+```bash
+ADDITIONAL_SLURM_PARAMS="nodelist=node001,node002;reservation=my_reservation;exclusive" llmb-run submit -w pretrain_nemotron-h --dtype fp8 --scale 128
 ```
 
 For more details on llmb-run usage, see the [llmb-run documentation](../cli/llmb-run/README.md).
@@ -163,7 +193,8 @@ For more details on llmb-run usage, see the [llmb-run documentation](../cli/llmb
 
 Alternatively, you can run training directly using the launch script. This method provides more control over individual parameters and environment variables.
 
-**Important**: 
+**Important**:
+
 - Ensure your virtual environment is activated before running the training commands below. If you used the installer with conda, run `conda activate $LLMB_INSTALL/venvs/<env_name>`. If you used the installer with python venv, run `source $LLMB_INSTALL/venvs/<env_name>/bin/activate`.
 - Run the launch script from the installed recipe directory: `cd $LLMB_INSTALL/llmb_repo/nemotron-h/`
 
@@ -176,64 +207,58 @@ JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] 
 ### Environment Variables
 
 **Required:**
+
 - `JOB_TOTAL_GPUS`: Number of GPUs to use
 - `GPU_TYPE`: Type of GPU hardware
   - `gb300` - NVIDIA GB300 GPUs
   - `gb200` - NVIDIA GB200 GPUs
+  - `b300` - NVIDIA B300 GPUs
   - `b200` - NVIDIA B200 GPUs
   - `h100` - NVIDIA H100 GPUs
 
 **Optional:**
+
 - `DTYPE`: Precision format (fixed: `fp8`)
+
 - `FP8_RECIPE`: FP8 recipe (fixed: `cs`)
+
 - `MODEL_SIZE`: Model variant (fixed: `56b`)
+
   - `56b` - 56 billion parameter model (only supported size)
 
-- `ADDITIONAL_SLURM_PARAMS`: Additional SLURM parameters (optional)
-  - Format: Semicolon-separated key=value pairs (use semicolons when values contain commas)
-  - Example: `"nodelist=node001,node002;constraint=gpu"`
+- `ADDITIONAL_SLURM_PARAMS`: Extra `sbatch` flags (e.g. `--nodelist`, `--reservation`), semicolon-separated
+
+  - Example: `"nodelist=node001,node002;reservation=my_reservation;exclusive"`
 
 **Note:** This workload only supports:
+
 - FP8 precision
 - 56B model size
 
 ### Example Commands
 
 Train Nemotron-H 56B with FP8 precision on 128 GB300 GPUs:
+
 ```shell
 JOB_TOTAL_GPUS=128 GPU_TYPE=GB300 ./launch.sh
 ```
 
 Train Nemotron-H 56B with FP8 precision on 128 GB200 GPUs:
+
 ```shell
 JOB_TOTAL_GPUS=128 GPU_TYPE=GB200 ./launch.sh
 ```
 
 Train Nemotron-H 56B with FP8 precision on 128 B200 GPUs:
+
 ```shell
 JOB_TOTAL_GPUS=128 GPU_TYPE=B200 ./launch.sh
 ```
 
 Train Nemotron-H 56B with FP8 precision on 128 H100 GPUs:
+
 ```shell
 JOB_TOTAL_GPUS=128 GPU_TYPE=H100 ./launch.sh
-```
-
-### SLURM Node Specification Examples
-
-Train on specific nodes:
-```shell
-ADDITIONAL_SLURM_PARAMS="nodelist=node001,node002" JOB_TOTAL_GPUS=128 GPU_TYPE=gb200 ./launch.sh
-```
-
-Train with node constraints:
-```shell
-ADDITIONAL_SLURM_PARAMS="constraint=gpu&memory;exclusive" JOB_TOTAL_GPUS=256 GPU_TYPE=gb200 ./launch.sh
-```
-
-Train using a SLURM reservation:
-```shell
-ADDITIONAL_SLURM_PARAMS="reservation=my_reservation" JOB_TOTAL_GPUS=512 GPU_TYPE=h100 ./launch.sh
 ```
 
 # Output Locations
@@ -255,49 +280,60 @@ experiments/
 The `<experiment_name>` typically follows the pattern: `pretrain_nemotron-h_56b_<dtype>_<scale>_<config>`
 
 **Key files:**
-- `log-<experiment_name>.out` - Contains training step timing and performance metrics analyzed by `parse_train_timing.sh`
-- `nsys_profile/` - Contains profiling traces when `ENABLE_PROFILE=true`
 
-# Run Nsight Profiling
-To enable profiling with Nsight Systems set variable `ENABLE_PROFILE=true` when submitting your job. The job will run for a total of 50 steps where steps 45-50 will be profiled.
+- `log-<experiment_name>.out` - Contains training step timing and performance metrics analyzed by `parse_train_timing.sh`
+- `nsys_profile/` - Contains profiling traces when using the `-p` flag with `llmb-run` or when `ENABLE_PROFILE=true`
+
+# Profiling
+
+Profiling is supported with Nsight Systems.
+
+## Run Nsight Profiling
+
+To enable profiling with Nsight Systems, use the `-p` flag with `llmb-run` or set `ENABLE_PROFILE=true` when submitting your job. The job will run for a total of 50 steps where steps 45-50 will be profiled.
 
 In order to view the resulting profiles, ensure you have the latest version of Nsight Systems installed. For more information visit: [Nsight Systems](https://docs.nvidia.com/nsight-systems/)
 
 ### Profiling job details:
-* **MPI Ranks:** all ranks
-* **Job Steps:** 45-50
-* **Output Location:** Profiling output saved alongside training results ([see Output Locations](#output-locations))
-* **Filename format:** `profile_{SLURM_JOBID}_{SLURM_NODEID}_{SLURM_PROCID}.nsys-rep`
+
+- **MPI Ranks:** all ranks
+- **Job Steps:** 45-50
+- **Output Location:** Profiling output saved alongside training results ([see Output Locations](#output-locations))
+- **Filename format:** `profile_{SLURM_JOBID}_{SLURM_NODEID}_{SLURM_PROCID}.nsys-rep`
 
 **Example command:**
+
 ```shell
-ENABLE_PROFILE=true JOB_TOTAL_GPUS=128 GPU_TYPE=gb200 ./launch.sh
+llmb-run submit -w pretrain_nemotron-h --dtype fp8 --scale 128 -p
 ```
 
 ### Customizing profiling behavior:
-* Specify job steps to profile:
-  * `PROFILE_START_STEP`: start profiling on this job step.
-	  - Default: 45
-  * `PROFILE_STOP_STEP`: stop profiling on this job step.
+
+- Specify job steps to profile:
+  - `PROFILE_START_STEP`: start profiling on this job step.
+    - Default: 45
+  - `PROFILE_STOP_STEP`: stop profiling on this job step.
     - Default: 50
-* Enable GPU metrics collection:
-  * `ENABLE_GPU_METRICS`: Enable GPU metrics collection during Nsight profiling (default: false)
-  - When set to `true` along with `ENABLE_PROFILE=true`, captures detailed GPU performance metrics
-  - Provides additional GPU utilization, memory usage, and compute efficiency data
-  - May require additional system configuration for GPU device metrics to work properly
+- Enable GPU metrics collection:
+  - `ENABLE_GPU_METRICS`: Enable GPU metrics collection during Nsight profiling (default: false)
+  * When set to `true` along with `ENABLE_PROFILE=true`, captures detailed GPU performance metrics
+  * Provides additional GPU utilization, memory usage, and compute efficiency data
+  * May require additional system configuration for GPU device metrics to work properly
 
 **Example command with GPU metrics:**
+
 ```shell
-ENABLE_PROFILE=true ENABLE_GPU_METRICS=true JOB_TOTAL_GPUS=128 GPU_TYPE=gb200 ./launch.sh
+ENABLE_GPU_METRICS=true llmb-run submit -w pretrain_nemotron-h --dtype fp8 --scale 128 -p
 ```
 
 ### Viewing results
 
-In order to view the profile traces (*.nsys-rep files) interactively:
+In order to view the profile traces (\*.nsys-rep files) interactively:
+
 - Install the latest [Nsight Systems client](https://developer.nvidia.com/nsight-systems/get-started) on your preferred system
 - Copy the generated .nsys-rep files to a folder on your preferred system. E.g., /home/nsight-traces/
 - Open Nsight Systems client, then click "File | Open" and select one or more .nsys-rep files from /home/nsight-systems folder. For more details, see [Reading Your Report in GUI guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#opening-an-existing-report).
-- Once loaded you can analyze the workload behavior to learn about any performance bottlenecks associated with the model or the job run. 
+- Once loaded you can analyze the workload behavior to learn about any performance bottlenecks associated with the model or the job run.
 
 Since most of the benchmarking jobs run on multiple GPUs, there will be multiple .nsys-rep files generated for each run. [Multi-Report Analysis Guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#multi-report-analysis) will be very helpful to automate the analysis and get to results quicker by using Nsight recipes.
 

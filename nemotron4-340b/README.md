@@ -1,93 +1,48 @@
 # Overview
 
-This recipe contains information and scripts to produce performance results for the Nemotron 4 340b pre-training workloads. The scripts help perform environment setup and launch benchmark jobs.
+This recipe contains information and scripts to produce performance results for the Nemotron 4 340b pre-training workloads. The scripts help perform environment setup and launch benchmark jobs. Configurations use weak scaling methodology (global batch size scales proportionally with GPU count). B200 also includes strong scaling configurations where the global batch size remains constant.
 
-## H100
+## GB300 and GB200
 
-340 billion parameter variant (FP8/BF16)
-
-- At least 128 GPUs with at least 80GB memory each.
-
-| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
-|------|:---------:|:----:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:----:|:---:|
-| 340b | BF16/FP8  | 256  | 4096   | 96     | 8   | 8   | 1   | NA  | 4   | 12  | 1   | 64   | 16 |
-| 340b | BF16/FP8  | 512  | 4096   | 96     | 8   | 8   | 1   | NA  | 8   | 12  | 1   | 128   | 16 |
-| 340b | BF16/FP8  | 1024  | 4096   | 96     | 8   | 8   | 1   | NA  | 16   | 12  | 1   | 256   | 16 |
-| 340b | BF16/FP8  | 2048  | 4096   | 96     | 8   | 8   | 1   | NA  | 32   | 12  | 1   | 512   | 16 |
-
-## GB200
-
-340 billion parameter variant (FP8/BF16)
-
-- At least 128 GPUs with at least 80GB memory each.
-- The GB200 recipes listed below progressively increase GPU count, with configurations weak-scaled to match.
-
-| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | VP  | MBS | GBS | DP   | GA  |
-|------|:--------:|:------:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 340b  | BF16/FP8 | 128  | 4096   | 96     | 8   | 4   | 1   | 12  | 1   | 32   |4    | 8   |
-| 340b  | BF16/FP8 | 256  | 4096   | 96     | 8   | 4   | 1   | 12  | 1   | 64   |8    | 8   |
-| 340b  | BF16/FP8 | 512  | 4096   | 96     | 8   | 4   | 1   | 12  | 1   | 128  |16   | 8   |
-
-- Strong Scaling, where GBS remains constant across increasing GPU counts and reducing gradient accumulation. 
-
-| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | VP  | MBS | GBS | DP  | GA   |
-|------|:--------:|:------:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 340b  | BF16/FP8  | 128  | 4096   | 96     | 8   | 4   | 1   | 12  | 1   | 512 | 4   | 128  |
-| 340b  | BF16/FP8  | 256  | 4096   | 96     | 8   | 4   | 1   | 12  | 1   | 512 | 8   | 64   |
-| 340b  | BF16/FP8  | 512  | 4096   | 96     | 8   | 4   | 1   | 12  | 1   | 512 | 16  | 32   |
-
-## GB300
-
-340 billion parameter variant (FP8/BF16)
-
-- At least 128 GPUs with at least 80GB memory each.
-- The GB300 recipes listed below progressively increase GPU count, with configurations weak-scaled to match.
-
-| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | VP  | MBS | GBS | DP   | GA  |
-|------|:--------:|:------:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 340b  | BF16/FP8 | 128  | 4096   | 96     | 8   | 4   | 1   | 12  | 1   | 32   |4    | 8   |
-| 340b  | BF16/FP8 | 256  | 4096   | 96     | 8   | 4   | 1   | 12  | 1   | 64   |8    | 8   |
-| 340b  | BF16/FP8 | 512  | 4096   | 96     | 8   | 4   | 1   | 12  | 1   | 128  |16   | 8   |
-
-- Strong Scaling, where GBS remains constant across increasing GPU counts and reducing gradient accumulation.
-
-| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | VP  | MBS | GBS | DP  | GA   |
-|------|:--------:|:------:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 340b  | BF16/FP8  | 128  | 4096   | 96     | 8   | 4   | 1   | 12  | 1   | 512 | 4   | 128  |
-| 340b  | BF16/FP8  | 256  | 4096   | 96     | 8   | 4   | 1   | 12  | 1   | 512 | 8   | 64   |
-| 340b  | BF16/FP8  | 512  | 4096   | 96     | 8   | 4   | 1   | 12  | 1   | 512 | 16  | 32   |
+| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS | GA  |
+| ---- | :-------: | :--: | :----: | :----: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+| 340b | BF16/FP8  | 256  |  4096  |   96   |  8  |  8  |  1  |  1  |  4  | 12  |  1  | 64  | 16  |
+| 340b | BF16/FP8  | 512  |  4096  |   96   |  8  |  8  |  1  |  1  |  8  | 12  |  1  | 128 | 16  |
+| 340b | BF16/FP8  | 1024 |  4096  |   96   |  8  |  8  |  1  |  1  | 16  | 12  |  1  | 256 | 16  |
+| 340b | BF16/FP8  | 2048 |  4096  |   96   |  8  |  8  |  1  |  1  | 32  | 12  |  1  | 512 | 16  |
 
 ## B200
 
-340 billion parameter variant (FP8/BF16)
-
-- At least 128 GPUs with at least 180GB memory each.
-- The B200 recipes listed below progressively increase GPU count, with configurations weak-scaled to match.
-
-| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | VP  | MBS | GBS | DP   | GA  |
-|------|:--------:|:------:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 340b  | BF16/FP8 | 128  | 4096   | 96     | 8   | 4   | 1   | 12  | 1   | 32   |4    | 8   |
-| 340b  | BF16/FP8 | 256  | 4096   | 96     | 8   | 4   | 1   | 12  | 1   | 64   |8    | 8   |
-| 340b  | BF16/FP8 | 512  | 4096   | 96     | 8   | 4   | 1   | 12  | 1   | 128  |16   | 8   |
-| 340b  | BF16/FP8 | 1024 | 4096   | 96     | 8   | 4   | 1   | 12  | 1   | 256  |32   | 8   |
+| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | VP  | MBS | GBS | DP  | GA  |
+| ---- | :-------: | :--: | :----: | :----: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+| 340b | BF16/FP8  | 128  |  4096  |   96   |  8  |  4  |  1  | 12  |  1  | 32  |  4  |  8  |
+| 340b | BF16/FP8  | 256  |  4096  |   96   |  8  |  4  |  1  | 12  |  1  | 64  |  8  |  8  |
+| 340b | BF16/FP8  | 512  |  4096  |   96   |  8  |  4  |  1  | 12  |  1  | 128 | 16  |  8  |
+| 340b | BF16/FP8  | 1024 |  4096  |   96   |  8  |  4  |  1  | 12  |  1  | 256 | 32  |  8  |
 
 - Strong Scaling, where GBS remains constant across increasing GPU counts and reducing gradient accumulation.
 
-| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | VP  | MBS | GBS | DP  | GA   |
-|------|:--------:|:------:|:------:|:------:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 340b  | BF16/FP8 | 128  | 4096   | 96     | 8   | 4   | 1   | 12  | 1   | 512 | 4   | 128  |
-| 340b  | BF16/FP8 | 256  | 4096   | 96     | 8   | 4   | 1   | 12  | 1   | 512 | 8   | 64   |
-| 340b  | BF16/FP8 | 512  | 4096   | 96     | 8   | 4   | 1   | 12  | 1   | 512 | 16  | 32   |
-| 340b  | BF16/FP8 | 1024 | 4096   | 96     | 8   | 4   | 1   | 12  | 1   | 512 | 32  | 16   |
+| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | VP  | MBS | GBS | DP  | GA  |
+| ---- | :-------: | :--: | :----: | :----: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+| 340b | BF16/FP8  | 128  |  4096  |   96   |  8  |  4  |  1  | 12  |  1  | 512 |  4  | 128 |
+| 340b | BF16/FP8  | 256  |  4096  |   96   |  8  |  4  |  1  | 12  |  1  | 512 |  8  | 64  |
+| 340b | BF16/FP8  | 512  |  4096  |   96   |  8  |  4  |  1  | 12  |  1  | 512 | 16  | 32  |
+| 340b | BF16/FP8  | 1024 |  4096  |   96   |  8  |  4  |  1  | 12  |  1  | 512 | 32  | 16  |
 
+## H100
+
+| Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS | GA  |
+| ---- | :-------: | :--: | :----: | :----: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+| 340b | BF16/FP8  | 256  |  4096  |   96   |  8  |  8  |  1  |  1  |  4  | 12  |  1  | 64  | 16  |
+| 340b | BF16/FP8  | 512  |  4096  |   96   |  8  |  8  |  1  |  1  |  8  | 12  |  1  | 128 | 16  |
+| 340b | BF16/FP8  | 1024 |  4096  |   96   |  8  |  8  |  1  |  1  | 16  | 12  |  1  | 256 | 16  |
+| 340b | BF16/FP8  | 2048 |  4096  |   96   |  8  |  8  |  1  |  1  | 32  | 12  |  1  | 512 | 16  |
 
 # Performance Measurement and Analysis
 
-Performance for Nemotron4 training is measured by seconds per iteration, or in other words seconds per training step. This metric is logged for every training step in the main training log file [see Output Locations](#output-locations).
+Performance for Nemotron4 training is measured by the achieved GPU FLOPS via the `TFLOPS_per_GPU` metric, which indicates computational throughput efficiency. Additionally, training step timing (seconds per iteration) is captured and logged for every training step in the main training log file [see Output Locations](#output-locations).
 
-This recipe supports two cluster types: Slurm and Run:ai. We expect cluster type to have a negligible impact to performance. Application performance on a Run:ai cluster matches performance on a Slurm cluster.
-
-Since the early training steps typically take much longer time (with input prefetch, activation memory allocation, and JIT compilation), we use the `parse_train_timing.sh` script to analyze iterations 35-44 and calculate mean and standard deviation for reliable performance metrics. We also get the achieved GPU FLOPS via `TFLOPS_per_GPU` metric.
+Since the early training steps typically take much longer time (with input prefetch, activation memory allocation, and JIT compilation), we use the `parse_train_timing.sh` script to analyze iterations 35-44 and calculate mean and standard deviation for reliable performance metrics for both TFLOPS per GPU and timing measurements.
 
 ### Running the parse_train_timing.sh script
 
@@ -111,6 +66,7 @@ $LLMB_INSTALL/llmb_repo/common/parse_train_timing.sh --full-names
 ```
 
 Example output:
+
 ```shell
 Train Step Timing and TFLOPS Analysis (iterations 35-44)
 ================================================================================
@@ -119,7 +75,8 @@ Experiment                                                                      
 pretrain_nemotron4_340b_fp8_gpus128_tp8_pp4_cp1_vp12_mbs1_gbs512_389757                     Success        21.542        0.010             1600.74               0.78
 ```
 
-To obtain throughput as a tokens per second measurement, follow this formula: 
+To obtain throughput as a tokens per second measurement, follow this formula:
+
 ```shell
 (sequence length) * (global batch size) / (training_step_timing) = (throughput in tokens per second)
 ```
@@ -127,19 +84,23 @@ To obtain throughput as a tokens per second measurement, follow this formula:
 E.g. 4096 * 256 / 2.693 = 389371
 
 To calculate time to train estimate:
+
 ```shell
 (total tokens) / (throughput in tokens per second) / (number of seconds in a day) = (time to train in days) 
 ```
-E.g. 1e12 / 389371 / 86400 = 29.7 days 
 
+E.g. 1e12 / 389371 / 86400 = 29.7 days
 
 To calculate the model flops utilization (MFU):
+
 ```shell
 MFU = (global batch size) * (model flops) / (training step time) / (number of GPUs) / (peak GPU FLOPS)
 ```
+
 The model flops for Nemotron4 340b for GBS=1 is 8.62124e15. Calculation shown [here](#mfu-formula).
 
 E.g. Nemotron4 340b BF16 on 256x H100 GPUs (GBS=64)
+
 ```shell
 peak FLOPS for H100 BF16 = 989 TFLOPS
 training step time = 4.31 s
@@ -147,12 +108,10 @@ model flops = 8.62124e15
 
 MFU = 64 * 8.62124e15 / 4.31 / 256 / 989e+12 = 50.5%
 ```
+
 **Peak theoretical throughput across GPUs and Data Types (in TFLOPS)**
 
-| Data Type | GB300 | GB200 | B200 | H100 |
-| --------  | :---: | :---: | :---:| :---:|
-| BF16      | 2450  | 2450  | 2250 | 989  |
-| FP8       | 4900  | 4900  | 4500 | 1979 |
+For peak theoretical throughput values used in MFU calculations, see the [Peak Theoretical Throughput](../README.md#peak-theoretical-throughput) section in the main README.
 
 # Prerequisites
 
@@ -169,10 +128,11 @@ No special access is required to run this benchmark.
 We reference a number of Slurm commands and parameters in this document. A brief summary is included below. It's important to note these are a guide and might not be applicable to all environments. Please consult with your system administrator for the parameters that are specific to your system.
 
 **Common parameters:**
+
 - `SBATCH_PARTITION` or `-p` - Partition (or queue) to use.
 - `SBATCH_ACCOUNT` or `-A` - Slurm account to associate with your job, different from your user. Meant for accounting purposes.
 - `SBATCH_GPUS_PER_NODE` or `--gres=gpu:<num gpus>` - If your cluster is configured with GRES this should be set to all GPUs in a node. Ignore if not configured.
-	- Encountering errors such as 'GPUs not found' or 'Cannot submit to this partition without GPU resources' means this setting is required.
+  - Encountering errors such as 'GPUs not found' or 'Cannot submit to this partition without GPU resources' means this setting is required.
 
 These parameters can be set either by exporting the environment variable or using the corresponding `sbatch` flag.
 
@@ -187,6 +147,7 @@ The following directory layout and key variables are used in the recipe:
 - Results, logs, and checkpoints are stored under subfolders of `LLMB_WORKLOAD` (see below).
 
 #### Set the environment variables
+
 ```shell
 # Set the path where all artifacts will be downloaded
 export LLMB_INSTALL=<path to your shared file system folder> (e.g. /lustre/myproject/nemo)
@@ -198,13 +159,15 @@ export LLMB_INSTALL=<path to your shared file system folder> (e.g. /lustre/mypro
 
 The workload relies on python virtual environment in order ensure there are no conflicts between required dependencies and user's packages. We require Python 3.12.x for the workload to work.
 
-There are multiple choices available to set up virtual environment: 
-* conda
-* python venv
+There are multiple choices available to set up virtual environment:
 
-##### Conda 
+- conda
+- python venv
+
+##### Conda
 
 To install and activate conda virtual environment
+
 ```shell
 # pick INSTALL_PATH with sufficient disk space
 INSTALL_PATH=~
@@ -218,73 +181,28 @@ conda activate nemo2-nemotron
 ```
 
 When you are finished running this benchmark you can deactivate the environment, run this command
+
 ```shell
 conda deactivate
 ```
 
 ##### Python venv
 
-To install and activate python venv 
+To install and activate python venv
+
 ```shell
 python3 -m venv $LLMB_INSTALL/venvs/<venv_name>
 source $LLMB_INSTALL/venvs/<venv_name>/bin/activate
 ```
 
 When you are finished running this benchmark you can deactivate the environment, run this command
+
 ```shell
 deactivate
 ```
 
-#### Setup script
-
-Create a install directory by running the attached setup.sh. 
-
-```shell
-# activate virtual python environment setup previously
-export CLUSTER_TYPE=runai
-./setup.sh
-```
-
-**Note**: output log from running `setup.sh` script may include an error about tritonclient dependency. The error can be ignored as it doesn't affect benchmark functionality. 
-It would look like this:
-`ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
-tritonclient 2.51.0 requires urllib3>=2.0.7, but you have urllib3 1.26.20 which is incompatible.`
-
-### Install Run:ai CLI tooling
-
-
-- Open https://nvidia.run.ai/ web page and login to your Run:ai cluster
-- Install Run:ai (CLI tool) by clicking top right "? | Researcher Command Line Interface" and following instructions
-- Obtain latest kubeconfig file (e.g., my_runaicluster.kubeconfig) from cluster administrator 
-- `cp my_runaicluster.kubeconfig ~/.kube/config`
-- Login to your cluster via Run:ai CLI:
-  - `runai login` if you have login with browser available OR
-  - `runai login remote-browser` otherwise where you can authenticate from any machine and copy/paste authentication code
-- `runai kubeconfig set`
-- Set your current cluster via Run:ai CLI tool:
-  - `runai cluster` 
-  - Pick your cluster and press Enter
-
-
-**Required environment variables:**
-
-Make sure that the environment variables below have been set before submitting recipe job on Run:AI cluster.
-- `RUN_CONF_MOUNTS` - PVCs that will be mounted into your environment. This should be in the form `name:path:k8s-claimName`. Confirm that the path to PVC exists in Run:ai UI under "Assets | Data Sources"
-  e.g., `export RUN_CONF_MOUNTS="workspace:/nemo2-workspace:nemo2-workspace-project-hprdj"`
-- `BASE_URL`- NVIDIA Run:ai API url to use for experiment. Should look like `https://<base-url>/api/v1`. 
-  e.g., `export BASE_URL=https://nvidia.run.ai/api/v1`
-- `APP_ID` - name of NVIDIA Run:ai Application. The APP_ID value should be listed in Run:ai web UI under "Access | Applications"
-  e.g., `export APP_ID=llmb-qa`
-- `APP_SECRET` - NVIDIA Run:ai Application secret. Make sure the value is correct before launching the job. Contact your Run:ai cluster admin to provide you with latest application secret
-- `PROJECT_NAME` - NVIDIA Run:ai Project to run the experiment in
-  e.g., `llmb-testing`
-- `PVC_DIR` - path to nemo-run dir in the mounted PVC. Should look like `/mount/nemo-run`
-  e.g., `export PVC_DIR="/nemo2-workspace/nemo-run"`
-
-These parameters must be set to launch your job on Run:ai. They can be set by exporting the environment variables.
-
-
 # Prepare Dataset
+
 Since Nemotron4 training only uses synthetic datasets, this step is omitted.
 
 # Run Training
@@ -300,19 +218,45 @@ The easiest way to run benchmarks is using the llmb-run launcher tool. This meth
 cd $LLMB_INSTALL
 
 # Run a benchmark with llmb-run
-llmb-run submit -w pretrain_nemotron4-340b -s 340b --dtype bf16 --scale 256
+llmb-run submit -w pretrain_nemotron4-340b --dtype bf16 --scale 256
+```
+
+### Additional SLURM Parameters
+
+Use a SLURM reservation:
+
+```bash
+ADDITIONAL_SLURM_PARAMS="reservation=my_reservation" llmb-run submit -w pretrain_nemotron4-340b --dtype fp8 --scale 128
+```
+
+Run on specific nodes:
+
+```bash
+ADDITIONAL_SLURM_PARAMS="nodelist=node001,node002" llmb-run submit -w pretrain_nemotron4-340b --dtype fp8 --scale 128
+```
+
+Exclude specific nodes:
+
+```bash
+ADDITIONAL_SLURM_PARAMS="exclude=node003,node004" llmb-run submit -w pretrain_nemotron4-340b --dtype fp8 --scale 128
+```
+
+Combine multiple parameters (semicolon-separated):
+
+```bash
+ADDITIONAL_SLURM_PARAMS="nodelist=node001,node002;reservation=my_reservation;exclusive" llmb-run submit -w pretrain_nemotron4-340b --dtype fp8 --scale 128
 ```
 
 For more details on llmb-run usage, see the [llmb-run documentation](../cli/llmb-run/README.md).
 
-## Direct Method (SLURM or Run:ai)
+## Direct Method
 
 Alternatively, you can run training directly using the launch script. This method provides more control over individual parameters and environment variables.
 
 The training will run for the first 50 steps and will stop afterwards. Log files and results will be located under the `${LLMB_WORKLOAD}/experiments/` folder.
 
+**Important**:
 
-**Important**: 
 - Ensure your virtual environment is activated before running the training commands below. If you used the installer with conda, run `conda activate $LLMB_INSTALL/venvs/<env_name>`. If you used the installer with python venv, run `source $LLMB_INSTALL/venvs/<env_name>/bin/activate`.
 - Run the launch script from the installed recipe directory: `cd $LLMB_INSTALL/llmb_repo/nemotron4-340b/`
 
@@ -325,6 +269,7 @@ JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] 
 ### Environment Variables
 
 **Required:**
+
 - `JOB_TOTAL_GPUS`: Number of GPUs to use
 - `GPU_TYPE`: Type of GPU hardware
   - `gb300` - NVIDIA GB300 GPUs
@@ -333,48 +278,36 @@ JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] 
   - `h100` - NVIDIA H100 GPUs
 
 **Optional:**
+
 - `DTYPE`: Precision format (default: `fp8`)
   - `fp8` - FP8 precision
   - `bf16` - BFloat16 precision
 - `MODEL_SIZE`: Model variant
   - `340b` - 340 billion parameter model
-- `CLUSTER_TYPE`: Cluster management system (default: `slurm`)
-  - `slurm` - Slurm workload manager 
-  - `runai` - Run:AI platform
 - `STRONG_SCALING`: Scaling behavior (default: `false`)
   - `true` - Keep global batch size constant when scaling GPUs
   - `false` - Scale global batch size with GPU count
-- `ADDITIONAL_SLURM_PARAMS`: Additional SLURM parameters (optional)
-  - Format: Semicolon-separated key=value pairs (use semicolons when values contain commas)
-  - Example: `"nodelist=node001,node002;constraint=gpu"`
+- `ADDITIONAL_SLURM_PARAMS`: Extra `sbatch` flags (e.g. `--nodelist`, `--reservation`), semicolon-separated
+  - Example: `"nodelist=node001,node002;reservation=my_reservation;exclusive"`
 
 ### SLURM Example Commands
 
 Train Nemotron4 340B with FP8 precision on 256 GB200 GPUs:
+
 ```shell
 JOB_TOTAL_GPUS=256 GPU_TYPE=gb200 ./launch.sh
 ```
 
 Train Nemotron4 340B, FP8 precision with strong scaling enabled on 256 B200 GPUs:
+
 ```shell
 JOB_TOTAL_GPUS=256 GPU_TYPE=b200 STRONG_SCALING=true ./launch.sh
 ```
 
 Train Nemotron4 340B with FP8 precision on 256 GB200 GPUs:
+
 ```shell
 JOB_TOTAL_GPUS=256  GPU_TYPE=gb200 ./launch.sh
-```
-
-### SLURM Node Specification Examples
-
-Train Nemotron4 340B on nodes with specific constraints:
-```shell
-ADDITIONAL_SLURM_PARAMS="constraint=gpu&memory;exclusive" JOB_TOTAL_GPUS=256 GPU_TYPE=gb200 ./launch.sh
-```
-
-Train with reservation and additional constraints:
-```shell
-ADDITIONAL_SLURM_PARAMS="reservation=gpu_reservation;constraint=gpu" JOB_TOTAL_GPUS=128 GPU_TYPE=gb200 ./launch.sh
 ```
 
 # Output Locations
@@ -396,49 +329,60 @@ experiments/
 The `<experiment_name>` typically follows the pattern: `pretrain_nemotron4_<size>_<dtype>_<scale>_<config>`
 
 **Key files:**
-- `log-<experiment_name>.out` - Contains training step timing and performance metrics analyzed by `parse_train_timing.sh`
-- `nsys_profile/` - Contains profiling traces when `ENABLE_PROFILE=true`
 
-# Run Nsight Profiling
-To enable profiling with Nsight Systems set variable `ENABLE_PROFILE=true` when submitting your job. The job will run for a total of 50 steps where steps 45-50 will be profiled.
+- `log-<experiment_name>.out` - Contains training step timing and performance metrics analyzed by `parse_train_timing.sh`
+- `nsys_profile/` - Contains profiling traces when using the `-p` flag with `llmb-run` or when `ENABLE_PROFILE=true`
+
+# Profiling
+
+Profiling is supported with Nsight Systems.
+
+## Run Nsight Profiling
+
+To enable profiling with Nsight Systems, use the `-p` flag with `llmb-run` or set `ENABLE_PROFILE=true` when submitting your job. The job will run for a total of 50 steps where steps 45-50 will be profiled.
 
 In order to view the resulting profiles, ensure you have the latest version of Nsight Systems installed. For more information visit: [Nsight Systems](https://docs.nvidia.com/nsight-systems/)
 
 ### Profiling job details:
-* **MPI Ranks:** 0-8
-* **Job Steps:** 45-50
-* **Output Location:** Profiling output saved alongside training results (see Output Locations)
-* **Filename format:** `profile_${SLURM_JOB_ID}_nodeId_rankId.nsys-rep`
+
+- **MPI Ranks:** 0-8
+- **Job Steps:** 45-50
+- **Output Location:** Profiling output saved alongside training results (see Output Locations)
+- **Filename format:** `profile_${SLURM_JOB_ID}_nodeId_rankId.nsys-rep`
 
 **Example command:**
+
 ```shell
-ENABLE_PROFILE=true JOB_TOTAL_GPUS=128 DTYPE=fp8 GPU_TYPE=gb200 ./launch.sh
+llmb-run submit -w pretrain_nemotron4-340b --dtype fp8 --scale 128 -p
 ```
 
 ### Customizing profiling behavior:
-* Specify job steps to profile:
-	* `PROFILE_START_STEP`: start profiling on this job step.
-	- Default: 45
-	* `PROFILE_STOP_STEP`: stop profiling on this job step.
-	- Default: 50
-* Enable GPU metrics collection:
-	* `ENABLE_GPU_METRICS`: Enable GPU metrics collection during Nsight profiling (default: false)
-	- When set to `true` along with `ENABLE_PROFILE=true`, captures detailed GPU performance metrics
-	- Provides additional GPU utilization, memory usage, and compute efficiency data
-	- May require additional system configuration for GPU device metrics to work properly
+
+- Specify job steps to profile:
+  - `PROFILE_START_STEP`: start profiling on this job step.
+  * Default: 45
+  - `PROFILE_STOP_STEP`: stop profiling on this job step.
+  * Default: 50
+- Enable GPU metrics collection:
+  - `ENABLE_GPU_METRICS`: Enable GPU metrics collection during Nsight profiling (default: false)
+  * When set to `true` along with `ENABLE_PROFILE=true`, captures detailed GPU performance metrics
+  * Provides additional GPU utilization, memory usage, and compute efficiency data
+  * May require additional system configuration for GPU device metrics to work properly
 
 **Example command with GPU metrics:**
+
 ```shell
-ENABLE_PROFILE=true ENABLE_GPU_METRICS=true JOB_TOTAL_GPUS=128 GPU_TYPE=gb200 DTYPE=fp8 ./launch.sh
+ENABLE_GPU_METRICS=true llmb-run submit -w pretrain_nemotron4-340b --dtype fp8 --scale 128 -p
 ```
 
 ### Viewing results
 
-In order to view the profile traces (*.nsys-rep files) interactively:
+In order to view the profile traces (\*.nsys-rep files) interactively:
+
 - Install the latest [Nsight Systems client](https://developer.nvidia.com/nsight-systems/get-started) on your preferred system
 - Copy the generated .nsys-rep files to a folder on your preferred system. E.g., /home/nsight-traces/
 - Open Nsight Systems client, then click "File | Open" and select one or more .nsys-rep files from /home/nsight-systems folder. For more details, see [Reading Your Report in GUI guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#opening-an-existing-report).
-- Once loaded you can analyze the workload behavior to learn about any performance bottlenecks associated with the model or the job run. 
+- Once loaded you can analyze the workload behavior to learn about any performance bottlenecks associated with the model or the job run.
 
 Since most of the benchmarking jobs run on multiple GPUs, there will be multiple .nsys-rep files generated for each run. [Multi-Report Analysis Guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#multi-report-analysis) will be very helpful to automate the analysis and get to results quicker by using Nsight recipes.
 
@@ -446,32 +390,36 @@ Since most of the benchmarking jobs run on multiple GPUs, there will be multiple
 
 # Run With Checkpoints
 
-Checkpoint save and load can be enabled for this workload in order to measure the impact of storage on checkpointing operations. The additional collected metrics are: time to save a checkpoint and time to load a checkpoint. 
+Checkpoint save and load can be enabled for this workload in order to measure the impact of storage on checkpointing operations. The additional collected metrics are: time to save a checkpoint and time to load a checkpoint.
 
 ## Save Checkpoint
 
-Save checkpoint feature works for Nemotron4 340b sizes with either FP8 or BF16 precision. Make sure your file system has sufficient disk space to accomodate checkpoint sizes below:
+Save checkpoint feature works for Nemotron4 340b sizes with either FP8 or BF16 precision. Make sure your file system has sufficient disk space to accommodate checkpoint sizes below:
 
-| Model | Checkpoint Size | Minimum Tested  Scale H100 | Minimum Tested Scale GB200 | Minimum Tested Scale B200 |
-| :---: | :---: |  :---: | :---: | :---: |
-| 340b | ~4.4 TB | 512 | 128 | 128 |
+| Model | Checkpoint Size | Minimum Tested Scale H100 | Minimum Tested Scale GB200 | Minimum Tested Scale B200 |
+| :---: | :-------------: | :-----------------------: | :------------------------: | :-----------------------: |
+| 340b  |     ~4.4 TB     |            512            |            128             |            128            |
 
 ### How to enable
-To save the checkpoints after pretraining nemotron4 model for `max_steps`, you need to set environment variable `ENABLE_CHECKPOINT=true`. At the end of the pretraining the checkpoints will be saved in the  `${LLMB_WORKLOAD}/experiments` folder.
+
+To save the checkpoints after pretraining nemotron4 model for `max_steps`, you need to set environment variable `ENABLE_CHECKPOINT=true`. At the end of the pretraining the checkpoints will be saved in the `${LLMB_WORKLOAD}/experiments` folder.
 
 ```shell
 experiment_name = pretrain_nemotron4_${MODEL_SIZE}_${DTYPE}_${JOB_TOTAL_GPUS}
 timestamp = date '+%s'
 Example directory where checkpoints are saved is ${LLMB_WORKLOAD}/experiments/$experiment_name/${experiment_name}_${timestamp}/$experiment_name/code/nemo_experiments/default/checkpoints/
 ```
+
 Command to run nemotron4 with checkpoint save enabled
+
 ```shell
-ENABLE_CHECKPOINT=true DTYPE=<precision> MODEL_SIZE=<size> JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> STRONG_SCALING=<bool> ./launch.sh
+ENABLE_CHECKPOINT=true STRONG_SCALING=<bool> llmb-run submit -w pretrain_nemotron4-340b --dtype <precision> --scale <number>
 ```
 
 ### How to validate
-- Check `${LLMB_WORKLOAD}/experiments/$experiment_name/${experiment_name}_${timestamp}/$experiment_name/code/nemo_experiments/default/checkpoints/*/weights` folder that it contains *.distcp files
-- Check job output log-*.out file (see Training section for reference) for entries like
+
+- Check `${LLMB_WORKLOAD}/experiments/$experiment_name/${experiment_name}_${timestamp}/$experiment_name/code/nemo_experiments/default/checkpoints/*/weights` folder that it contains \*.distcp files
+- Check job output log-\*.out file (see Training section for reference) for entries like
   ```
   [NeMo I 2025-04-11 14:48:45 nemo_logging:393] Global Checkpoint Save : Rank: 0 : Iteration: 50 : Start time: 1744408121.151s : Save duration: 4.389s
   ```
@@ -480,29 +428,31 @@ ENABLE_CHECKPOINT=true DTYPE=<precision> MODEL_SIZE=<size> JOB_TOTAL_GPUS=<numbe
 
 Load checkpoint feature works successfully at the following scales:
 
-| Model | Minimum Tested Scale H100 |  Minimum Tested Scale GB200 |  Minimum Tested Scale B200 |
-| :---: | :---: | :---: | :---: |
-| 340b | 512 | 128 | 128 |
+| Model | Minimum Tested Scale H100 | Minimum Tested Scale GB200 | Minimum Tested Scale B200 |
+| :---: | :-----------------------: | :------------------------: | :-----------------------: |
+| 340b  |            512            |            128             |            128            |
 
 **Note**:
-- Running load checkpointing feature at other scales may run into CUDA OOM errors. 
+
+- Running load checkpointing feature at other scales may run into CUDA OOM errors.
 
 ### How to enable
+
 To resume training from saved checkpoints, you need to set `LOAD_CHECKPOINT_PATH=<path_to_checkpoint_directory>` environment variable. Make sure the checkpoint files are under the `${LLMB_WORKLOAD}/experiments` directory and `LOAD_CHECKPOINT_PATH` variable is set to parent folder of the `weights` directory containing distributed checkpoint files with extension `*.distcp`.
 
-E.g., if the checkpoint was saved under `${LLMB_WORKLOAD}/experiments/pretrain_nemotron4_340b_fp8_128/pretrain_nemotron4_340b_fp8_128_<timestamp>/pretrain_nemotron4_340b_fp8_128/code/nemo_experiments/default/checkpoints/*/weights` then set the environment variable to a directory one level higher: 
+E.g., if the checkpoint was saved under `${LLMB_WORKLOAD}/experiments/pretrain_nemotron4_340b_fp8_128/pretrain_nemotron4_340b_fp8_128_<timestamp>/pretrain_nemotron4_340b_fp8_128/code/nemo_experiments/default/checkpoints/*/weights` then set the environment variable to a directory one level higher:
 
 `LOAD_CHECKPOINT_PATH=${LLMB_WORKLOAD}/experiments/pretrain_nemotron4_340b_fp8_128/pretrain_nemotron4_340b_fp8_128_<timestamp>/pretrain_nemotron4_340b_fp8_128/code/nemo_experiments/default/checkpoints/default--None=0.0000-epoch=0-consumed_samples=12800.0`
 
 The scripts will restore configuration from the checkpoint and resume training process. Training will run for 1 step after checkpoint has been loaded.
 
 ```shell
-LOAD_CHECKPOINT_PATH=<your_path_to_checkpoint_directory> JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> DTYPE=<precision> MODEL_SIZE=<size> STRONG_SCALING=<true/false> ./launch.sh
+LOAD_CHECKPOINT_PATH=<your_path_to_checkpoint_directory> STRONG_SCALING=<true/false> llmb-run submit -w pretrain_nemotron4-340b --dtype <precision> --scale <number>
 ```
 
 ### How to validate
 
-To validate that checkpoint was loaded successfully look for the entry like below in the main job log-*.out file (see Training section for reference):
+To validate that checkpoint was loaded successfully look for the entry like below in the main job log-\*.out file (see Training section for reference):
 
 ```
 [NeMo I 2025-04-11 14:46:18 nemo_logging:393] Global Checkpoint Load : Rank : 0 : Start time : 1744407969.270s : Time spent in load_checkpoint: 9.712s
@@ -513,6 +463,7 @@ To validate that checkpoint was loaded successfully look for the entry like belo
 ## Failure detected by watchdog
 
 For GB200 you may see the following error message
+
 ```shell
 [rank368]:[E808 04:21:41.160918398 ProcessGroupNCCL.cpp:655] [Rank 368] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=5, OpType=ALLREDUCE, NumelIn=1, NumelOut=1, Timeout(ms)=600000) ran for 600001 milliseconds before timing out.
 [rank368]:[E808 04:21:41.161005534 ProcessGroupNCCL.cpp:2299] [PG ID 0 PG GUID 0(default_pg) Rank 368]  failure detected by watchdog at work sequence id: 5 PG status: last enqueued work: 5, last completed work: 4
@@ -520,9 +471,10 @@ For GB200 you may see the following error message
 [rank368]:[E808 04:21:41.161045406 ProcessGroupNCCL.cpp:2147] [PG ID 0 PG GUID 0(default_pg) Rank 368] First PG on this rank to signal dumping.
 ```
 
-To fix, try running with TP_COMM_OVERLAP disabled like so:  
+To fix, try running with TP_COMM_OVERLAP disabled like so:
+
 ```bash
-TP_COMM_OVERLAP=False llmb-run submit -w pretrain_nemotron4-340b -s 340b --dtype bf16 --scale 256
+TP_COMM_OVERLAP=False llmb-run submit -w pretrain_nemotron4-340b --dtype bf16 --scale 256
 ```
 
 # MFU formula
@@ -550,5 +502,6 @@ Nemotron4 340b calculation:
     model flops = 4096 * (510,966,890,496 + 1,565,515,579,392 + 28,311,552,000) = 8.62124e15
 
 ```
+
 **Note**:
 Per-tensor delayed scaling recipe is used for FP8 training here.

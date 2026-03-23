@@ -16,6 +16,7 @@ $LLMB_REPO/install.sh
 ```
 
 This script will:
+
 1. Install required dependencies
 2. Install llmb-run as a Python package
 3. Launch the interactive installer to:
@@ -49,26 +50,50 @@ If you need to install llmb-run without the automated installer, see [Alternativ
 
 The `cluster_config.yaml` file contains several main sections:
 
-### launcher
-Configuration for the launcher system:
+### top-level cluster fields
+
+High-level cluster settings:
+
+- `schema_version`: Use `2` for the current flattened schema
 - `llmb_repo`: Path to the LLM benchmarking collection repository
 - `llmb_install`: Base installation directory for workloads and data
 - `gpu_type`: GPU type for your cluster (`h100`, `gb200`, etc.)
+- `cluster_name` (optional): Used in generated job metadata
+
+### install
+
+Install metadata:
+
+- `install.node_architecture`: Node architecture used for profiling/tool mount resolution (`x86_64` or `aarch64`)
+
+Legacy `launcher`-based configs are still supported for backward compatibility.
 
 ### environment
+
 Environment variables that will be appended to every job:
+
 - `HF_TOKEN`: Hugging Face token (required for some models)
 - Common settings include `RUN_CONF_*` settings
 
 ### slurm
+
 Slurm-specific configuration:
-- `account`: Slurm account name
-- `gpu_partition`: GPU partition name
-- `gpu_gres`: Only set if GRES is required for your cluster
-- `cpu_partition`: CPU partition name (optional)
+
+- Common keys under `slurm` apply to both GPU and CPU targets (e.g. `account`, `qos`)
+- `slurm.gpu`: Required target-specific Slurm settings for benchmark jobs
+- `slurm.cpu`: Optional target-specific Slurm settings for CPU-style jobs (post-processing, etc.). If omitted, falls back to `slurm.gpu`
+- For GPU requests, `gres` is supported as a compatibility alias and maps to `SBATCH_GPUS_PER_NODE` (same behavior as legacy `gpu_gres`).
+- Use `gres: null` in `slurm.cpu` to explicitly unset inherited GPU request settings.
+- Keys may be provided as:
+  - bare names (e.g. `partition`, `mem_per_gpu`) -> converted to `SBATCH_*`
+  - explicit `SBATCH_*` names
+  - explicit `SLURM_*` names
+- Legacy fields (`gpu_partition`, `gpu_gres`, `cpu_partition`, `cpu_gres`) are still supported for compatibility, but cannot be mixed with `slurm.gpu`/`slurm.cpu`
 
 ### workloads
+
 Workload configuration:
+
 - `installed`: List of workloads installed on this cluster
 - `config`: Workload-specific configuration (typically managed by installer)
 
@@ -89,9 +114,11 @@ llmb-run [GLOBAL OPTIONS] COMMAND [COMMAND OPTIONS]
 Tip: use `llmb-run -h` to see global options, and `llmb-run <command> -h` (e.g. `llmb-run submit -h`) to see command-specific options.
 
 **Global options (apply to all commands):**
+
 - `-v, --verbose`: Enable verbose output including debug information.
 
 **Examples:**
+
 ```bash
 # Correct: global option BEFORE the command
 llmb-run -v submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 256
@@ -117,6 +144,7 @@ Pick the workflow that matches how you want to run:
   - Pattern: `llmb-run submit -f <file_path>`
 
 #### 1. Single Job Submission (Explicit)
+
 Submit a single workload with specific parameters.
 
 ```bash
@@ -124,21 +152,27 @@ llmb-run submit -w <workload> -s <model_size> --dtype <dtype> --scale <scale>
 ```
 
 **Required Flags:**
+
 - `-w, --workload`: Name of the workload (e.g., `pretrain_llama3.1`)
 - `-s, --model_size`: Model size (e.g., `405b`, `70b`).
 - `--dtype`: Data type (e.g., `fp8`, `bf16`).
 - `--scale`: Number of GPUs. Accepts a single value or a comma-separated list.
 
 **Examples:**
+
 ```bash
 # Run a single configuration
 llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 256
 
 # Run multiple scales for the same workload
 llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128,256,512
+
+# Run with proxy configuration (altered config for debug workflows)
+llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 16 --proxy
 ```
 
 #### 2. File-Based Submission (Batch)
+
 Submit multiple jobs defined in a file. This replaces the old `bulk` command.
 
 ```bash
@@ -146,17 +180,20 @@ llmb-run submit -f <file_path>
 ```
 
 **Supported Formats:**
+
 - **Simple (.txt)**: For basic configurations.
 - **Advanced (.yaml)**: For complex configurations with overrides and environment variables.
 
 See [Bulk_Examples.md](Bulk_Examples.md) for detailed file format specifications and examples.
 
 **Example:**
+
 ```bash
 llmb-run submit -f my_experiment.yaml
 ```
 
 #### 3. Auto-Discovery (Submit All)
+
 Automatically discover and submit jobs for installed workloads based on metadata. This replaces the old `submit-all` command.
 
 ```bash
@@ -164,13 +201,16 @@ llmb-run submit --max-scale <num_gpus>
 ```
 
 **Flags:**
+
 - `--max-scale`: Run all workloads up to this scale.
 - `--min-scale`: Run only the minimum supported scale for each workload.
 - `--exact-scales`: Only use scales explicitly listed in workload metadata (no power-of-2 expansion beyond metadata max).
 - `-w, --workload`: Limit discovery to specific workloads (comma-separated).
 - `--scale`: specific scales to run (comma-separated).
+- `--proxy`: In auto-discovery, only workloads with `proxy_scales` defined are included.
 
 **Examples:**
+
 ```bash
 # Run all installed workloads up to 512 GPUs
 llmb-run submit --max-scale 512
@@ -183,9 +223,12 @@ llmb-run submit --scale 128,256
 ```
 
 #### Submit Options (All Submit Modes)
+
 These flags apply to all `llmb-run submit` modes (explicit, file-based, and auto-discovery):
+
 - `-r, --repeats <N>`: Repeat each job N times (default: 1).
 - `-p, --profile`: Enable profiling for all submitted jobs.
+- `--proxy`: Use proxy scales.
 - `--dry-run`: Print the jobs that would be submitted without running them.
 
 ### List Command
@@ -193,21 +236,25 @@ These flags apply to all `llmb-run submit` modes (explicit, file-based, and auto
 The list command helps you discover available workloads and their configurations.
 
 #### Basic Usage
+
 ```bash
 llmb-run list
 ```
 
 #### Options
+
 - `-w, --workload <name>`: Show detailed information for a specific workload
 
 #### Examples
 
 1. List all installed workloads:
+
 ```bash
 llmb-run list
 ```
 
 2. Show details for a specific workload:
+
 ```bash
 llmb-run list -w pretrain_llama3.1
 ```
@@ -217,28 +264,30 @@ llmb-run list -w pretrain_llama3.1
 The exemplar command runs the cloud certification workload suite.
 
 #### Basic Usage
+
 ```bash
 llmb-run exemplar
 ```
 
 #### Options
-- `--dry-run`: Preview all jobs without submitting
-- `-r, --repeats INTEGER`: Number of times to run each job (default: 3).
-- Profiling: Always enabled for the exemplar suite (no flag required).
 
+- `--dry-run`: Preview all jobs without submitting
+- `-r, --repeats INTEGER`: Number of times to run each job (must be >= 1, default: 3).
+- Profiling: Controlled by exemplar suite config (no CLI profiling flag).
 
 #### Behavior
-- Runs all eligible `pretrain` workloads at **scale 512**, with profiling enabled.
+
+- Runs all eligible `pretrain` workloads at **scale 512**.
 - Eligibility:
   - Workload type is `pretrain`.
   - The workload supports the cluster's GPU type (from `cluster_config.yaml`).
   - The per‑dtype configuration explicitly lists `scale: 512` (implicit ranges are not used).
   - The workload is listed under `workloads.installed` in `cluster_config.yaml`.
 - Enforces strict validation (install gating): if any workload that meets eligibility is not installed, the command fails.
-- Runs 3 profiled repetitions per job by default (required for certification). You can override the repeat count for debugging via `-r/--repeats`.
-
+- Runs 3 repetitions per job by default. When profiling is enabled in exemplar config, the last repeat is profiled and earlier repeats are non-profiled (default: 2 normal + 1 profiled). You can override repeat count for debugging via `-r/--repeats`.
 
 #### Troubleshooting Missing Workloads
+
 If `llmb-run exemplar` fails due to missing workloads, do **not** use `llmb-install express`.
 Instead, verify your installed workloads and add missing ones:
 
@@ -247,6 +296,36 @@ cd $LLMB_INSTALL
 llmb-install
 # Select the missing workloads from the menu
 ```
+
+### Archive Command
+
+Package all experiment results into a single compressed file for submission to NVIDIA or offline analysis.
+
+#### Basic Usage
+
+```bash
+llmb-run archive
+```
+
+This creates a `.tar.zst` archive at `$LLMB_INSTALL/llmb-archive-<timestamp>.tar.zst` containing experiment logs and configuration files from all workloads.
+
+#### Options
+
+- `--output <path>`: Write the archive to a custom path instead of the default location.
+
+#### Example
+
+```bash
+# Archive to the default location
+llmb-run archive
+
+# Archive to a specific path
+llmb-run archive --output /shared/results/my-cluster-results.tar.zst
+```
+
+#### What's Included
+
+The archive collects experiment data from `$LLMB_INSTALL/workloads/*/experiments/`, including logs and `llmb-config_*.yaml` metadata files. Profiling data (`.nsys-rep` files) is excluded to keep the archive compact — profiles are typically only needed for debugging and can be shared separately if requested.
 
 ### Job Configuration Files
 
@@ -299,10 +378,11 @@ container_info:
 
 job_config:
   profile_enabled: true                # Whether profiling was enabled
+  proxy: false                         # Whether this run used proxy configuration
   env_overrides:                       # Environment variable overrides
     DEBUG: "true"
-  model_overrides:                     # Model parameter overrides
-    seq_len: 8192
+  model_overrides:                     # Model parameter overrides (passed as env vars to recipes)
+    tp: 8
 ```
 
 See [example_llmb_config.yaml](example_llmb_config.yaml) for a complete example.
@@ -320,35 +400,51 @@ The following commands are deprecated and will be removed in a future release. P
 ### Common Issues and Solutions
 
 1. **Invalid Workload/Model Size**
+
    ```
    ERROR: Invalid Workload / Model Size: workload_name_model_size
    ```
+
    - Ensure the workload and model size combination exists and is compatible with your GPU type
    - Use `llmb-run list` to see available workloads
    - Use `llmb-run list -w <workload_name>` for detailed workload information
 
 2. **Workload Not Installed**
+
    ```
    ERROR: Workload 'workload_name' is not installed on this cluster.
    ```
+
    - Check your `cluster_config.yaml` file's `workloads.installed` list
    - Ensure the workload is properly installed and listed
 
 3. **GPU Type Not Supported**
+
    ```
    ERROR: GPU type 'h100' not supported for workload 'workload_name'.
    ```
+
    - Check if the workload supports your cluster's GPU type
    - Use `llmb-run list -w <workload_name>` to see supported GPU types
 
-4. **Missing Configuration**
+4. **Proxy Configuration Usage**
+
+   - Proxy configurations are altered configs that run on fewer GPUs
+   - Designed for debug workflows and advanced analysis only
+   - Results from proxy runs cannot be compared to production configurations
+   - Do not use proxy configs for performance validation or extrapolation
+
+5. **Missing Configuration**
+
    ```
    FileNotFoundError: cluster_config.yaml not found
    ```
+
    - Solution: Create a `cluster_config.yaml` file in your working directory
    - See the Configuration section for the required format
 
-5. **Job Submission Fails**
+6. **Job Submission Fails**
+
    - Check your Slurm account and partition settings in `cluster_config.yaml`
    - If your system does not support GRES, make sure `SBATCH_GPUS_PER_NODE` is not in your environment section
    - Re-run with verbose output to see detailed error messages, e.g. `llmb-run -v submit ...`
@@ -370,6 +466,7 @@ uv tool install $LLMB_REPO/cli/llmb-run
 ```
 
 ### Option 2: Install as a Package (pip)
+
 ```bash
 # Install from the project directory
 cd llmb-run
@@ -381,6 +478,7 @@ pip install .
 ```
 
 ### Option 3: Direct Execution
+
 ```bash
 # Make the script executable
 chmod +x llmb-run
@@ -388,12 +486,16 @@ chmod +x llmb-run
 # Run directly (must be in directory with cluster_config.yaml)
 ./llmb-run submit --help
 ```
+
 ### Option 4: Python Module
+
 ```bash
 # Run as a Python module (must be in directory with cluster_config.yaml)
 llmb-run submit --help
 ```
+
 **Note**: These alternative methods require you to:
+
 1. Create your own `cluster_config.yaml`
 2. Install workloads manually
 3. Set up any required virtual environments
@@ -402,13 +504,12 @@ llmb-run submit --help
 
 For most users, we recommend using the automated installer script described in Quick Start.
 
-
 ## Environment Variables Reference
 
 The following environment variables are recognized to control behavior:
 
-| Variable | Purpose | Input |
-|---|---|---|
+| Variable       | Purpose                                | Input                            |
+| -------------- | -------------------------------------- | -------------------------------- |
 | `LLMB_SKIP_PP` | Disable post-processing job submission | `1`, `true`, or `yes` to disable |
 
 ## Development
@@ -428,9 +529,9 @@ This project uses `uv` for dependency management and `tox` for multi-environment
 - **Add a dependency**: `uv add <package>`
 - **Add a dev dependency**: `uv add --dev <package>`
 - **Update lockfile**: Run this after modifying `pyproject.toml` (including version bumps) or dependencies.
-   ```bash
-   uv lock
-   ```
+  ```bash
+  uv lock
+  ```
 
 ### Running Tests
 

@@ -31,10 +31,10 @@ from abc import ABC, abstractmethod
 
 from rich.console import Console
 
-from llmb_run.config_manager import get_slurm_env_vars, get_workload_config
+from llmb_run.config_manager import ClusterConfig
 from llmb_run.constants import (
     GPU_TYPE_TO_NUM_GPUS,
-    NEMO_MODEL_PARAMS,
+    NVLINK_DOMAIN_SIZE,
     SLURM_OUTPUT_PATTERN,
 )
 from llmb_run.nsys_mount_handler import get_tool_mounts
@@ -79,7 +79,7 @@ def should_enable_vboost(config):
         bool: True if VBoost should be enabled, False otherwise
     """
     # Check if cluster_name is explicitly configured
-    cluster_name = config.get('launcher', {}).get('cluster_name')
+    cluster_name = config.cluster_name
 
     # If not configured, try to detect from SLURM
     if not cluster_name:
@@ -90,6 +90,18 @@ def should_enable_vboost(config):
         return True
 
     return False
+
+
+def _compute_segment_size(num_nodes: int) -> int:
+    """Compute SBATCH_SEGMENT_SIZE for GB200/GB300 NVLink systems.
+
+    Returns the greatest divisor of num_nodes that is <= NVLINK_DOMAIN_SIZE.
+    For powers of 2 this is min(num_nodes, 16); for multiples of 18 it is 18.
+    """
+    for d in range(min(num_nodes, NVLINK_DOMAIN_SIZE), 0, -1):
+        if num_nodes % d == 0:
+            return d
+    return 1
 
 
 def filter_nemo2_status_instructions(output: str) -> str:
@@ -247,7 +259,7 @@ def create_experiment_directory(
 class JobLauncher(ABC):
     """Abstract base class for job launchers."""
 
-    def __init__(self, config, workloads):
+    def __init__(self, config: ClusterConfig, workloads):
         self.config = config
         self.workloads = workloads
 
@@ -263,20 +275,14 @@ class JobLauncher(ABC):
         """
         pass
 
+    def get_launch_script(self, task):
+        """Return the launch script name from workload metadata, defaulting to 'launch.sh'."""
+        metadata = self.workloads[task.workload_key].get('metadata', {})
+        return metadata.get('run', {}).get('launch_script', 'launch.sh')
+
     def get_gpu_type(self, task):
         """Determine GPU type for a task from cluster config only."""
-        return self.config.get('launcher', {}).get('gpu_type')
-
-    def model_optimizations(self, model_overrides):
-        """Convert parameter overrides into OPTIMIZATION_NAME, CODE for recipe."""
-        optimizations = []
-        for key, value in model_overrides.items():
-            if key in NEMO_MODEL_PARAMS:
-                optimizations.append(f"{NEMO_MODEL_PARAMS[key]}={value}")
-            else:
-                logger.warning(f"Unknown model parameter: {key}={value}")
-
-        return ' '.join(optimizations)
+        return self.config.gpu_type
 
 
 class SbatchLauncher(JobLauncher):
@@ -288,7 +294,7 @@ class SbatchLauncher(JobLauncher):
         """Launch a task using the legacy sbatch method."""
         job = {
             "workload": task.workload_key,
-            "LLMB_INSTALL": self.config['launcher']['llmb_install'],
+            "LLMB_INSTALL": self.config.llmb_install,
             "dir": self.workloads[task.workload_key]["dir"],
             "MODEL_SIZE": task.model_size,
             "DTYPE": task.dtype,
@@ -310,7 +316,7 @@ class SbatchLauncher(JobLauncher):
         # If the job uses less than all GPUs on a node, set ntasks-per-node to the number of GPUs used.
         ntasks_per_node = str(gpus_per_node) if task.scale >= gpus_per_node else str(task.scale)
 
-        llmb_workload = f"{self.config['launcher']['llmb_install']}/workloads/{job['workload']}"
+        llmb_workload = f"{self.config.llmb_install}/workloads/{job['workload']}"
 
         cmd = [
             "sbatch",
@@ -326,7 +332,7 @@ class SbatchLauncher(JobLauncher):
         if task.extra_slurm_params and 'nice' in task.extra_slurm_params:
             cmd.append(f"--nice={task.extra_slurm_params['nice']}")
 
-        cmd.append("launch.sh")
+        cmd.append(self.get_launch_script(task))
 
         env = os.environ.copy()
 
@@ -338,7 +344,7 @@ class SbatchLauncher(JobLauncher):
         env["GPU_TYPE"] = self.get_gpu_type(task)
 
         # Add SLURM environment variables
-        slurm_env = get_slurm_env_vars(self.config)
+        slurm_env = self.config.slurm.env()
         env.update(slurm_env)
 
         if task.profile:
@@ -354,8 +360,8 @@ class SbatchLauncher(JobLauncher):
             logger.debug("Automatically enabled VBoost for 'eos' cluster")
 
         # Handle environment variables from config
-        if 'environment' in self.config:
-            env_vars = {k: str(v) for k, v in self.config['environment'].items()}
+        if self.config.environment:
+            env_vars = {k: str(v) for k, v in self.config.environment.items()}
             env.update(env_vars)
 
         # Convert all task override values to strings
@@ -364,8 +370,7 @@ class SbatchLauncher(JobLauncher):
 
         # Handle model parameter overrides
         if task.model_overrides:
-            env['OPTIMIZATION_NAME'] = 'cc'  # Custom Config
-            env['OPTIMIZATION_CODE'] = self.model_optimizations(task.model_overrides)
+            env.update({k.upper(): str(v) for k, v in task.model_overrides.items()})
 
         try:
             logger.debug(f"Command: {cmd}")
@@ -391,10 +396,10 @@ class ConfiguredSbatchLauncher(JobLauncher):
 
     def launch(self, task):
         """Launch a task using sbatch with a pre-created experiment directory."""
-        # Working directory for sbatch (where launch.sh lives)
+        # Working directory for sbatch (where the launch script lives)
         script_dir = self.workloads[task.workload_key]["dir"]
         # Base directory for experiments (under $LLMB_INSTALL/workloads/)
-        llmb_workload = f"{self.config['launcher']['llmb_install']}/workloads/{task.workload_key}"
+        llmb_workload = f"{self.config.llmb_install}/workloads/{task.workload_key}"
 
         # Create experiment directory
         try:
@@ -413,10 +418,10 @@ class ConfiguredSbatchLauncher(JobLauncher):
         job_name = f"{task.workload_key}_{task.model_size}_{task.dtype}"
 
         # Determine node configuration
+        gpu_type = self.get_gpu_type(task)
         if os.environ.get('GPUS_PER_NODE'):
             gpus_per_node = int(os.environ.get('GPUS_PER_NODE'))
         else:
-            gpu_type = self.get_gpu_type(task)
             if gpu_type not in GPU_TYPE_TO_NUM_GPUS:
                 raise ValueError(
                     f"Invalid GPU type specified: '{gpu_type}'. Valid types in 'llmb-run' modules are: {', '.join(GPU_TYPE_TO_NUM_GPUS.keys())}"
@@ -424,7 +429,6 @@ class ConfiguredSbatchLauncher(JobLauncher):
             gpus_per_node = GPU_TYPE_TO_NUM_GPUS[gpu_type]
 
         num_nodes = (task.scale + gpus_per_node - 1) // gpus_per_node
-        num_nodes = str(num_nodes)
         ntasks_per_node = str(gpus_per_node) if task.scale >= gpus_per_node else str(task.scale)
 
         cmd = [
@@ -434,26 +438,26 @@ class ConfiguredSbatchLauncher(JobLauncher):
             "-J",
             job_name,
             "-N",
-            num_nodes,
+            str(num_nodes),
             f"--ntasks-per-node={ntasks_per_node}",
         ]
 
         if task.extra_slurm_params and 'nice' in task.extra_slurm_params:
             cmd.append(f"--nice={task.extra_slurm_params['nice']}")
 
-        cmd.append("launch.sh")
+        cmd.append(self.get_launch_script(task))
 
         # Set up environment
         env = os.environ.copy()
-        env["LLMB_INSTALL"] = self.config['launcher']['llmb_install']
+        env["LLMB_INSTALL"] = self.config.llmb_install
         env["LLMB_EXPERIMENT_DIR"] = experiment_dir
         env["MODEL_SIZE"] = task.model_size
         env["DTYPE"] = task.dtype
         env["JOB_TOTAL_GPUS"] = str(task.scale)
-        env["GPU_TYPE"] = self.get_gpu_type(task)
+        env["GPU_TYPE"] = gpu_type
 
         # Add SLURM environment variables
-        slurm_env = get_slurm_env_vars(self.config)
+        slurm_env = self.config.slurm.env()
         env.update(slurm_env)
 
         if task.profile:
@@ -468,9 +472,18 @@ class ConfiguredSbatchLauncher(JobLauncher):
             env['ENABLE_VBOOST'] = 'true'
             logger.debug("Automatically enabled VBoost for 'eos' cluster")
 
+        # Set SBATCH_SEGMENT_SIZE for GB200/GB300 if not already set in environment
+        if (
+            gpu_type in {'gb200', 'gb300'}
+            and 'SBATCH_SEGMENT_SIZE' not in env
+            and 'SBATCH_SEGMENT_SIZE' not in task.env_overrides
+        ):
+            env['SBATCH_SEGMENT_SIZE'] = str(_compute_segment_size(num_nodes))
+            logger.debug(f"Set SBATCH_SEGMENT_SIZE={env['SBATCH_SEGMENT_SIZE']} for {gpu_type}")
+
         # Handle environment variables from config
-        if 'environment' in self.config:
-            env_vars = {k: str(v) for k, v in self.config['environment'].items()}
+        if self.config.environment:
+            env_vars = {k: str(v) for k, v in self.config.environment.items()}
             env.update(env_vars)
 
         # Convert all task override values to strings
@@ -479,8 +492,12 @@ class ConfiguredSbatchLauncher(JobLauncher):
 
         # Handle model parameter overrides
         if task.model_overrides:
-            env['OPTIMIZATION_NAME'] = 'cc'  # Custom Config
-            env['OPTIMIZATION_CODE'] = self.model_optimizations(task.model_overrides)
+            env.update({k.upper(): str(v) for k, v in task.model_overrides.items()})
+
+        # Backward-compat: also pass segment size as a CLI flag for older Slurm
+        # versions where SBATCH_SEGMENT_SIZE did not exist but --segment did.
+        if 'SBATCH_SEGMENT_SIZE' in env:
+            cmd.insert(-1, f"--segment={env['SBATCH_SEGMENT_SIZE']}")
 
         try:
             logger.debug(f"Command: {cmd}")
@@ -504,7 +521,7 @@ class Nemo2Launcher(JobLauncher):
 
     def launch(self, task):
         """Launch a task using the Nemo2 method with venv activation."""
-        workload_config = get_workload_config(self.config, task.workload_key)
+        workload_config = self.config.workload_config(task.workload_key)
         venv_path = workload_config.get('venv_path')
         venv_type = workload_config.get('venv_type')
 
@@ -521,14 +538,14 @@ class Nemo2Launcher(JobLauncher):
             env = get_venv_environment(venv_path, venv_type)
 
             # Set basic job environment variables
-            env["LLMB_INSTALL"] = self.config['launcher']['llmb_install']
+            env["LLMB_INSTALL"] = self.config.llmb_install
             env["MODEL_SIZE"] = task.model_size
             env["DTYPE"] = task.dtype
             env["JOB_TOTAL_GPUS"] = str(task.scale)
             env["GPU_TYPE"] = self.get_gpu_type(task)
 
             # Add SLURM environment variables
-            slurm_env = get_slurm_env_vars(self.config)
+            slurm_env = self.config.slurm.env()
             env.update(slurm_env)
 
             if task.profile:
@@ -546,8 +563,8 @@ class Nemo2Launcher(JobLauncher):
                 logger.debug("Automatically enabled VBoost for 'eos' cluster")
 
             # Handle environment variables from config
-            if 'environment' in self.config:
-                env_vars = {k: str(v) for k, v in self.config['environment'].items()}
+            if self.config.environment:
+                env_vars = {k: str(v) for k, v in self.config.environment.items()}
                 env.update(env_vars)
 
             # Handle workload-specific environment variables
@@ -559,14 +576,18 @@ class Nemo2Launcher(JobLauncher):
             task_env = {k: str(v) for k, v in task.env_overrides.items()}
             env.update(task_env)
 
+            # Handle model parameter overrides
+            if task.model_overrides:
+                env.update({k.upper(): str(v) for k, v in task.model_overrides.items()})
+
             # Handle custom tool mounts if needed (workarounds for container bugs during profiling)
             try:
                 workload_metadata = self.workloads[task.workload_key].get('metadata', {})
                 tool_mounts = get_tool_mounts(
-                    llmb_install=self.config['launcher']['llmb_install'],
+                    llmb_install=self.config.llmb_install,
                     workload_metadata=workload_metadata,
                     gpu_type=self.get_gpu_type(task),
-                    arch=self.config['launcher']['node_architecture'],
+                    arch=self.config.install.node_architecture,
                     profiling_enabled=task.profile,
                 )
 
@@ -584,9 +605,9 @@ class Nemo2Launcher(JobLauncher):
                 # Log but don't fail for unexpected errors in mount handling
                 logger.warning(format_task_output(task, prefix="WARNING: ", suffix=f"nsys mount handler error: {e}"))
 
-            # Run launch.sh script in the workload directory
+            # Run launch script in the workload directory
             workload_dir = self.workloads[task.workload_key]["dir"]
-            launch_script = "launch.sh"
+            launch_script = self.get_launch_script(task)
 
             logger.debug(f"Running {launch_script} in {workload_dir} with venv {venv_path} (type: {venv_type})")
 

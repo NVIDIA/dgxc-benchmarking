@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -64,7 +64,7 @@ for value in $USE_CASES; do
     LOG_NAME=${value}_overhead
 
     if [ ${value} == "kernel_launch" ]; then
-        CMD="python $LLMB_WORKLOAD/pytorch_kernel_launch_latency.py \
+        CMD="numactl --cpunodebind=0 --membind=0 python $LLMB_WORKLOAD/pytorch_kernel_launch_latency.py \
 	    --start_size 4 --end_size 512 --iters 1000000"
     elif [ ${value} == "tokenization" ]; then
         export DATASET_FILE=$LLMB_WORKLOAD/dataset_1000_1000_${NUM_PROMPTS}_${SLURM_PROCID}.txt

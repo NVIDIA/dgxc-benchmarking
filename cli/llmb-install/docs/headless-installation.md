@@ -6,13 +6,13 @@ The installer supports automated installations for deployment scenarios and repr
 
 ## Installation Modes Overview
 
-| Mode | Automation Level | Use Case |
-|------|-----------------|----------|
-| **Play Mode** | Fully headless | CI/CD pipelines, batch deployments |
-| **Express Mode** | Minimal prompts | Quick repeat installations, development |
-| **Interactive** | Full prompts | First-time setup, exploration |
+| Mode             | Automation Level | Use Case                                |
+| ---------------- | ---------------- | --------------------------------------- |
+| **Play Mode**    | Fully headless   | CI/CD pipelines, batch deployments      |
+| **Express Mode** | Minimal prompts  | Quick repeat installations, development |
+| **Interactive**  | Full prompts     | First-time setup, exploration           |
 
-**Play Mode** is truly headless - no prompts, all settings from config file.  
+**Play Mode** is truly headless - no prompts, all settings from config file.\
 **Express Mode** reuses saved settings but may prompt for missing values (install path, workload selection).
 
 ## Prerequisites
@@ -48,6 +48,7 @@ llmb-install --play my_config.yaml
 ```
 
 This performs a fully headless installation:
+
 - No user prompts or interaction required
 - All settings loaded from the configuration file
 - Suitable for CI/CD pipelines and automated deployments
@@ -212,19 +213,20 @@ llmb-install -v --play config.yaml
 
 ## Use Cases
 
-| Use Case | Recommended Mode | Why |
-|----------|-----------------|-----|
-| CI/CD pipelines | Play Mode | Fully automated, repeatable, version-controlled config |
-| Production deployments | Play Mode | No user interaction, audit trail via config file |
-| Multi-site deployments | Play Mode | Same config across clusters (adjust SLURM settings) |
-| Development iterations | Express Mode | Quick repeat installs, reuse system settings |
-| Testing new workloads | Express Mode | Fast workflow for recipe development |
+| Use Case               | Recommended Mode | Why                                                    |
+| ---------------------- | ---------------- | ------------------------------------------------------ |
+| CI/CD pipelines        | Play Mode        | Fully automated, repeatable, version-controlled config |
+| Production deployments | Play Mode        | No user interaction, audit trail via config file       |
+| Multi-site deployments | Play Mode        | Same config across clusters (adjust SLURM settings)    |
+| Development iterations | Express Mode     | Quick repeat installs, reuse system settings           |
+| Testing new workloads  | Express Mode     | Fast workflow for recipe development                   |
 
 ## Validation and Error Handling
 
 The installer validates configuration files before installation:
 
 **Validates**:
+
 - Required fields present
 - Valid workload names
 - Compatible GPU types
@@ -232,6 +234,7 @@ The installer validates configuration files before installation:
 - SLURM settings (account, partition accessibility)
 
 **On error**:
+
 - Clear error messages with field details
 - Non-zero exit codes for automation
 - No partial installations
@@ -239,11 +242,13 @@ The installer validates configuration files before installation:
 ## Security Considerations
 
 **Sensitive Data**: Configuration files may contain tokens (HF_TOKEN, API keys)
+
 - Store securely with appropriate permissions (`chmod 600`)
 - Avoid committing to version control (use templating/secrets management)
 - Consider environment variable substitution for secrets
 
 **Portability**: Configuration files are cluster-specific (SLURM accounts/partitions)
+
 - Cannot directly share configs across different clusters
 - Template configs and customize SLURM settings per cluster
 - Non-SLURM settings (workloads, gpu_type) are portable
@@ -252,4 +257,4 @@ The installer validates configuration files before installation:
 
 - **[Main README](../README.md)**: Installation guide and prerequisites
 - **[Recipe Development Guide](recipe_guide.md)**: Creating workload recipes
-- **[Tools Configuration](tools.md)**: Workload-specific tool versions 
+- **[Tools Configuration](tools.md)**: Workload-specific tool versions

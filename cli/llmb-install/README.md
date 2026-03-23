@@ -30,7 +30,7 @@ uv tool install $LLMB_REPO/cli/llmb-install
 
 #### Option 2: Install as a Package (pip)
 
-It is recommended to run installer in a virtual environment (uv, conda or venv with python 3.12.x). The installer has been tested with these three environment types; other solutions may work but are not officially supported. Make sure to have the environment activated 
+It is recommended to run installer in a virtual environment (uv, conda or venv with python 3.12.x). The installer has been tested with these three environment types; other solutions may work but are not officially supported. Make sure to have the environment activated
 before running commands below.
 
 The installer supports multiple Python environment types with automatic detection and preference ordering:
@@ -54,8 +54,9 @@ llmb-install express /path/to/install --workloads all
 ```
 
 The installer will guide you through an interactive setup process covering:
+
 - Installation location selection
-- SLURM cluster configuration  
+- SLURM cluster configuration
 - Node architecture (x86_64/aarch64)
 - Environment type (automatic detection with uv/venv/conda)
 - Installation method (local/SLURM)
@@ -73,12 +74,14 @@ llmb-install
 ```
 
 The installer will:
+
 1. Detect your existing installation automatically
 2. Prompt you to select additional workloads to install
 3. Skip already-installed dependencies (images, tools, venvs)
 4. Update the configuration file to include all workloads (both old and new)
 
 **Example workflow**:
+
 ```bash
 # Initial installation
 llmb-install  # Install one workload
@@ -106,6 +109,7 @@ llmb-install express
 ```
 
 Express mode uses saved system configuration (SLURM settings, GPU type, image folder, etc.) and only prompts for:
+
 - Installation path (if not provided)
 - Workload selection (if not specified)
 
@@ -114,52 +118,57 @@ Express mode uses saved system configuration (SLURM settings, GPU type, image fo
 ## Prerequisites
 
 ### System Requirements
-- **Python**: 3.12+ (for venv support), OR conda/miniconda, OR uv installed
+
+- **Python**: 3.12+ (for venv support), OR conda/miniconda. `uv` is installed automatically if missing.
 - **SLURM**: 22.x or newer with job scheduler access
 - **Enroot**: For container image management
 - **Network Access**: Required for downloading container images
 - **Disk Space**: Substantial space required (see [Storage Requirements](#storage-requirements))
 
 ### Environment Options
+
 The installer automatically detects and offers available options in preference order:
 
-1. **UV** (Recommended): Fast, modern Python package manager
-   - Install: 
-     ```bash
-     curl -LsSf https://astral.sh/uv/install.sh | sh
-     ```
+1. **UV** (Required): Fast, modern Python package manager
+
+   - Installed automatically by `install.sh` if missing
    - Benefits: Faster dependency resolution, automatic Python version management
 
 2. **System venv**: Uses system Python 3.12+ with venv module
+
    - Requires: Python 3.12+ with venv support
    - Benefits: Standard library solution, no additional tools needed
 
-3. **Conda**: Anaconda/Miniconda environments
-   - Requires: conda or miniconda installation  
+3. **Conda** (Deprecated): Anaconda/Miniconda environments
+
+   - Requires: conda or miniconda installation
    - Benefits: Cross-platform compatibility, scientific package ecosystem
 
 ### Python Dependencies
+
 The installer dependencies are defined in `pyproject.toml`:
+
 ```bash
 cd cli/llmb-install
 pip install .
 ```
 
 This installs:
+
 - PyYAML>=6.0
 - questionary>=1.10.0
 - rich>=13.0 (for enhanced UI mode)
-- prompt_toolkit<3.0.52
+- prompt_toolkit\<3.0.52
 
 ## Storage Requirements
 
 The installer downloads and stores significant amounts of data:
 
-| Component | Size Range | Notes |
-|-----------|------------|-------|
-| Container Images | 5-60 GB each | Architecture-specific |
-| Virtual Environments | 1-10 GB each | Per workload |
-| Workload Datasets | 200 GB - 1 TB | Model-dependent |
+| Component            | Size Range    | Notes                 |
+| -------------------- | ------------- | --------------------- |
+| Container Images     | 5-60 GB each  | Architecture-specific |
+| Virtual Environments | 1-10 GB each  | Per workload          |
+| Workload Datasets    | 200 GB - 1 TB | Model-dependent       |
 
 **Recommendation**: Install on high-performance shared storage (Lustre, GPFS) with sufficient space and fast I/O.
 
@@ -184,30 +193,37 @@ $LLMB_INSTALL/
 ## Configuration Options
 
 ### Installation Location
+
 - Must have sufficient disk space (hundreds of GB to TB)
 - Should be on shared storage accessible to all compute nodes
 - Requires write permissions
 
 ### SLURM Configuration
+
 The installer automatically detects and validates:
+
 - **Account**: Your SLURM accounts (via `sacctmgr`)
 - **Partitions**: Available partitions (via `sinfo`)
 - **GPU Resources**: GPU counts per partition (via GRES)
 
 ### Node Architecture
+
 - **x86_64**: Standard Intel/AMD processors
 - **aarch64**: ARM-based systems (Grace Blackwell, etc.)
 
 **Important**: Choosing the wrong architecture will cause "Exec format error" when running containers.
 
 ### Installation Method
+
 Which method to use to download the large container images and datasets. Workload specific setup and venv installation will always be on the current node.
+
 - **Local**: Downloads run on current machine (requires enroot access)
 - **SLURM**: Downloads submitted as jobs (recommended for clusters)
-    - **Note:** Currently this is sequential srun jobs.
-    - **Important:** SLURM installation method is not available when running the installer within a SLURM job
+  - **Note:** Currently this is sequential srun jobs.
+  - **Important:** SLURM installation method is not available when running the installer within a SLURM job
 
 **SLURM Job Detection**: The installer automatically detects if it's running within a SLURM job (via `SLURM_JOB_ID` environment variable). When detected:
+
 - SLURM installation method is disabled (cannot submit jobs from within a job)
 - Automatically defaults to local installation method if enroot is available
 - Exits with error if enroot is not available
@@ -215,12 +231,16 @@ Which method to use to download the large container images and datasets. Workloa
 ## Common Issues and Solutions
 
 ### Running Installer Within SLURM Job
+
 **Issue**: Installer fails when run within a SLURM job without enroot
+
 ```
 Error: Cannot proceed with installation.
 You are running within a SLURM job, but enroot is not available on this system.
 ```
-**Solution**: 
+
+**Solution**:
+
 - **Option 1**: Run the installer from a login node (outside SLURM job)
 - **Option 2**: Ensure enroot is available on compute nodes and use local installation method
 
@@ -231,28 +251,36 @@ You are running within a SLURM job, but enroot is not available on this system.
 **Explanation**: The installation process, especially downloading large container images and installing all necessary pip packages, can be resource-intensive. Login nodes are often shared and with limited resources per user, which can lead to slow performance.
 
 **Solution**:
+
 - **Option 1**: Try running the installer again, perhaps during off-peak hours.
 - **Option 2**: Obtain an interactive shell on a dedicated CPU node and run the installer there. This offloads the resource usage from the login node.
 
 ### Enroot Not Available for Local Installation
+
 **Issue**: Installer automatically selects SLURM method when enroot is missing
+
 ```
 Note: enroot is not available on this system.
 Local installation requires enroot for container image downloading.
 Automatically selecting SLURM-based installation.
 ```
-**Solution**: 
+
+**Solution**:
+
 - **Option 1**: Install enroot on the current system to enable local installation
 - **Option 2**: Continue with SLURM installation method (recommended for clusters)
 - **Option 3**: Manually download container images using enroot on a different system
 
-
 ### Python Version Compatibility
+
 **Issue**: No compatible environment available
+
 ```text
 Error: No compatible environment options available.
 ```
+
 **Solutions** (in recommended order):
+
 1. **Install UV** (Recommended):
    ```bash
    curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -265,29 +293,39 @@ Error: No compatible environment options available.
    source ~/.bashrc
    ```
 3. **Upgrade system Python** to 3.12+ with venv support
+
 ### Cache Directory Warnings
+
 **Issue**: Cache directories under `/home` may cause space issues
+
 ```
 WARNING: PIP_CACHE_DIR is under /home: /home/user/.cache/pip
 WARNING: UV_CACHE_DIR is under /home: /home/user/.cache/uv
 ```
+
 **Solution**: The installer automatically configures cache directories under `$LLMB_INSTALL/.cache/` to avoid space issues. If you see these warnings, the installer has already handled the configuration for you.
 
 ### SLURM Account/Partition Issues
+
 **Issue**: Account or partition not recognized
-**Solution**: 
+**Solution**:
+
 - Verify with `squeue -u $USER` or `sacctmgr show associations user=$USER`
 - Contact system administrator for correct account/partition names
 
 ### Network Access Issues
+
 **Issue**: Container downloads fail
 **Solution**:
+
 - Ensure login nodes have internet access and enroot OR
 - Use SLURM installation method to run downloads on nodes with access
 
 ### Insufficient Disk Space
+
 **Issue**: Downloads fail due to space constraints
 **Solution**:
+
 - Choose installation location with adequate space
 - Clean up unnecessary files in target directory
 - Consider using storage with higher quotas
@@ -319,31 +357,33 @@ llmb-install express --help
 
 ### Global Flags (All Modes)
 
-| Flag | Purpose | Example |
-|------|---------|---------|
-| `-v, --verbose` | Enable debug logging | `llmb-install -v` |
+| Flag                      | Purpose                                     | Example                              |
+| ------------------------- | ------------------------------------------- | ------------------------------------ |
+| `-v, --verbose`           | Enable debug logging                        | `llmb-install -v`                    |
 | `-i, --image-folder PATH` | Share container images across installations | `llmb-install -i /shared/containers` |
-| `-d, --dev-mode` | Use original repo (for recipe development) | `llmb-install -d` |
-| `--record FILE` | Save configuration without installing | `llmb-install --record config.yaml` |
-| `--play FILE` | Automated installation from config | `llmb-install --play config.yaml` |
+| `-d, --dev-mode`          | Use original repo (for recipe development)  | `llmb-install -d`                    |
+| `--record FILE`           | Save configuration without installing       | `llmb-install --record config.yaml`  |
+| `--play FILE`             | Automated installation from config          | `llmb-install --play config.yaml`    |
 
-**Note on image folder**: 
+**Note on image folder**:
+
 - **Purpose**: Highly recommended for multi-user or multi-installation setups. Container images are 5-60 GB each and read-only, so sharing saves significant space with no downsides.
 - **Persistence**: The image folder path is saved to `~/.config/llmb/system_config.yaml` after successful installation and automatically reused in future installs.
 - **Override**: Use `-i` flag to override the saved location for a specific installation, or for first time installs.
 
 ### Express Mode Flags
 
-| Flag | Purpose | Example |
-|------|---------|---------|
-| `install_path` (positional) | Installation directory | `llmb-install express /work/llmb` |
-| `-w, --workloads` | Workloads to install | `--workloads all` or `--workloads pretrain_nemotron-h,pretrain_llama3.1` |
-| `--exemplar` | Install all 'pretrain' reference workloads (Exemplar Cloud) | `llmb-install express --exemplar` |
-| `--list-workloads` | Show available workloads and exit | `llmb-install express --list-workloads` |
+| Flag                        | Purpose                                                     | Example                                                                  |
+| --------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `install_path` (positional) | Installation directory                                      | `llmb-install express /work/llmb`                                        |
+| `-w, --workloads`           | Workloads to install                                        | `--workloads all` or `--workloads pretrain_nemotron-h,pretrain_llama3.1` |
+| `--exemplar`                | Install all 'pretrain' reference workloads (Exemplar Cloud) | `llmb-install express --exemplar`                                        |
+| `--list-workloads`          | Show available workloads and exit                           | `llmb-install express --list-workloads`                                  |
 
 **Note on flag order**: `-v/--verbose`, `-i/--image-folder`, and `-d/--dev-mode` are **global flags** and must be provided **before** the `express` subcommand (e.g. `llmb-install -v express ...`).
 
 **Combined example**:
+
 ```bash
 llmb-install -v -i /shared/containers express /work/llmb --workloads all
 ```
@@ -361,6 +401,7 @@ llmb-install -d
 ```
 
 Dev mode features:
+
 - **Direct repo access**: Uses the original repo location (no copy to `LLMB_INSTALL/llmb_repo`), allowing git operations and version control
 - **Streamlined workflow**: In interactive mode, skips the "Exemplar Cloud vs Custom" prompt and goes straight to workload selection
 - **No resume support**: Resume functionality disabled in dev mode
@@ -378,16 +419,19 @@ To disable: `export LLMB_DISABLE_RESUME=1`
 ### Debugging Failed Installations
 
 **Check**:
+
 1. Installer error messages
 2. Container images: `$LLMB_INSTALL/images/`
 3. Virtual environments: `$LLMB_INSTALL/venvs/`
 4. System config: `~/.config/llmb/system_config.yaml`
 
 **Manual container import** (if automatic download fails):
+
 ```bash
 enroot import -o $LLMB_INSTALL/images/nvidian+nemo+25.02.01.sqsh \
     docker://nvcr.io/nvidian/nemo:25.02.01
 ```
+
 Use `-a <arch>` flag if node architecture differs.
 
 ## Validation
@@ -395,18 +439,21 @@ Use `-a <arch>` flag if node architecture differs.
 After installation, verify setup:
 
 1. **Check directory structure**:
+
    ```bash
    ls -la $LLMB_INSTALL/
    # Should show: images/ datasets/ venvs/ workloads/
    ```
 
 2. **Verify container images**:
+
    ```bash
    ls -la $LLMB_INSTALL/images/*.sqsh
    # Should show downloaded container files
    ```
 
 3. **Test virtual environments**:
+
    ```bash
    source $LLMB_INSTALL/venvs/<workload>_venv/bin/activate
    python --version  # Should show a 3.12.x version
@@ -416,11 +463,11 @@ After installation, verify setup:
 
 The installer recognizes the following environment variables to control behavior:
 
-| Variable | Purpose | Input |
-|----------|---------|-------|
-| `LLMB_DISABLE_RESUME` | Disable resume functionality | `1`, `true`, or `yes` to disable |
-| `LLMB_DISABLE_GIT_CACHE` | Disable git repository caching | `1`, `true`, or `yes` to disable |
-| `LLMB_USE_PIP_FALLBACK` | Use standard pip instead of uv pip in uv environments | `1`, `true`, or `yes` to enable |
+| Variable                      | Purpose                                                   | Input                            |
+| ----------------------------- | --------------------------------------------------------- | -------------------------------- |
+| `LLMB_DISABLE_RESUME`         | Disable resume functionality                              | `1`, `true`, or `yes` to disable |
+| `LLMB_DISABLE_GIT_CACHE`      | Disable git repository caching                            | `1`, `true`, or `yes` to disable |
+| `LLMB_USE_PIP_FALLBACK`       | Use standard pip instead of uv pip in uv environments     | `1`, `true`, or `yes` to enable  |
 | `LLMB_DISABLE_MANAGED_PYTHON` | Disable enforced managed python usage for UV environments | `1`, `true`, or `yes` to disable |
 
 **Resume Control**: Set `LLMB_DISABLE_RESUME=1` to prevent automatic resume detection and always start fresh installations.
@@ -448,9 +495,9 @@ This project uses `uv` for dependency management and `tox` for multi-environment
 - **Add a dependency**: `uv add <package>`
 - **Add a dev dependency**: `uv add --dev <package>`
 - **Update lockfile**: Run this after modifying `pyproject.toml` (including version bumps) or dependencies.
-   ```bash
-   uv lock
-   ```
+  ```bash
+  uv lock
+  ```
 
 ### Running Tests
 
@@ -479,9 +526,10 @@ This project uses `uv` for dependency management and `tox` for multi-environment
 ## Support
 
 For installation issues:
+
 1. Check this README and [main FAQ](../../README.md#faq)
 2. Verify system prerequisites are met
 3. Contact LLMBenchmarks@nvidia.com with:
    - Installer output/error messages
    - System configuration details
-   - SLURM cluster information 
+   - SLURM cluster information

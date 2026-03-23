@@ -35,7 +35,7 @@ pretrain_llama_7x:          # ❌ Invalid format (must end with 'b')
 
 **Tip:** Use `llmb-run list` to see all available workload_modelsize combinations.
 
----
+______________________________________________________________________
 
 ## Job Specification Formats
 
@@ -52,6 +52,7 @@ There are two supported file formats for bulk job submission:
 ## YAML Examples (Recommended)
 
 ### Basic Configuration
+
 ```yaml
 pretrain_llama3.1_8b:
   tasks:
@@ -59,9 +60,11 @@ pretrain_llama3.1_8b:
       scales: [16, 32, 64]
       repeats: 3
 ```
+
 **Explanation**: This will run Llama 3.1 8B with fp8 precision at three different scales (16, 32, and 64 GPUs), repeating each configuration 3 times. Total of 9 jobs will be submitted.
 
 ### Multiple Data Types
+
 ```yaml
 pretrain_llama3.1_70b:
   tasks:
@@ -69,9 +72,24 @@ pretrain_llama3.1_70b:
       scales: [64, 128]
       repeats: 2
 ```
+
 **Explanation**: This configuration will run the workload with both fp8 and bf16 precision at two different scales. Each combination (fp8@64, fp8@128, bf16@64, bf16@128) will be run twice. Total of 8 jobs will be submitted.
 
+### With Proxy Configuration
+
+```yaml
+pretrain_nemotron4_340b:
+  tasks:
+    - dtypes: 'bf16'
+      scales: [16]
+      repeats: 1
+      proxy: true    # Altered configuration for debug workflows
+```
+
+**Explanation**: This runs a proxy configuration - an altered config designed for debug workflows on fewer GPUs. Proxy results cannot be compared to production runs.
+
 ### With Environment Variables
+
 ```yaml
 pretrain_grok1_314b:
   defaults:
@@ -82,9 +100,11 @@ pretrain_grok1_314b:
       scales: [128, 256]
       repeats: 3
 ```
+
 **Explanation**: This example sets global environment variables for all jobs. The workload will run with fp8 precision at two scales, with each configuration repeated 3 times. The environment variables will be applied to all 6 jobs.
 
 ### Complex Configuration (Overrides & Profiling)
+
 ```yaml
 pretrain_llama3.1_405b:
   defaults:
@@ -106,12 +126,15 @@ pretrain_llama3.1_405b:
         env:
           LOG_LEVEL: "TRACE"
 ```
+
 **Explanation**: This complex example demonstrates multiple features:
+
 1. First task: Runs bf16 and fp8 at scales 128 and 256, with a `DEBUG` log level. Each configuration runs twice.
 2. Second task: Overrides the dtype to only use fp8, and scale to 512. It is a single profiling run with `TRACE` log level.
 3. All jobs will have the default `LOG_LEVEL` of `INFO` unless overridden.
 
 ### Multiple Workloads
+
 ```yaml
 pretrain_llama3.1_405b:
   defaults:
@@ -137,6 +160,7 @@ The text format uses a Python-tuple-like syntax:
 **Important**: Inline trailing comments on task lines are **not supported**. Put comments on their own lines instead.
 
 ### Basic Text Example
+
 ```
 pretrain_llama3.1_405b:
 ('bf16', [128, 256], 1)
@@ -144,6 +168,7 @@ pretrain_llama3.1_405b:
 ```
 
 ### Mixed Text Example
+
 ```
 pretrain_nemotron4_340b:
 (['bf16','fp8'], [128, 256], 2)
@@ -172,6 +197,7 @@ llmb-run submit -f my_config.yaml --dry-run
 If you see `ERROR: No tasks generated`, ensure your YAML includes at least one task entry:
 
 ❌ **Incorrect** (generates no tasks):
+
 ```yaml
 pretrain_llama3.1_70b:
   dtypes: fp8
@@ -180,6 +206,7 @@ pretrain_llama3.1_70b:
 ```
 
 ✅ **Correct** (specify tasks directly):
+
 ```yaml
 pretrain_llama3.1_70b:
   tasks:
@@ -190,6 +217,7 @@ pretrain_llama3.1_70b:
 **Note**: Top-level `dtypes`/`scales` are defaults for task inheritance, not task definitions. Always define jobs under `tasks:`.
 
 ## Notes
+
 - All examples assume a valid `cluster_config.yaml` file is present.
 - The `repeats` parameter defaults to 1 if not specified.
 - To run a profiling job in YAML, create a task with `profile: true`.

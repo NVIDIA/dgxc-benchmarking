@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -29,19 +29,14 @@ set -eu -o pipefail
 
 export WORKLOAD_TYPE=finetune
 export MODEL_NAME=llama3
-export FW_VERSION=25.09.00
+export FW_VERSION=26.02.00
 
 # --- Required environment variables (provided by the installer) ---
 : "${HF_TOKEN:?Required variable Hugging Face token}"
 : "${GPU_TYPE:?Required variable GPU_TYPE}"
 : "${LLMB_INSTALL:?Required variable LLMB_INSTALL}"
 : "${LLMB_WORKLOAD:?Provided by installer}"
-: "${SBATCH_ACCOUNT:?Required variable SBATCH_ACCOUNT}"
-: "${SBATCH_PARTITION:?Required variable SBATCH_PARTITION}"
-
 export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
-
-export NEMO_DIR="$LLMB_WORKLOAD/NeMo"
 
 # Directory for cached objects
 mkdir -p "$LLMB_WORKLOAD/checkpoint_and_dataset"
@@ -49,54 +44,26 @@ export HF_HOME=${HF_HOME:-$LLMB_WORKLOAD/checkpoint_and_dataset}
 export NEMO_HOME=${NEMO_HOME:-$LLMB_WORKLOAD/checkpoint_and_dataset}
 export NEMORUN_HOME=$LLMB_WORKLOAD
 
-SCRIPT_NAME="scripts.performance.llm.finetune_llama3_70b"
-CONTAINER_MOUNTS=""
-if [[ -n ${RUN_CONF_MOUNTS:-""} ]]; then
-    if [[ -n ${CONTAINER_MOUNTS} ]]; then
-        CONTAINER_MOUNTS+=","
-    fi
-    CONTAINER_MOUNTS+="${RUN_CONF_MOUNTS}"
-fi
+SCRIPT_NAME="$LLMB_WORKLOAD/Megatron-Bridge/examples/conversion/convert_checkpoints.py"
+
 export IMAGE="${IMAGE:-${LLMB_INSTALL}/images/nvidia+nemo+${FW_VERSION}.sqsh}"
 
 TIME_LIMIT=${TIME_LIMIT:-"00:55:00"}
 GPU_TYPE=${GPU_TYPE,,}
 
-# Default values for Import Checkpoint and Dataset Download
-SKIP_IMPORT_CHECKPOINT=${SKIP_IMPORT_CHECKPOINT:-false}
-SKIP_DATASET_DOWNLOAD=${SKIP_DATASET_DOWNLOAD:-false}
+# Change to Megatron-Bridge directory
+pushd "$LLMB_WORKLOAD/Megatron-Bridge" > /dev/null
 
-CONFIG_OVERRIDES=""
-if [ $SKIP_IMPORT_CHECKPOINT = true ]; then
-    # 3.1 Import Checkpoint
-    CONFIG_OVERRIDES+=" --skip_import_checkpoint "
-fi
-if [ $SKIP_DATASET_DOWNLOAD = true ]; then
-    # 3.2 Download Dataset
-    CONFIG_OVERRIDES+=" --skip_dataset_download "
-fi
-
-if [[ -n ${CONTAINER_MOUNTS} ]]; then
-    CONFIG_OVERRIDES+=" --custom_mounts $CONTAINER_MOUNTS"
-fi
-
-pushd "$NEMO_DIR" > /dev/null
-
-python3 -m "$SCRIPT_NAME" \
-    -hf "$HF_TOKEN" \
-    --gpu "$GPU_TYPE" \
-    --container_image "$IMAGE" \
-    --num_gpus 1 \
-    --gpus_per_node 1 \
-    --finetuning "lora" \
-    --skip_finetuning \
-    $CONFIG_OVERRIDES \
-    slurm \
-    --account "$SBATCH_ACCOUNT" \
-    --partition "$SBATCH_PARTITION" \
-    --log_dir "$NEMORUN_HOME" \
-    --time_limit "$TIME_LIMIT"
+# Run conversion
+srun \
+    --time="$TIME_LIMIT" \
+    --container-image="$IMAGE" \
+    --container-mounts="$LLMB_WORKLOAD:$LLMB_WORKLOAD" \
+    python3 $SCRIPT_NAME import \
+    --hf-model meta-llama/Meta-Llama-3-70B \
+    --megatron-path $LLMB_WORKLOAD/checkpoint_and_dataset/llama3_70b \
+    --torch-dtype bfloat16
 
 popd > /dev/null
 
-echo "✓ Checkpoint import and dataset download queued."
+echo "Checkpoint conversion completed!"

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -32,6 +32,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
+from llmb_run.config_manager import ClusterConfig
 from llmb_run.metadata_utils import normalize_model_dtype_config, parse_workload_name
 from llmb_run.task_generation import ValidationError
 from llmb_run.tasks import WorkloadTask
@@ -39,11 +40,11 @@ from llmb_run.tasks import WorkloadTask
 logger = logging.getLogger('llmb_run.exemplar')
 
 
-def load_exemplar_yaml(cluster_config: Dict) -> Dict[str, Any]:
+def load_exemplar_yaml(cluster_config: ClusterConfig) -> Dict[str, Any]:
     """Load and parse exemplar.yaml from llmb_repo.
 
     Args:
-        cluster_config: Cluster configuration containing launcher.llmb_repo
+        cluster_config: Cluster configuration containing llmb_repo
 
     Returns:
         Parsed YAML contents as a dictionary
@@ -51,9 +52,9 @@ def load_exemplar_yaml(cluster_config: Dict) -> Dict[str, Any]:
     Raises:
         ValidationError: If file is missing or cannot be parsed
     """
-    llmb_repo = cluster_config.get('launcher', {}).get('llmb_repo')
+    llmb_repo = cluster_config.llmb_repo
     if not llmb_repo:
-        raise ValidationError("cluster_config.launcher.llmb_repo is not set")
+        raise ValidationError("cluster_config.llmb_repo is not set")
 
     exemplar_path = Path(llmb_repo) / "exemplar.yaml"
 
@@ -384,7 +385,7 @@ def get_eligible_exemplar_configs_from_yaml(
     return yaml_configs
 
 
-def validate_strict_installs(eligible_configs: List[Tuple[str, str, str]], cluster_config: Dict) -> None:
+def validate_strict_installs(eligible_configs: List[Tuple[str, str, str]], cluster_config: ClusterConfig) -> None:
     """Validate that all eligible workloads are installed, with strict error handling.
 
     Args:
@@ -396,7 +397,7 @@ def validate_strict_installs(eligible_configs: List[Tuple[str, str, str]], clust
     """
     # Check if eligible universe is empty (shouldn't happen with YAML, but defensive)
     if not eligible_configs:
-        gpu_type = cluster_config.get('launcher', {}).get('gpu_type', 'unknown')
+        gpu_type = cluster_config.gpu_type
         msg = (
             f"No eligible workloads found for exemplar certification (gpu_type={gpu_type}).\n"
             "This may indicate an empty or invalid exemplar.yaml configuration."
@@ -407,7 +408,7 @@ def validate_strict_installs(eligible_configs: List[Tuple[str, str, str]], clust
     eligible_workload_keys = {cfg[0] for cfg in eligible_configs}
 
     # Get installed workloads
-    installed_workloads = cluster_config.get('workloads', {}).get('installed', [])
+    installed_workloads = cluster_config.workloads.installed
 
     # Edge case: if installed is missing or empty, treat as no workloads installed
     if not installed_workloads:
@@ -444,7 +445,7 @@ def validate_strict_installs(eligible_configs: List[Tuple[str, str, str]], clust
 
 
 def compute_and_validate_eligible_configs(
-    workloads: Dict, cluster_config: Dict
+    workloads: Dict, cluster_config: ClusterConfig
 ) -> Tuple[List[Tuple[str, str, str]], int, int, bool]:
     """Load YAML configs, validate against metadata, and validate strict install gating.
 
@@ -459,12 +460,12 @@ def compute_and_validate_eligible_configs(
         - eligible configs: List of (workload_key, model_size, dtype) tuples
         - scale: Scale value from YAML config (defaults to 512)
         - repeats: Number of repeats from YAML config (defaults to 3)
-        - profile: Profile flag from YAML config (defaults to True)
+        - profile: If True, include exactly one profiled run per config (last repeat). If False, no profiling.
 
     Raises:
         ValidationError: If validation fails (YAML missing, metadata mismatch, empty universe, or missing installs)
     """
-    gpu_type = cluster_config.get('launcher', {}).get('gpu_type')
+    gpu_type = cluster_config.gpu_type
     if not gpu_type:
         raise ValidationError("No GPU type specified in cluster configuration.")
 
@@ -487,7 +488,9 @@ def compute_and_validate_eligible_configs(
     return eligible_configs, scale, repeats, profile
 
 
-def generate_exemplar_tasks(workloads: Dict, cluster_config: Dict, repeats: Optional[int] = None) -> List[WorkloadTask]:
+def generate_exemplar_tasks(
+    workloads: Dict, cluster_config: ClusterConfig, repeats: Optional[int] = None
+) -> List[WorkloadTask]:
     """Generate WorkloadTask list for exemplar certification.
 
     Behavior:
@@ -496,7 +499,9 @@ def generate_exemplar_tasks(workloads: Dict, cluster_config: Dict, repeats: Opti
       model_size exists, dtype exists, scale explicitly in dtype's scales list)
     - Validate strict install gating
     - For each eligible (workload_key, model_size, dtype), generate repeats at
-      config.scale (default 512) with config.profile (default True)
+      config.scale (default 512)
+    - If config.profile is True, the last repeat is profiled and earlier repeats are non-profiled
+      (e.g., repeats=3 -> [False, False, True]); if config.profile is False, all repeats are non-profiled
     - Deterministic ordering and clustered by workload_key for submission speed;
       repeats contiguous
 
@@ -519,6 +524,10 @@ def generate_exemplar_tasks(workloads: Dict, cluster_config: Dict, repeats: Opti
 
     # Use CLI repeats if provided, otherwise use YAML repeats
     effective_repeats = repeats if repeats is not None else yaml_repeats
+    if isinstance(effective_repeats, bool) or not isinstance(effective_repeats, int) or effective_repeats < 1:
+        raise ValidationError(
+            f"Invalid exemplar repeats value: {effective_repeats!r}. " "Expected an integer greater than or equal to 1."
+        )
 
     # Sort configs for deterministic ordering:
     # - Clustered by workload_key
@@ -528,18 +537,23 @@ def generate_exemplar_tasks(workloads: Dict, cluster_config: Dict, repeats: Opti
     # Generate tasks with contiguous repeats
     task_list = []
     for workload_key, model_size, dtype in eligible_configs:
-        for _ in range(effective_repeats):
+        for repeat_idx in range(effective_repeats):
+            # Exemplar profiling policy: at most one profiling run per workload config,
+            # and when present it is always the last repeat for deterministic behavior.
+            run_profile = bool(profile and repeat_idx == (effective_repeats - 1))
             task_list.append(
                 WorkloadTask(
                     workload_key=workload_key,
                     model_size=model_size,
                     dtype=dtype,
                     scale=scale,
-                    profile=profile,
+                    profile=run_profile,
                 )
             )
 
+    profiled_runs = sum(1 for task in task_list if task.profile)
     logger.debug(
-        f"Generated {len(task_list)} exemplar tasks ({len(eligible_configs)} configs × {effective_repeats} repeats)"
+        f"Generated {len(task_list)} exemplar tasks "
+        f"({len(eligible_configs)} configs × {effective_repeats} repeats, {profiled_runs} profiled)"
     )
     return task_list

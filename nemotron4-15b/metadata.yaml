@@ -74,19 +74,23 @@ run:
       model_configs:
         - model_size: '15b'
           dtypes: ['fp8', 'bf16']
-          scales: [16, 32, 64, 128, 256, 512]
+          scales: [16, 32, 64, 128, 256]
+          exact_scales: true
     gb200:
       model_configs:
         - model_size: '15b'
           dtypes: ['fp8', 'bf16']
-          scales: [16, 32, 64, 128, 256, 512]
+          scales: [16, 32, 64, 128, 256]
+          exact_scales: true
     b200:
       model_configs:
         - model_size: '15b'
           dtypes: ['fp8', 'bf16']
-          scales: [16, 32, 64, 128, 256, 512, 1024]
+          scales: [16, 32, 64, 128, 256]
+          exact_scales: true
     h100:
       model_configs:
         - model_size: '15b'
           dtypes: ['fp8', 'bf16']
-          scales: [16, 32, 64, 128, 256, 512, 1024, 2048]
+          scales: [16, 32, 64, 128, 256]
+          exact_scales: true

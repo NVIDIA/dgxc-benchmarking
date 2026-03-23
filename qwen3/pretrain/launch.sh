@@ -46,7 +46,7 @@ else
     exit 1
 fi
 
-export FW_VERSION=25.11.01
+export FW_VERSION=26.02.00
 
 export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 
@@ -63,7 +63,11 @@ export DTYPE=${DTYPE,,}
 export GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
 export GPU_TYPE=${GPU_TYPE,,}
 export JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
-export TIME_LIMIT=${TIME_LIMIT:-"00:40:00"}
+if [ "$MODEL_SIZE" = "235b" ]; then
+    export TIME_LIMIT=${TIME_LIMIT:-"01:40:00"}
+else
+    export TIME_LIMIT=${TIME_LIMIT:-"01:00:00"}
+fi
 export MAX_STEPS=${MAX_STEPS:-50}
 export PROFILE_START_STEP=${PROFILE_START_STEP:-45}
 export PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
@@ -99,128 +103,51 @@ if [[ -n ${CONTAINER_MOUNTS} ]]; then
     CONFIG_OVERRIDES+=" --custom_mounts $CONTAINER_MOUNTS"
 fi
 
-CUDA_GRAPH=${CUDA_GRAPH:-""}
-
-if [ $GPU_TYPE = "gb300" ]; then
-    if [ $MODEL_SIZE = "30b" ]; then
-        #Parallelism settings for GB300
-        TP=${TP:-1}
-        PP=${PP:-1}
-        CP=${CP:-1}
-        VP=${VP:-1}
-        EP=${EP:-8}
-        ETP=${ETP:-1}
-        MBS=${MBS:-8}
-        GBS=${GBS:-$((JOB_TOTAL_GPUS * 64))}
-        CUDA_GRAPH=${CUDA_GRAPH:-'--cuda_graph_impl=transformer_engine --cuda_graph_scope=moe_router,moe_preprocess'}
-    elif [ $MODEL_SIZE = "235b" ]; then
-        TP=${TP:-1}
-        PP=${PP:-1}
-        CP=${CP:-1}
-        VP=${VP:-1}
-        EP=${EP:-64}
-        ETP=${ETP:-1}
-        MBS=${MBS:-2}
-        GBS=${GBS:-$((JOB_TOTAL_GPUS * 16))}
-        CUDA_GRAPH=${CUDA_GRAPH:-'--cuda_graph_impl=transformer_engine --cuda_graph_scope=moe_router,moe_preprocess'}
-    fi
-elif [ $GPU_TYPE = "gb200" ]; then
-    if [ $MODEL_SIZE = "30b" ]; then
-        #Parallelism settings for GB200
-        TP=${TP:-1}
-        PP=${PP:-1}
-        CP=${CP:-1}
-        VP=${VP:-1}
-        EP=${EP:-8}
-        ETP=${ETP:-1}
-        MBS=${MBS:-4}
-        GBS=${GBS:-$((JOB_TOTAL_GPUS * 64))}
-        if [ $DTYPE = "bf16" ]; then
-            CUDA_GRAPH=${CUDA_GRAPH:-'--cuda_graph_impl=transformer_engine --cuda_graph_scope=moe_router,moe_preprocess,attn'}
-        else
-            CUDA_GRAPH=${CUDA_GRAPH:-'--cuda_graph_impl=transformer_engine --cuda_graph_scope=moe_router,moe_preprocess'}
-        fi
-    elif [ $MODEL_SIZE = "235b" ]; then
-        TP=${TP:-1}
-        PP=${PP:-8}
-        CP=${CP:-1}
-        VP=${VP:-1}
-        EP=${EP:-8}
-        ETP=${ETP:-1}
-        MBS=${MBS:-1}
-        GBS=${GBS:-$((JOB_TOTAL_GPUS * 16))}
-        CUDA_GRAPH=${CUDA_GRAPH:-'--cuda_graph_impl=transformer_engine --cuda_graph_scope=moe_router,moe_preprocess,attn'}
-    fi
-elif [ $GPU_TYPE = "b200" ]; then
-    if [ $MODEL_SIZE = "30b" ]; then
-        #Parallelism settings for B200
-        TP=${TP:-1}
-        PP=${PP:-1}
-        CP=${CP:-1}
-        VP=${VP:-1}
-        EP=${EP:-8}
-        ETP=${ETP:-1}
-        MBS=${MBS:-1}
-        GBS=${GBS:-$((JOB_TOTAL_GPUS * 64))}
-        CUDA_GRAPH=${CUDA_GRAPH:-'--cuda_graph_impl=transformer_engine --cuda_graph_scope=moe_router,moe_preprocess'}
-    elif [ $MODEL_SIZE = "235b" ]; then
-        TP=${TP:-1}
-        PP=${PP:-8}
-        CP=${CP:-1}
-        VP=${VP:-4}
-        EP=${EP:-8}
-        ETP=${ETP:-1}
-        MBS=${MBS:-1}
-        GBS=${GBS:-$((JOB_TOTAL_GPUS * 16))}
-    fi
-elif [ $GPU_TYPE = "h100" ]; then
-    if [ $MODEL_SIZE = "30b" ]; then
-        #Parallelism settings for H100
-        TP=${TP:-1}
-        PP=${PP:-2}
-        CP=${CP:-1}
-        VP=${VP:-12}
-        EP=${EP:-8}
-        ETP=${ETP:-1}
-        MBS=${MBS:-1}
-        GBS=${GBS:-$((JOB_TOTAL_GPUS * 32))}
-        if [ $DTYPE = "bf16" ]; then
-            CUDA_GRAPH=${CUDA_GRAPH:-'--cuda_graph_impl=transformer_engine --cuda_graph_scope=moe_router,moe_preprocess'}
-        fi
-    elif [ $MODEL_SIZE = "235b" ]; then
-        TP=${TP:-2}
-        PP=${PP:-8}
-        CP=${CP:-1}
-        VP=${VP:-4}
-        EP=${EP:-32}
-        ETP=${ETP:-1}
-        MBS=${MBS:-1}
-        GBS=${GBS:-$((JOB_TOTAL_GPUS * 8))}
-    fi
-else
-    echo "$GPU_TYPE not supported"
-    exit 1
+# Optional overrides: only set when user provides values.
+if [[ -n ${TP:-} ]]; then
+    CONFIG_OVERRIDES+=" -tp $TP "
 fi
-
-CONFIG_OVERRIDES+=" -tp $TP \
-  -pp $PP \
-  -cp $CP \
-  -ep $EP \
-  -et $ETP \
-  -gb $GBS \
-  -mb $MBS \
-  $CUDA_GRAPH \
-"
-
-# Only add -vp if VP is greater than 1
-if [ "$VP" -gt "1" ]; then
+if [[ -n ${PP:-} ]]; then
+    CONFIG_OVERRIDES+=" -pp $PP "
+fi
+if [[ -n ${CP:-} ]]; then
+    CONFIG_OVERRIDES+=" -cp $CP "
+fi
+if [[ -n ${EP:-} ]]; then
+    CONFIG_OVERRIDES+=" -ep $EP "
+fi
+if [[ -n ${ETP:-} ]]; then
+    CONFIG_OVERRIDES+=" -et $ETP "
+fi
+if [[ -n ${GBS:-} ]]; then
+    CONFIG_OVERRIDES+=" -gb $GBS "
+fi
+if [[ -n ${MBS:-} ]]; then
+    CONFIG_OVERRIDES+=" -mb $MBS "
+fi
+if [[ -n ${VP:-} ]]; then
     CONFIG_OVERRIDES+=" -vp $VP "
+fi
+if [[ -n ${CUDA_GRAPH_SCOPE:-} ]]; then
+    CUDA_GRAPH_IMPL="transformer_engine"
+    if [[ $CUDA_GRAPH_SCOPE == "full_iteration" ]]; then
+        CUDA_GRAPH_IMPL="local"
+    elif [[ $CUDA_GRAPH_SCOPE == "none" ]]; then
+        CUDA_GRAPH_IMPL="none"
+    fi
+    CONFIG_OVERRIDES+=" --cuda_graph_impl=$CUDA_GRAPH_IMPL "
+    if [[ $CUDA_GRAPH_IMPL != "none" ]]; then
+        CONFIG_OVERRIDES+=" --cuda_graph_scope=$CUDA_GRAPH_SCOPE "
+    fi
 fi
 
 if [[ $PROFILE_ENABLED == "true" ]]; then
-    CONFIG_OVERRIDES+=" -en "
+    CONFIG_OVERRIDES+=" --enable_nsys "
     CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
     CONFIG_OVERRIDES+=" --profiling_stop_step=$PROFILE_STOP_STEP "
+    CONFIG_OVERRIDES+=" --nsys_trace=cuda,nvtx "
+    CONFIG_OVERRIDES+=" --nsys_extra_args=--nvtx-domain-include=NCCL "
+    CONFIG_OVERRIDES+=" --profiling_ranks=$(seq -s, 0 $((JOB_TOTAL_GPUS - 1))) "
     if [[ $GPU_METRICS_ENABLED == true ]]; then
         CONFIG_OVERRIDES+=" --profiling_gpu_metrics "
     fi
@@ -249,24 +176,28 @@ else
     GPUS_PER_NODE=8
 fi
 
+if [[ $DTYPE == "bf16" ]] && [[ $MODEL_SIZE == "235b" ]] && [[ $GPU_TYPE != "h100" ]]; then
+    export NCCL_IB_QPS_PER_CONNECTION=${NCCL_IB_QPS_PER_CONNECTION:-4}
+fi
+
 #run command
 pushd $LLMB_WORKLOAD/Megatron-Bridge
 
 python3 scripts/performance/setup_experiment.py \
     --container_image $IMAGE \
+    --offline \
     --compute_dtype $COMPUTE_DTYPE \
+    --model_family_name qwen \
+    --model_recipe_name qwen3_${MODEL_SIZE_FULL} \
     --gpu $GPU_TYPE \
     --num_gpus $JOB_TOTAL_GPUS \
     --gpus_per_node $GPUS_PER_NODE \
-    --model_name qwen3 \
-    --model_size ${MODEL_SIZE_FULL} \
     ${CONFIG_OVERRIDES} \
     --account $SBATCH_ACCOUNT \
     --partition $SBATCH_PARTITION \
     --log_dir $NEMORUN_HOME \
     --time_limit $TIME_LIMIT \
     --max_steps $MAX_STEPS \
-    --hf_token ${HF_TOKEN:?HF_TOKEN is required} \
     $SLURM_ARGS
 
 popd

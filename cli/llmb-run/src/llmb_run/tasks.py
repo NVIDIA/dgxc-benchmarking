@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -35,6 +35,7 @@ class WorkloadTask:
     dtype: str
     scale: int
     profile: bool = False
+    proxy: bool = False
     env_overrides: dict = field(default_factory=dict)
     model_overrides: dict = field(default_factory=dict)
     extra_slurm_params: Dict[str, Any] = field(default_factory=dict)
@@ -47,9 +48,10 @@ def format_task_output(task, prefix="", suffix=""):
     dtype_field = f"dtype={task.dtype}"
     scale_field = f"scale={task.scale}"
     profile_field = f"profile={task.profile}"
+    proxy_field = f"proxy={task.proxy}"
 
     # Build the base output with aligned fields
-    output = f"{prefix}{workload_field:<30} {dtype_field:<12} {scale_field:<12} {profile_field:<15}"
+    output = f"{prefix}{workload_field:<30} {dtype_field:<12} {scale_field:<12} {profile_field:<15} {proxy_field:<12}"
 
     # Add optional fields if they exist
     if task.env_overrides:

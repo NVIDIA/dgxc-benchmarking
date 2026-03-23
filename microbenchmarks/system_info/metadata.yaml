@@ -1,0 +1,69 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: MIT
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+
+# Setup
+general:
+  workload: system_info
+  workload_type: microbenchmark
+  framework: host-debug
+
+# Host-debug steps run directly on the node; the container image is only used
+# for the srun smoke-test (step 11) that validates pyxis/enroot + GPU visibility.
+container:
+  images:
+    - 'nvcr.io#nvidia/nemo:26.02.00'
+
+# Run
+run:
+  launcher_type: 'configured_sbatch'
+  launch_script: 'launch.sh'
+
+  gpu_configs:
+    gb300:
+      model_configs:
+        - model_size: '1b'
+          dtypes: ['bf16']
+          scales: [4]
+          exact_scales: true
+    gb200:
+      model_configs:
+        - model_size: '1b'
+          dtypes: ['bf16']
+          scales: [4]
+          exact_scales: true
+    b300:
+      model_configs:
+        - model_size: '1b'
+          dtypes: ['bf16']
+          scales: [8]
+          exact_scales: true
+    b200:
+      model_configs:
+        - model_size: '1b'
+          dtypes: ['bf16']
+          scales: [8]
+          exact_scales: true
+    h100:
+      model_configs:
+        - model_size: '1b'
+          dtypes: ['bf16']
+          scales: [8]
+          exact_scales: true
