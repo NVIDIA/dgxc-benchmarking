@@ -94,11 +94,9 @@ run:
         - model_size: '405b'
           dtypes: ['fp8']
           scales: [256, 512]
-          exact_scales: true
         - model_size: '70b'
           dtypes: ['fp8']
           scales: [64,128,256,512]
-          exact_scales: true
     b200:
       model_configs:
         - model_size: '405b'

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project uses [PEP 440](https://www.python.org/dev/peps/pep-0440/) versioning with semantic versioning semantics:
 **MAJOR.MINOR.PATCH** for feature parity with [SemVer](https://semver.org/).
 
+## [1.8.4] - 2026-03-23
+
+### Fixed
+
+- Fix v1→v2 cluster config migration dropping GRES values due to wrong field names (`gpu_gres`/`cpu_gres` → `gpu_partition_gres`/`cpu_partition_gres`).
+
 ## [1.8.3] - 2026-02-27
 
 ### Changed

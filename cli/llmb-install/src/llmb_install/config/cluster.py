@@ -89,11 +89,11 @@ def normalize_cluster_config(config: dict) -> dict:
             new_slurm['account'] = slurm['account']
         new_slurm['gpu'] = {
             'partition': slurm.get('gpu_partition', ''),
-            'gres': slurm.get('gpu_gres'),
+            'gres': slurm.get('gpu_partition_gres'),
         }
         new_slurm['cpu'] = {
             'partition': slurm.get('cpu_partition', ''),
-            'gres': slurm.get('cpu_gres'),
+            'gres': slurm.get('cpu_partition_gres'),
         }
         normalized['slurm'] = new_slurm
 
