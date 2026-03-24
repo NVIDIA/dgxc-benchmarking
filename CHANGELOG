@@ -1,262 +1,328 @@
+## [v26.02] - 2026-03-23
+
+### Added
+
+- B300 support
+  - Pretrain recipes: Llama 3.1, DeepSeek V3, Nemotron-H, Qwen3
+  - NCCL benchmark
+  - CPU overhead microbenchmark
+- GPT-OSS pretrain recipe.
+- DeepSeek V3 Torchtitan FP8 support for GB300 and GB200.
+- DeepSeek V3 proxy models for 64 GB300/GB200 GPUs.
+- System info script for IB, container, and enroot diagnostics.
+- `llmb-run archive` command to package experiment logs into tarball.
+- Exemplar program documentation and tooling.
+
+### Changed
+
+- Updated recipes to NeMo 26.02.00 where applicable.
+- Llama3 LoRa finetuning ported to Megatron Bridge.
+- Torchtitan optimizations for DeepSeek V3.
+- Centralized peak throughput (TFLOP/GPU) as primary performance metric in READMEs.
+- Qwen3 235B GB200 removed FP8 support.
+
+### Removed
+
+- Run:ai support.
+
+### Known Issues
+
+- Recipes using NeMo 26.02.00 container will not work with EFA, see Known
+  Issues section of README for workaround.
+- DeepSeek V3 on EFA clusters may encounter connectivity issues.
+
 ## [v25.12.02] - 2026-02-11
 
 ### Fixed
-  - Pin `uv` to `<=0.9.28` in `install.sh` to avoid strict parsing failures when installing pinned `nemo_run` commits with `uv 0.9.29+`.
+
+- Pin `uv` to `<=0.9.28` in `install.sh` to avoid strict parsing failures when installing pinned `nemo_run` commits with `uv 0.9.29+`.
 
 ## [v25.12.01] - 2026-02-05
 
 ### Changed
-  - For Megatron Bridge models, download model configs in addition to tokenizers.
-  - Add `--container-writable` flag to Megatron Bridge SLURM job scripts.
-  - Use the passthrough packager for Megatron Bridge recipes.
-  - Standardize Torchtitan log location and naming.
-  - DSV3 B200 scales to match tested configurations.
+
+- For Megatron Bridge models, download model configs in addition to tokenizers.
+- Add `--container-writable` flag to Megatron Bridge SLURM job scripts.
+- Use the passthrough packager for Megatron Bridge recipes.
+- Standardize Torchtitan log location and naming.
+- DSV3 B200 scales to match tested configurations.
 
 ### Fixed
-  - Inference and microbenchmark job submission.
-  - Headless installation.
-  - Ensure Qwen handles custom mounts correctly.
-  - Resolve `llmb-install` Transformers version issues.
-  - Llama3.1 70b scale documentation for H100.
+
+- Inference and microbenchmark job submission.
+- Headless installation.
+- Ensure Qwen handles custom mounts correctly.
+- Resolve `llmb-install` Transformers version issues.
+- Llama3.1 70b scale documentation for H100.
 
 ### Known Issues
-  - Qwen3 requires internet connectivity and may encounter Hugging Face Hub access or rate limit errors during benchmark runs.
+
+- Qwen3 requires internet connectivity and may encounter Hugging Face Hub access or rate limit errors during benchmark runs.
 
 ## [v25.12] - 2026-01-07
 
 ### Added
-  - Qwen3 pretrain recipes 30B-A3B and 235B-A22B.
-  - DeepSeek V3 Torchtitan pretrain recipe.
+
+- Qwen3 pretrain recipes 30B-A3B and 235B-A22B.
+- DeepSeek V3 Torchtitan pretrain recipe.
 
 ### Changed
-  - Updated recipes to NeMo 25.11.01 where applicable.
-  - Consolidated llmb-run submit commands (see `cli/llmb-run/CHANGELOG.md` for details).
+
+- Updated recipes to NeMo 25.11.01 where applicable.
+- Consolidated llmb-run submit commands (see `cli/llmb-run/CHANGELOG.md` for details).
 
 ## [v25.10.01] - 2026-01-05
 
 ### Added
-  - NVCF support to inference recipes deployable via Helm Charts.
-  - Offline mode support for Grok1 and Nemotron4 (15B and 340B) pretrain recipes on SLURM clusters. Tokenizers are pre-downloaded during installation and mounted into containers at runtime, eliminating the need for HuggingFace API access during workload execution.
+
+- NVCF support to inference recipes deployable via Helm Charts.
+- Offline mode support for Grok1 and Nemotron4 (15B and 340B) pretrain recipes on SLURM clusters. Tokenizers are pre-downloaded during installation and mounted into containers at runtime, eliminating the need for HuggingFace API access during workload execution.
 
 ### Fixed
-  - Fixed Nemotron 340B runtime failures caused by rate limiting (HTTP 429 errors) when connecting to HuggingFace Hub. The workload now operates in offline mode using pre-downloaded tokenizer files, preventing API rate limit exhaustion during training runs.
+
+- Fixed Nemotron 340B runtime failures caused by rate limiting (HTTP 429 errors) when connecting to HuggingFace Hub. The workload now operates in offline mode using pre-downloaded tokenizer files, preventing API rate limit exhaustion during training runs.
 
 ## [v25.10] - 2025-12-03
 
 ### Added
-  - GB300 support
-    - Pretrain recipes: Nemotron4, Llama3.1, DS V3, Grok1 and Nemotron-H
-  - Micro-benchmark for measuring CPU overhead
-  - NCCL benchmark
-  - Inference recipes deployable via Helm Charts for K8s platform
-  - GPT OSS inference recipes for Dynamo K8s platform
-  - Llama3 LoRa finetuning recipe
+
+- GB300 support
+  - Pretrain recipes: Nemotron4, Llama3.1, DS V3, Grok1 and Nemotron-H
+- Micro-benchmark for measuring CPU overhead
+- NCCL benchmark
+- Inference recipes deployable via Helm Charts for K8s platform
+- GPT OSS inference recipes for Dynamo K8s platform
+- Llama3 LoRa finetuning recipe
 
 ### Changed
-  - Updated DS V3, Grok1, Llama 3.1, Nemotron4 and Nemotron-H pretrain and finetune recipes to reduce install footprint
-  - Updated to NeMo 25.09.00 where applicable
+
+- Updated DS V3, Grok1, Llama 3.1, Nemotron4 and Nemotron-H pretrain and finetune recipes to reduce install footprint
+- Updated to NeMo 25.09.00 where applicable
 
 ### Removed
-  - DeepSeek R1 NIM inference recipe
-  - RAG Blueprint inference recipe
-  - Llama4 pretrain, fine tuning, inference recipes
+
+- DeepSeek R1 NIM inference recipe
+- RAG Blueprint inference recipe
+- Llama4 pretrain, fine tuning, inference recipes
 
 ## [v25.08.01] - 2025-11-07
 
 ### Changed
-  - Enforce 'nvidia-modelopt==0.35.1' during install to workaround bug caused by latest torch version.
-  - Switched inference downloads to use 'hf download' instead of 'git clone'.
-  - Updated llmb-run and llmb-install packages
-  - Updated 'install.sh' script.
-  - Updated inf_nim/deepseek-r1 launch script.
+
+- Enforce 'nvidia-modelopt==0.35.1' during install to workaround bug caused by latest torch version.
+- Switched inference downloads to use 'hf download' instead of 'git clone'.
+- Updated llmb-run and llmb-install packages
+- Updated 'install.sh' script.
+- Updated inf_nim/deepseek-r1 launch script.
 
 ## [v25.05.05] - 2025-10-22
 
 ### Changed
-  - Llama3.1 Documentation - GA parameter fix
+
+- Llama3.1 Documentation - GA parameter fix
 
 ## [v25.08] - 2025-09-08
 
 ### Added
-  - GB200 support
-    - Pretrain recipe: Nemotron4 15B
-    - Expanded scales support for pretrain recipes: Nemotron 4 340B, Llama 3.1 405B, DeepSeek V3 671B, Grok1 314B
-  - B200 support
-    - Pretrain recipes: Nemotron4 15B, Llama 4 Maverick 400B
-    - Expanded scales support for pretrain recipes: Nemotron 4 340B, Llama 3.1 405B, DeepSeek V3 671B, Grok1 314B, Llama 4 Maverick
-  - H100 support
-    - Inference recipes: DeepSeek R1, Llama 3.3, Llama 4
-    - Expanded scales support for pretrain recipes: Llama 3.1 405B, Llama 4 Maverick, Grok1 314B, Nemotron4 15B/340B
 
-### Changed 
-  - Pretrain and finetune NeMo based recipes have been updated to 25.07.01 image
+- GB200 support
+  - Pretrain recipe: Nemotron4 15B
+  - Expanded scales support for pretrain recipes: Nemotron 4 340B, Llama 3.1 405B, DeepSeek V3 671B, Grok1 314B
+- B200 support
+  - Pretrain recipes: Nemotron4 15B, Llama 4 Maverick 400B
+  - Expanded scales support for pretrain recipes: Nemotron 4 340B, Llama 3.1 405B, DeepSeek V3 671B, Grok1 314B, Llama 4 Maverick
+- H100 support
+  - Inference recipes: DeepSeek R1, Llama 3.3, Llama 4
+  - Expanded scales support for pretrain recipes: Llama 3.1 405B, Llama 4 Maverick, Grok1 314B, Nemotron4 15B/340B
+
+### Changed
+
+- Pretrain and finetune NeMo based recipes have been updated to 25.07.01 image
 
 ## [v25.07] - 2025-09-05
 
 ### Added
-  - B200 Support
-    - Pretrain recipes: Nemotron4 340B, Llama 3.1 405B, DeepSeek V3 671B, Grok1 314B, Nemotron-H 56B
-    - Finetune recipes: Llama4 Maverick 400B
-  - TensorRT-LLM Inference recipes for GB200:
-    - DeepSeek R1
-    - Llama 3.3
-    - Llama 4
-  - Nemotron-H GB200 support
-  - Nemotron4 checkpointing support GB200
-  - Nemotron4 support for Run:ai clusters
-  - GPU metrics collection during NSight profiling (ENABLE_GPU_METRICS variable)
+
+- B200 Support
+  - Pretrain recipes: Nemotron4 340B, Llama 3.1 405B, DeepSeek V3 671B, Grok1 314B, Nemotron-H 56B
+  - Finetune recipes: Llama4 Maverick 400B
+- TensorRT-LLM Inference recipes for GB200:
+  - DeepSeek R1
+  - Llama 3.3
+  - Llama 4
+- Nemotron-H GB200 support
+- Nemotron4 checkpointing support GB200
+- Nemotron4 support for Run:ai clusters
+- GPU metrics collection during NSight profiling (ENABLE_GPU_METRICS variable)
 
 ### Changed
-  - Grok1 314B - GB200 Config
+
+- Grok1 314B - GB200 Config
 
 ### Removed
-  - Llama3 70b inference NIM recipe
+
+- Llama3 70b inference NIM recipe
 
 ## [v25.05.04] - 2025-09-05
 
 ### Added
-  - H100 512 GPU support for DeepSeek V3 Pretrain
+
+- H100 512 GPU support for DeepSeek V3 Pretrain
 
 ### Changed
-  - Bug fix for broken launch sequence due to transformers package update
-  - Include latest LLMB tooling with improved capabilities for mass recipe submission and other updates
+
+- Bug fix for broken launch sequence due to transformers package update
+- Include latest LLMB tooling with improved capabilities for mass recipe submission and other updates
 
 ## [v25.05.03] - 2025-08-21
 
 ### Changed
-  - Fixed nvcr.io links in DeepSeek V3 and Nemotron-H metadata files.
+
+- Fixed nvcr.io links in DeepSeek V3 and Nemotron-H metadata files.
 
 ## [v25.04.02] - 2025-07-23
 
 ### Changed
-  - Fixed launch errors for nemotron and llama 3.1 recipes
+
+- Fixed launch errors for nemotron and llama 3.1 recipes
 
 ## [v25.05.02] - 2025-07-22
 
 ### Changed
-  - H100 baseline performance numbers based on most recent runs
-    - Grok1 314B
+
+- H100 baseline performance numbers based on most recent runs
+  - Grok1 314B
 
 ## [v25.05.01] - 2025-06-18
 
 ### Added
-  - H100 support for the following recipes
-    - Llama3.1 405B
-    - Grok1 314B
+
+- H100 support for the following recipes
+  - Llama3.1 405B
+  - Grok1 314B
 
 ### Changed
-  - Fixed DeepSeek and Llama4 READMEs
-  - Installer
-    - Enforce min and max python versions
-	- Use GRES properly for CPU_PARTITION jobs.
-  - bitsandbytes update for ARM systems.
+
+- Fixed DeepSeek and Llama4 READMEs
+- Installer
+  - Enforce min and max python versions
+  - Use GRES properly for CPU_PARTITION jobs.
+- bitsandbytes update for ARM systems.
 
 ## [v25.05] - 2025-06-10
 
 ### Added
-  - GB200 support for the following recipes
-    - Llama3.1 405B
-    - Grok1 314B
-    - Nemotron4 15B/340B
-    - Deepseek v3
-    - Llama 4 Maverick
-  - Nemotron-H 56B model training recipe for H100 GPUs
-  - End to end installer and launcher for all recipes
+
+- GB200 support for the following recipes
+  - Llama3.1 405B
+  - Grok1 314B
+  - Nemotron4 15B/340B
+  - Deepseek v3
+  - Llama 4 Maverick
+- Nemotron-H 56B model training recipe for H100 GPUs
+- End to end installer and launcher for all recipes
 
 ### Changed
-  - Recipes collection moved from [NGC Collection](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/dgxc-benchmarking/collections/dgxc-benchmarking) to [GitHub](https://github.com/NVIDIA/dgxc-benchmarking).
+
+- Recipes collection moved from [NGC Collection](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/dgxc-benchmarking/collections/dgxc-benchmarking) to [GitHub](https://github.com/NVIDIA/dgxc-benchmarking).
 
 ### Removed
-  - NeMo GPT3 175b training recipe in favor of Nemotron4
-  - Maxtext Llama 3 training recipe
-  - Llama 3 SFT/LoRa fine tuning recipes
 
+- NeMo GPT3 175b training recipe in favor of Nemotron4
+- Maxtext Llama 3 training recipe
+- Llama 3 SFT/LoRa fine tuning recipes
 
 ## [v25.04.01] - 2025-05-16
 
 ### Changed
-  - Fixed MFU formula for Nemotron4 workload
-  - Fixed setup script for FineTuning workload
+
+- Fixed MFU formula for Nemotron4 workload
+- Fixed setup script for FineTuning workload
 
 ## [v25.04] - 2025-04-30
 
 ### Changed
-  - Llama3.1 and Nemotron4 benchmarks adopted 25.02.01 NeMo Framework and use NeMo2.0 interface
-  - Llama3.1 and Nemotron4 benchmarks support checkpointing restart functionality
 
+- Llama3.1 and Nemotron4 benchmarks adopted 25.02.01 NeMo Framework and use NeMo2.0 interface
+- Llama3.1 and Nemotron4 benchmarks support checkpointing restart functionality
 
 ## [v25.03] - 2025-04-18
 
 ### Added
-  - Deepseek R1 NIM inference benchmark
+
+- Deepseek R1 NIM inference benchmark
 
 ## [v25.02] - 2025-03-17
 
 ### Added
-  - SFT/LoRA fine-tuning workload added based on 24.12 NeMo Framework
-  - Maxtext Llama 3 70b added based on 25.01 Maxtext Framework
-  - Llama 3 NIM inference benchmark
-  - RAG pipeline blueprint benchmark
+
+- SFT/LoRA fine-tuning workload added based on 24.12 NeMo Framework
+- Maxtext Llama 3 70b added based on 25.01 Maxtext Framework
+- Llama 3 NIM inference benchmark
+- RAG pipeline blueprint benchmark
 
 ### Changed
-  - Nemotron 15b updated to 24.12 NeMo Framework
-  - Llama 3.1 8b, 70b, 405b updated to 24.12 NeMo Framework
-  - Grok1 314b updated to 24.12 NeMo Framework
+
+- Nemotron 15b updated to 24.12 NeMo Framework
+- Llama 3.1 8b, 70b, 405b updated to 24.12 NeMo Framework
+- Grok1 314b updated to 24.12 NeMo Framework
 
 ### Removed
-  - HuggingFace Mistral fine-tuning
-  - HuggingFace Llama fine-tuning
-  - PaXML 175b training
-  - Maxtext Llama 2 70b training
+
+- HuggingFace Mistral fine-tuning
+- HuggingFace Llama fine-tuning
+- PaXML 175b training
+- Maxtext Llama 2 70b training
 
 ## [v25.01.1] - 2025-02-13
 
 ### Changed
-  - Readme fixes
-  - Fixed dataset generation on CSP clusters
+
+- Readme fixes
+- Fixed dataset generation on CSP clusters
 
 ## [v25.01] - 2025-02-11
 
 ### Changed
-  - added profiling instructions and how to consume profile traces
-  - improved setup scripts to fix sporadic enroot failures
-  - updated README instructions to address user's feedback
 
+- added profiling instructions and how to consume profile traces
+- improved setup scripts to fix sporadic enroot failures
+- updated README instructions to address user's feedback
 
 ## [v24.11] - 2024-12-13
 
 ### Added
 
-  - Grok1 314b
-  - Llama3.1 8b, 70b, 405b
-  - Maxtext Llama2 70b
-  - Nemotron 15b, 340b
+- Grok1 314b
+- Llama3.1 8b, 70b, 405b
+- Maxtext Llama2 70b
+- Nemotron 15b, 340b
 
 ### Changed
 
-  - Updated launch scripts and READMEs to align recipes:
-    - HuggingFace Mistral and Llama
-    - Nemo Megatron
-    - Paxml
+- Updated launch scripts and READMEs to align recipes:
+  - HuggingFace Mistral and Llama
+  - Nemo Megatron
+  - Paxml
 
 ### Removed
 
-  - Llama2
-  - Llama3
+- Llama2
+- Llama3
 
 ## [v24.05] - 2024-05-31
 
 ### Added
 
-  - HuggingFace Mistral 7x8b fine tuning
-  - HuggingFace Llama 70b LoRA fine tuning
+- HuggingFace Mistral 7x8b fine tuning
+- HuggingFace Llama 70b LoRA fine tuning
 
 ### Changed
 
-- Nemo Megatron 175B 
+- Nemo Megatron 175B
   - Update container version to 24.03.01
   - Simplified launch scripts with fewer dependencies due to removal of NeMo Launcher from the process
-- Llama 
+- Llama
   - Update container version to 24.03.01
   - Simplified launch scripts with fewer dependencies due to removal of NeMo Launcher from the process
   - Add grad_sync_dtype to config

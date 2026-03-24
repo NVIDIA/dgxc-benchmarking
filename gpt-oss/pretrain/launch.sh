@@ -106,6 +106,9 @@ fi
 if [[ -n ${VP-} ]]; then
     CONFIG_OVERRIDES+="-vp $VP "
 fi
+if [[ -z ${EP-} ]] && [[ $GPU_TYPE == "b300" ]]; then
+    EP=8
+fi
 if [[ -n ${EP-} ]]; then
     CONFIG_OVERRIDES+="-ep $EP "
 fi

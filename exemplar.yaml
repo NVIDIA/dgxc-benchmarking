@@ -60,12 +60,16 @@ workloads:
   b300:
   - pretrain_deepseek-v3_671b:
       dtypes: [bf16]
+  - pretrain_gpt_oss_120b:
+      dtypes: [bf16]
   - pretrain_llama3.1_405b:
       dtypes: [fp8]
   - pretrain_llama3.1_70b:
       dtypes: [fp8]
   - pretrain_nemotron-h_56b:
       dtypes: [fp8]
+  - pretrain_qwen3_235b:
+      dtypes: [bf16]
   b200:
   - pretrain_deepseek-v3_671b:
       dtypes: [bf16, fp8]

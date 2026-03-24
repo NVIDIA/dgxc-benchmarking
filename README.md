@@ -181,20 +181,21 @@ The following tables list each benchmark used to evaluate the model's performanc
 
 ### GB300 Workloads
 
-|   Type   |    Framework    |                             Model                             | Container Version | Model Size | Scale (# of GPUs) |    Precision     | Model Access Required | Checkpointing | Cluster Type |
-| :------: | :-------------: | :-----------------------------------------------------------: | :---------------: | :--------: | :---------------: | :--------------: | :-------------------: | :-----------: | :----------: |
-| Pretrain | Megatron-Bridge |          [GPT OSS 120B](gpt-oss/pretrain/README.md)           |     26.02.00      |    120B    |      64-512       |       BF16       |          No           |      No       |    Slurm     |
-| Pretrain | Megatron-Bridge | [DeepSeek V3](deepseek_v3/pretrain/megatron_bridge/README.md) |     26.02.00      |    671B    |      128-512      | FP8, BF16, NVFP4 |          Yes          |      No       |    Slurm     |
-| Pretrain | Megatron-Bridge |                [Llama 3.1](llama3.1/README.md)                |     26.02.00      |    405B    |      256-512      |    FP8, NVFP4    |          Yes          |      Yes      |    Slurm     |
-| Pretrain | Megatron-Bridge |                [Llama 3.1](llama3.1/README.md)                |     26.02.00      |    70B     |      64-512       |    FP8, NVFP4    |          Yes          |      Yes      |    Slurm     |
-| Pretrain | Megatron-Bridge |                [Llama 3.1](llama3.1/README.md)                |     26.02.00      |     8B     |       8-128       |    FP8, NVFP4    |          Yes          |      Yes      |    Slurm     |
-| Pretrain | Megatron-Bridge |               [Qwen3](qwen3/pretrain/README.md)               |     26.02.00      |    235B    |      256-512      |    FP8, BF16     |          Yes          |      No       |    Slurm     |
-| Pretrain | Megatron-Bridge |               [Qwen3](qwen3/pretrain/README.md)               |     26.02.00      |    30B     |       8-64        |    FP8, BF16     |          Yes          |      No       |    Slurm     |
-| Pretrain |      NeMo       |             [Nemotron4](nemotron4-15b/README.md)              |     25.09.00      |    15B     |      16-256       |    FP8, BF16     |          No           |      Yes      |    Slurm     |
-| Pretrain |      NeMo       |             [Nemotron4](nemotron4-340b/README.md)             |     25.09.00      |    340B    |      128-512      |    FP8, BF16     |          No           |      Yes      |    Slurm     |
-| Pretrain |      NeMo       |                   [Grok1](grok1/README.md)                    |     25.09.00      |    314B    |      128-512      |    FP8, BF16     |          Yes          |      No       |    Slurm     |
-| Pretrain | Megatron-Bridge |              [Nemotron-H](nemotron-h/README.md)               |     26.02.00      |    56B     |      32-512       |       FP8        |          No           |      No       |    Slurm     |
-| Finetune | Megatron-Bridge |             [Llama 3](llama3/finetune/README.md)              |     26.02.00      |    70B     |       8-16        |    BF16, FP8     |          Yes          |      No       |    Slurm     |
+|      Type      |    Framework    |                             Model                             | Container Version | Model Size | Scale (# of GPUs) | Precision  | Model Access Required | Checkpointing | Cluster Type |
+| :------------: | :-------------: | :-----------------------------------------------------------: | :---------------: | :--------: | :---------------: | :--------: | :-------------------: | :-----------: | :----------: |
+|    Pretrain    | Megatron-Bridge |          [GPT OSS 120B](gpt-oss/pretrain/README.md)           |     26.02.00      |    120B    |      64-512       |    BF16    |          No           |      No       |    Slurm     |
+|    Pretrain    | Megatron-Bridge | [DeepSeek V3](deepseek_v3/pretrain/megatron_bridge/README.md) |     26.02.00      |    671B    |      128-512      | FP8, BF16  |          Yes          |      No       |    Slurm     |
+|    Pretrain    | Megatron-Bridge |                [Llama 3.1](llama3.1/README.md)                |     26.02.00      |    405B    |      256-512      | FP8, NVFP4 |          Yes          |      Yes      |    Slurm     |
+|    Pretrain    | Megatron-Bridge |                [Llama 3.1](llama3.1/README.md)                |     26.02.00      |    70B     |      64-512       | FP8, NVFP4 |          Yes          |      Yes      |    Slurm     |
+|    Pretrain    | Megatron-Bridge |                [Llama 3.1](llama3.1/README.md)                |     26.02.00      |     8B     |       8-128       | FP8, NVFP4 |          Yes          |      Yes      |    Slurm     |
+|    Pretrain    | Megatron-Bridge |               [Qwen3](qwen3/pretrain/README.md)               |     26.02.00      |    235B    |      256-512      |    BF16    |          Yes          |      No       |    Slurm     |
+|    Pretrain    | Megatron-Bridge |               [Qwen3](qwen3/pretrain/README.md)               |     26.02.00      |    30B     |       8-64        |    BF16    |          Yes          |      No       |    Slurm     |
+|    Pretrain    |      NeMo       |             [Nemotron4](nemotron4-15b/README.md)              |     25.09.00      |    15B     |      16-256       | FP8, BF16  |          No           |      Yes      |    Slurm     |
+|    Pretrain    |      NeMo       |             [Nemotron4](nemotron4-340b/README.md)             |     25.09.00      |    340B    |      128-512      | FP8, BF16  |          No           |      Yes      |    Slurm     |
+|    Pretrain    |      NeMo       |                   [Grok1](grok1/README.md)                    |     25.09.00      |    314B    |      128-512      | FP8, BF16  |          Yes          |      No       |    Slurm     |
+|    Pretrain    | Megatron-Bridge |              [Nemotron-H](nemotron-h/README.md)               |     26.02.00      |    56B     |      32-512       |    FP8     |          No           |      No       |    Slurm     |
+|    Finetune    | Megatron-Bridge |             [Llama 3](llama3/finetune/README.md)              |     26.02.00      |    70B     |       8-16        | BF16, FP8  |          Yes          |      No       |    Slurm     |
+| Microbenchmark |     TRT-LLM     |       [GPT-OSS](microbenchmarks/cpu_overhead/README.md)       |     1.1.0rc5      |    120B    |        1-4        |   MXFP4    |          Yes          |      No       |    Slurm     |
 
 ### GB200 Workloads
 
@@ -206,8 +207,8 @@ The following tables list each benchmark used to evaluate the model's performanc
 |    Pretrain    | Megatron-Bridge  |                [Llama 3.1](llama3.1/README.md)                |      26.02.00      |    405B    |      256-512      | FP8, NVFP4 |          Yes          |      Yes      |    Slurm     |
 |    Pretrain    | Megatron-Bridge  |                [Llama 3.1](llama3.1/README.md)                |      26.02.00      |    70B     |      64-512       | FP8, NVFP4 |          Yes          |      Yes      |    Slurm     |
 |    Pretrain    | Megatron-Bridge  |                [Llama 3.1](llama3.1/README.md)                |      26.02.00      |     8B     |       8-128       | FP8, NVFP4 |          Yes          |      Yes      |    Slurm     |
-|    Pretrain    | Megatron-Bridge  |               [Qwen3](qwen3/pretrain/README.md)               |      26.02.00      |    235B    |      256-512      | FP8, BF16  |          Yes          |      No       |    Slurm     |
-|    Pretrain    | Megatron-Bridge  |               [Qwen3](qwen3/pretrain/README.md)               |      26.02.00      |    30B     |       8-64        | FP8, BF16  |          Yes          |      No       |    Slurm     |
+|    Pretrain    | Megatron-Bridge  |               [Qwen3](qwen3/pretrain/README.md)               |      26.02.00      |    235B    |      256-512      |    BF16    |          Yes          |      No       |    Slurm     |
+|    Pretrain    | Megatron-Bridge  |               [Qwen3](qwen3/pretrain/README.md)               |      26.02.00      |    30B     |       8-64        |    BF16    |          Yes          |      No       |    Slurm     |
 |    Pretrain    | Megatron-Bridge  | [DeepSeek V3](deepseek_v3/pretrain/megatron_bridge/README.md) |      26.02.00      |    671B    |      256-512      | FP8, BF16  |          Yes          |      No       |    Slurm     |
 |    Pretrain    |    TorchTitan    |   [DeepSeek V3](deepseek_v3/pretrain/torchtitan/README.md)    |     25.12-py3      |    671B    |        256        | FP8, BF16  |          Yes          |      No       |    Slurm     |
 |    Pretrain    |       NeMo       |                   [Grok1](grok1/README.md)                    |      25.09.00      |    314B    |      128-512      | FP8, BF16  |          Yes          |      No       |    Slurm     |
@@ -225,10 +226,12 @@ The following tables list each benchmark used to evaluate the model's performanc
 
 |   Type   |    Framework    |                             Model                             | Container Version | Model Size | Scale (# of GPUs) | Precision | Model Access Required | Checkpointing | Cluster Type |
 | :------: | :-------------: | :-----------------------------------------------------------: | :---------------: | :--------: | :---------------: | :-------: | :-------------------: | :-----------: | :----------: |
+| Pretrain | Megatron-Bridge |          [GPT OSS 120B](gpt-oss/pretrain/README.md)           |     26.02.00      |    120B    |      64-512       |   BF16    |          No           |      No       |    Slurm     |
 | Pretrain | Megatron-Bridge | [DeepSeek V3](deepseek_v3/pretrain/megatron_bridge/README.md) |     26.02.00      |    671B    |      128-512      |   BF16    |          Yes          |      No       |    Slurm     |
-| Pretrain | Megatron-Bridge |                [Llama 3.1](llama3.1/README.md)                |     26.02.00      |    405B    |     256-1024      |    FP8    |          Yes          |      Yes      |    Slurm     |
-| Pretrain | Megatron-Bridge |                [Llama 3.1](llama3.1/README.md)                |     26.02.00      |    70B     |      64-1024      |    FP8    |          Yes          |      Yes      |    Slurm     |
-| Pretrain | Megatron-Bridge |               [Qwen3](qwen3/pretrain/README.md)               |     26.02.00      |    30B     |       8-64        | FP8, BF16 |          Yes          |      No       |    Slurm     |
+| Pretrain | Megatron-Bridge |                [Llama 3.1](llama3.1/README.md)                |     26.02.00      |    405B    |      256-512      |    FP8    |          Yes          |      Yes      |    Slurm     |
+| Pretrain | Megatron-Bridge |                [Llama 3.1](llama3.1/README.md)                |     26.02.00      |    70B     |      64-512       |    FP8    |          Yes          |      Yes      |    Slurm     |
+| Pretrain | Megatron-Bridge |               [Qwen3](qwen3/pretrain/README.md)               |     26.02.00      |    235B    |      256-512      |   BF16    |          Yes          |      No       |    Slurm     |
+| Pretrain | Megatron-Bridge |               [Qwen3](qwen3/pretrain/README.md)               |     26.02.00      |    30B     |       8-64        |   BF16    |          Yes          |      No       |    Slurm     |
 | Pretrain | Megatron-Bridge |              [Nemotron-H](nemotron-h/README.md)               |     26.02.00      |    56B     |      32-512       |    FP8    |          No           |      No       |    Slurm     |
 
 ### B200 Workloads
@@ -241,8 +244,8 @@ The following tables list each benchmark used to evaluate the model's performanc
 |    Pretrain    | Megatron-Bridge  |                [Llama 3.1](llama3.1/README.md)                |       26.02.00       |    405B    |     256-1024      | FP8, NVFP4 |          Yes          |      Yes      |    Slurm     |
 |    Pretrain    | Megatron-Bridge  |                [Llama 3.1](llama3.1/README.md)                |       26.02.00       |    70B     |      64-1024      | FP8, NVFP4 |          Yes          |      Yes      |    Slurm     |
 |    Pretrain    | Megatron-Bridge  |                [Llama 3.1](llama3.1/README.md)                |       26.02.00       |     8B     |       8-128       | FP8, NVFP4 |          Yes          |      Yes      |    Slurm     |
-|    Pretrain    | Megatron-Bridge  |               [Qwen3](qwen3/pretrain/README.md)               |       26.02.00       |    235B    |      256-512      | FP8, BF16  |          Yes          |      No       |    Slurm     |
-|    Pretrain    | Megatron-Bridge  |               [Qwen3](qwen3/pretrain/README.md)               |       26.02.00       |    30B     |       8-64        | FP8, BF16  |          Yes          |      No       |    Slurm     |
+|    Pretrain    | Megatron-Bridge  |               [Qwen3](qwen3/pretrain/README.md)               |       26.02.00       |    235B    |      256-512      |    BF16    |          Yes          |      No       |    Slurm     |
+|    Pretrain    | Megatron-Bridge  |               [Qwen3](qwen3/pretrain/README.md)               |       26.02.00       |    30B     |       8-64        |    BF16    |          Yes          |      No       |    Slurm     |
 |    Pretrain    | Megatron-Bridge  | [DeepSeek V3](deepseek_v3/pretrain/megatron_bridge/README.md) |       26.02.00       |    671B    |      256-512      | FP8, BF16  |          Yes          |      No       |    Slurm     |
 |    Pretrain    |    TorchTitan    |   [DeepSeek V3](deepseek_v3/pretrain/torchtitan/README.md)    |      25.12-py3       |    671B    |        256        | FP8, BF16  |          Yes          |      No       |    Slurm     |
 |    Pretrain    |       NeMo       |                   [Grok1](grok1/README.md)                    |       25.09.00       |    314B    |     256-1024      | FP8, BF16  |          Yes          |      No       |    Slurm     |
@@ -266,8 +269,8 @@ Baseline performance metrics were collected using workloads on the NVIDIA DGX H1
 |    Pretrain    | Megatron-Bridge |                [Llama 3.1](llama3.1/README.md)                |     26.02.00      |    405B    |       1024        | BF16, FP8 |          Yes          |      Yes      |    Slurm     |
 |    Pretrain    | Megatron-Bridge |                [Llama 3.1](llama3.1/README.md)                |     26.02.00      |    70B     |      64-1024      | BF16, FP8 |          Yes          |      Yes      |    Slurm     |
 |    Pretrain    | Megatron-Bridge |                [Llama 3.1](llama3.1/README.md)                |     26.02.00      |     8B     |       8-128       | BF16, FP8 |          Yes          |      Yes      |    Slurm     |
-|    Pretrain    | Megatron-Bridge |               [Qwen3](qwen3/pretrain/README.md)               |     26.02.00      |    235B    |      256-512      | FP8, BF16 |          Yes          |      No       |    Slurm     |
-|    Pretrain    | Megatron-Bridge |               [Qwen3](qwen3/pretrain/README.md)               |     26.02.00      |    30B     |       16-64       | FP8, BF16 |          Yes          |      No       |    Slurm     |
+|    Pretrain    | Megatron-Bridge |               [Qwen3](qwen3/pretrain/README.md)               |     26.02.00      |    235B    |      256-512      |   BF16    |          Yes          |      No       |    Slurm     |
+|    Pretrain    | Megatron-Bridge |               [Qwen3](qwen3/pretrain/README.md)               |     26.02.00      |    30B     |       16-64       |   BF16    |          Yes          |      No       |    Slurm     |
 |    Pretrain    | Megatron-Bridge | [DeepSeek V3](deepseek_v3/pretrain/megatron_bridge/README.md) |     25.09.00      |    671B    |     512-1024      |    FP8    |          Yes          |      No       |    Slurm     |
 |    Pretrain    | Megatron-Bridge | [DeepSeek V3](deepseek_v3/pretrain/megatron_bridge/README.md) |     25.09.00      |    671B    |       1024        |   BF16    |          Yes          |      No       |    Slurm     |
 |    Pretrain    |   TorchTitan    |   [DeepSeek V3](deepseek_v3/pretrain/torchtitan/README.md)    |     25.12-py3     |    671B    |     512-1024      |   BF16    |          Yes          |      No       |    Slurm     |

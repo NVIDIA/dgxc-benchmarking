@@ -748,7 +748,7 @@ tools:
 **Solution**: Use valid enum values. Check the schema for allowed values:
 
 - workload_type: `pretrain`, `inference`, `finetune`
-- GPU types: `h100`, `b200`, `gb200`, `gb300`
+- GPU types: `h100`, `b200`, `b300`, `gb200`, `gb300`
 - dtypes: `fp8`, `bf16`, `nvfp4`
 
 ### Repository Commit Issues

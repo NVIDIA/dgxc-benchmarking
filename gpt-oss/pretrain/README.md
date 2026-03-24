@@ -14,6 +14,12 @@ This recipe contains information and scripts to produce performance results for 
 | ------------------ | :----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :------: | :-: | :---: |
 | 120b               | 64-512 |   BF16   |  4096  |   36   | False |  1  |  1  |  1  | 64  |  1  | GPUs/64 | NA  |  4  | GPUs\*20 |  5  | False |
 
+## B300
+
+| GPT OSS Model Size |  GPUs  | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP   | VP  | MBS |   GBS    | GA  |  CG   |
+| ------------------ | :----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :----: | :-: | :-: | :------: | :-: | :---: |
+| 120b               | 64-512 |   BF16   |  4096  |   36   | False |  1  |  1  |  1  |  8  |  1  | GPUs/8 | NA  |  4  | GPUs\*20 |  5  | False |
+
 ## B200
 
 | GPT OSS Model Size |  GPUs  | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS    | GA  |  CG   |
@@ -181,6 +187,7 @@ JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [ADDITIONAL_SLURM_PA
 - `GPU_TYPE`: Type of GPU hardware
   - `gb300` - NVIDIA GB300 GPUs
   - `gb200` - NVIDIA GB200 GPUs
+  - `b300` - NVIDIA B300 GPUs
   - `b200` - NVIDIA B200 GPUs
   - `h100` - NVIDIA H100 GPUs
 

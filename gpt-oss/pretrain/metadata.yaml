@@ -73,6 +73,11 @@ run:
         - model_size: '120b'
           dtypes: ['bf16']
           scales: [64, 128, 256, 512]
+    b300:
+      model_configs:
+        - model_size: '120b'
+          dtypes: ['bf16']
+          scales: [64, 128, 256, 512]
     b200:
       model_configs:
         - model_size: '120b'

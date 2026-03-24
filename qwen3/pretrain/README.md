@@ -56,6 +56,13 @@ Configurations use weak scaling methodology (global batch size scales proportion
 | BF16      |  32  |  4096  |   48   |   1 |   1 |   1 |   8 |  32 |   1 |   8 | 2048 |   8 |
 | BF16      |  64  |  4096  |   48   |   1 |   1 |   1 |   8 |  64 |   1 |   8 | 4096 |   8 |
 
+#### Qwen3 235B
+
+| Precision | GPUs | SeqLen | Layers |  TP |  PP |  CP |  EP |  DP |  VP | MBS |  GBS  |  GA |
+| :-------- | :--: | :----: | :----: | --: | --: | --: | --: | --: | --: | --: | :---: | --: |
+| BF16      | 256  |  4096  |   94   |   1 |   8 |   1 |   8 |  32 |   4 |   1 | 8192  | 256 |
+| BF16      | 512  |  4096  |   94   |   1 |   8 |   1 |   8 |  64 |   4 |   1 | 16384 | 256 |
+
 ## B200
 
 #### Qwen3 30B
@@ -265,6 +272,7 @@ JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] 
 - `GPU_TYPE`: Type of GPU hardware
   - `gb300` - NVIDIA GB300 GPUs
   - `gb200` - NVIDIA GB200 GPUs
+  - `b300` - NVIDIA B300 GPUs
   - `b200` - NVIDIA B200 GPUs
   - `h100` - NVIDIA H100 GPUs
 

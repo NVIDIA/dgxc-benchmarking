@@ -93,9 +93,11 @@ Scale: **512 GPUs** | Repeats: **3x** | Profiling: enabled for 1 of the 3 total 
 | Model       | Size | Dtypes |
 | :---------- | :--- | :----- |
 | DeepSeek-V3 | 671B | BF16   |
+| GPT (OSS)   | 120B | BF16   |
 | Llama 3.1   | 405B | FP8    |
 | Llama 3.1   | 70B  | FP8    |
 | Nemotron-H  | 56B  | FP8    |
+| Qwen3       | 235B | BF16   |
 
 ### B200
 

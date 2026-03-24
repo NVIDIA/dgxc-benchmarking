@@ -28,7 +28,7 @@ All commands are non-fatal; failures are reported in output and execution contin
 
 ```bash
 cd $LLMB_INSTALL
-llmb-run submit -w microbenchmark_system_info --scale 1
+llmb-run submit -w microbenchmark_system_info --scale <num_gpus_per_node>
 ```
 
 # Output
