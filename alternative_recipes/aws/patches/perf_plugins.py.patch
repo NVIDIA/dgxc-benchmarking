@@ -1,0 +1,14 @@
+diff --git a/scripts/performance/perf_plugins.py b/scripts/performance/perf_plugins.py
+index 20e8f250a..14bb07168 100644
+--- a/scripts/performance/perf_plugins.py
++++ b/scripts/performance/perf_plugins.py
+@@ -259,6 +259,9 @@ class PerfEnvPlugin(Plugin):
+                     # executor.env_vars["NCCL_NVLS_ENABLE"] = "1" # This causes OOM; worked fine with NeMo2 and 25.09
+                     executor.env_vars["NCCL_CTA_POLICY"] = "1"
+                     del_cudnn_ln = False
++            if model_name == "llama3" and model_size == "70b":
++                if compute_dtype == "bf16":
++                    del_cudnn_ln = False  # Experiment: test cuDNN fused RMSNorm on H100 70B BF16
+         if gpu in ["gb200", "gb300"]:
+             if model_name == "llama3" and model_size == "70b":
+                 if compute_dtype == "bf16" or (compute_dtype == "fp8_cs"):

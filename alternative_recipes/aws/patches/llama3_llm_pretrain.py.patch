@@ -1,0 +1,188 @@
+diff --git a/scripts/performance/configs/llama3/llama3_llm_pretrain.py b/scripts/performance/configs/llama3/llama3_llm_pretrain.py
+index 07be0440b..27864cfe2 100644
+--- a/scripts/performance/configs/llama3/llama3_llm_pretrain.py
++++ b/scripts/performance/configs/llama3/llama3_llm_pretrain.py
+@@ -19,7 +19,10 @@ from utils.helpers import (
+     set_workload_base_configs,
+ )
+ 
+-from megatron.bridge.recipes.llama import llama3_8b_pretrain_config, llama3_70b_pretrain_config
++from megatron.bridge.recipes.llama import (
++    llama3_8b_pretrain_config,
++    llama3_70b_pretrain_config,
++)
+ from megatron.bridge.training.comm_overlap import (
+     CommOverlapConfig,
+     userbuffers_bf16_b200_h8192_tp2_mbs1_seqlen8192,
+@@ -71,11 +74,15 @@ def llama3_70b_gb300_config(precision: str = "bf16") -> ConfigContainer:
+ 
+     if cfg.ddp.use_megatron_fsdp:
+         cfg.ddp.fsdp_double_buffer = True
+-        cfg.model.gradient_accumulation_fusion = False  # Disabled to avoid functional errors
++        cfg.model.gradient_accumulation_fusion = (
++            False  # Disabled to avoid functional errors
++        )
+         cfg.ddp.suggested_communication_unit_size = 800000000
+ 
+     cfg.comm_overlap.tp_comm_overlap_cfg = comm_overlap_cfg
+-    cfg.comm_overlap.tp_comm_overlap = False if precision == "nvfp4" else cfg.comm_overlap.tp_comm_overlap
++    cfg.comm_overlap.tp_comm_overlap = (
++        False if precision == "nvfp4" else cfg.comm_overlap.tp_comm_overlap
++    )
+ 
+     if precision == "fp8_mx":  # keeping this eanbled causes NaN grad norm
+         cfg.comm_overlap.overlap_param_gather = False
+@@ -106,11 +113,15 @@ def llama3_70b_gb200_config(precision: str = "bf16") -> ConfigContainer:
+ 
+     if cfg.ddp.use_megatron_fsdp:
+         cfg.ddp.fsdp_double_buffer = True
+-        cfg.model.gradient_accumulation_fusion = False  # Disabled to avoid functional errors
++        cfg.model.gradient_accumulation_fusion = (
++            False  # Disabled to avoid functional errors
++        )
+         cfg.ddp.suggested_communication_unit_size = 800000000
+ 
+     cfg.comm_overlap.tp_comm_overlap_cfg = comm_overlap_cfg
+-    cfg.comm_overlap.tp_comm_overlap = False if precision == "nvfp4" else cfg.comm_overlap.tp_comm_overlap
++    cfg.comm_overlap.tp_comm_overlap = (
++        False if precision == "nvfp4" else cfg.comm_overlap.tp_comm_overlap
++    )
+ 
+     if precision == "fp8_mx":  # keeping this eanbled causes NaN grad norm
+         cfg.comm_overlap.overlap_param_gather = False
+@@ -141,11 +152,15 @@ def llama3_70b_b200_config(precision: str = "bf16") -> ConfigContainer:
+ 
+     if cfg.ddp.use_megatron_fsdp:
+         cfg.ddp.fsdp_double_buffer = True
+-        cfg.model.gradient_accumulation_fusion = False  # Disabled to avoid functional errors
++        cfg.model.gradient_accumulation_fusion = (
++            False  # Disabled to avoid functional errors
++        )
+         cfg.ddp.suggested_communication_unit_size = 800000000
+ 
+     cfg.comm_overlap.tp_comm_overlap_cfg = comm_overlap_cfg
+-    cfg.comm_overlap.tp_comm_overlap = False if precision == "nvfp4" else cfg.comm_overlap.tp_comm_overlap
++    cfg.comm_overlap.tp_comm_overlap = (
++        False if precision == "nvfp4" else cfg.comm_overlap.tp_comm_overlap
++    )
+ 
+     if precision == "fp8_mx":  # keeping this eanbled causes NaN grad norm
+         cfg.comm_overlap.overlap_param_gather = False
+@@ -160,18 +175,52 @@ def llama3_70b_h100_config(precision: str = "bf16") -> ConfigContainer:
+     if precision == "bf16":
+         base_cfg = base_cfgs.LLAMA3_70B_H100_BF16_BASE_CONFIG
+         precision_config = get_precision_config(precision)
+-        comm_overlap_cfg = userbuffers_bf16_h100_h8192_tp4_mbs1_seqlen8192
++        comm_overlap_cfg = userbuffers_bf16_b200_h8192_tp2_mbs1_seqlen8192
+     else:
+         base_cfg = base_cfgs.LLAMA3_70B_H100_FP8_CS_BASE_CONFIG
+         precision_config = get_precision_config(precision)
+-        comm_overlap_cfg = userbuffers_fp8_h100_h8192_tp4_mbs1_seqlen8192
++        comm_overlap_cfg = userbuffers_fp8_b200_h8192_tp2_mbs1_seqlen8192
++
++    cfg = llama3_70b_pretrain_config(mock=True, precision_config=precision_config)
++    set_llama3_common_configs(cfg)
++    set_workload_base_configs(cfg, base_cfg)
++
++    cfg.comm_overlap.tp_comm_overlap_cfg = comm_overlap_cfg
++
++    # Setting num_workers to 0 to avoid os.fork() OOM with 70B model loaded in memory
++    cfg.dataset.num_workers = 0
++    cfg.dataset.pin_memory = False
++
++    return cfg
++
++
++
++def llama3_70b_h100_fsdp_config(precision: str = "bf16") -> ConfigContainer:
++    """H100 with Megatron FSDP (TP=1, PP=1) for apples-to-apples comparison with B200 FSDP."""
++    if precision == "bf16":
++        base_cfg = base_cfgs.LLAMA3_70B_H100_FSDP_BF16_BASE_CONFIG
++        precision_config = get_precision_config(precision)
++        comm_overlap_cfg = userbuffers_bf16_b200_h8192_tp2_mbs1_seqlen8192
++    else:
++        base_cfg = base_cfgs.LLAMA3_70B_H100_FSDP_FP8_CS_BASE_CONFIG
++        precision_config = get_precision_config(precision)
++        comm_overlap_cfg = userbuffers_fp8_b200_h8192_tp2_mbs1_seqlen8192
+ 
+     cfg = llama3_70b_pretrain_config(mock=True, precision_config=precision_config)
+     set_llama3_common_configs(cfg)
+     set_workload_base_configs(cfg, base_cfg)
+ 
++    if cfg.ddp.use_megatron_fsdp:
++        cfg.ddp.fsdp_double_buffer = True
++        cfg.model.gradient_accumulation_fusion = False
++        cfg.ddp.suggested_communication_unit_size = 800000000
++
+     cfg.comm_overlap.tp_comm_overlap_cfg = comm_overlap_cfg
+ 
++    # Setting num_workers to 0 to avoid os.fork() OOM with 70B model loaded in memory
++    cfg.dataset.num_workers = 0
++    cfg.dataset.pin_memory = False
++
+     return cfg
+ 
+ 
+@@ -195,8 +244,12 @@ def llama3_8b_gb300_config(precision: str = "bf16") -> ConfigContainer:
+     set_llama3_common_configs(cfg)
+     set_workload_base_configs(cfg, base_cfg)
+ 
+-    cfg.comm_overlap = CommOverlapConfig(tp_comm_overlap=bool(cfg.model.tensor_model_parallel_size > 1))
+-    cfg.comm_overlap.tp_comm_overlap = False if precision == "nvfp4" else cfg.comm_overlap.tp_comm_overlap
++    cfg.comm_overlap = CommOverlapConfig(
++        tp_comm_overlap=bool(cfg.model.tensor_model_parallel_size > 1)
++    )
++    cfg.comm_overlap.tp_comm_overlap = (
++        False if precision == "nvfp4" else cfg.comm_overlap.tp_comm_overlap
++    )
+ 
+     return cfg
+ 
+@@ -218,8 +271,12 @@ def llama3_8b_gb200_config(precision: str = "bf16") -> ConfigContainer:
+     set_llama3_common_configs(cfg)
+     set_workload_base_configs(cfg, base_cfg)
+ 
+-    cfg.comm_overlap = CommOverlapConfig(tp_comm_overlap=bool(cfg.model.tensor_model_parallel_size > 1))
+-    cfg.comm_overlap.tp_comm_overlap = False if precision == "nvfp4" else cfg.comm_overlap.tp_comm_overlap
++    cfg.comm_overlap = CommOverlapConfig(
++        tp_comm_overlap=bool(cfg.model.tensor_model_parallel_size > 1)
++    )
++    cfg.comm_overlap.tp_comm_overlap = (
++        False if precision == "nvfp4" else cfg.comm_overlap.tp_comm_overlap
++    )
+ 
+     return cfg
+ 
+@@ -241,8 +298,12 @@ def llama3_8b_b200_config(precision: str = "bf16") -> ConfigContainer:
+     set_llama3_common_configs(cfg)
+     set_workload_base_configs(cfg, base_cfg)
+ 
+-    cfg.comm_overlap = CommOverlapConfig(tp_comm_overlap=bool(cfg.model.tensor_model_parallel_size > 1))
+-    cfg.comm_overlap.tp_comm_overlap = False if precision == "nvfp4" else cfg.comm_overlap.tp_comm_overlap
++    cfg.comm_overlap = CommOverlapConfig(
++        tp_comm_overlap=bool(cfg.model.tensor_model_parallel_size > 1)
++    )
++    cfg.comm_overlap.tp_comm_overlap = (
++        False if precision == "nvfp4" else cfg.comm_overlap.tp_comm_overlap
++    )
+ 
+     return cfg
+ 
+@@ -260,11 +321,15 @@ def llama3_8b_h100_config(precision: str = "bf16") -> ConfigContainer:
+     set_llama3_common_configs(cfg)
+     set_workload_base_configs(cfg, base_cfg)
+ 
+-    cfg.comm_overlap = CommOverlapConfig(tp_comm_overlap=bool(cfg.model.tensor_model_parallel_size > 1))
++    cfg.comm_overlap = CommOverlapConfig(
++        tp_comm_overlap=bool(cfg.model.tensor_model_parallel_size > 1)
++    )
+ 
+     if cfg.ddp.use_megatron_fsdp:
+         cfg.ddp.nccl_ub = True
+-        cfg.model.gradient_accumulation_fusion = False  # Disabled to avoid functional errors
++        cfg.model.gradient_accumulation_fusion = (
++            False  # Disabled to avoid functional errors
++        )
+         cfg.ddp.keep_fp8_transpose_cache = True
+ 
+     return cfg
