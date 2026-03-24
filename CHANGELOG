@@ -3,7 +3,7 @@
 ### Added
 
 - B300 support
-  - Pretrain recipes: Llama 3.1, DeepSeek V3, Nemotron-H, Qwen3 30B
+  - Pretrain recipes: Llama 3.1, DeepSeek V3, Nemotron-H, Qwen3
   - NCCL benchmark
   - CPU overhead microbenchmark
 - GPT-OSS pretrain recipe.
