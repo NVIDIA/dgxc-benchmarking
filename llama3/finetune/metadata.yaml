@@ -27,15 +27,15 @@ general:
 
 container:
   images: 
-    - 'nvcr.io#nvidia/nemo:26.02.00'
+    - 'nvcr.io#nvidia/nemo:26.02.01'
 
 repositories:
   megatron_bridge:
     url: "https://github.com/NVIDIA-NeMo/Megatron-Bridge.git"
-    commit: "6b3b5ba7ef64182caba23faa8d7abc0125aa3807"
+    commit: "aeead1ae667d795ebe725cb4a608581a21f402cc"
   nemo_run:
     url: "https://github.com/NVIDIA-NeMo/Run.git"
-    commit: "ab0c4328275c4c731f1bdea3ceb0e68a9a17a6a2"
+    commit: "525d68bfce2d6baed86ed3d7d0edbae07833ea0d"
 
 setup:
   venv_req: true
@@ -75,10 +75,23 @@ run:
           scales: [8, 16]
           exact_scales: true
 
-    h100:
+    b300:
       model_configs:
         - model_size: '70b'
           dtypes: ['bf16', 'fp8']
           scales: [8, 16]
           exact_scales: true
 
+    b200:
+      model_configs:
+        - model_size: '70b'
+          dtypes: ['bf16', 'fp8']
+          scales: [8, 16]
+          exact_scales: true
+
+    h100:
+      model_configs:
+        - model_size: '70b'
+          dtypes: ['bf16', 'fp8']
+          scales: [8, 16]
+          exact_scales: true

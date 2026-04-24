@@ -1,3 +1,26 @@
+## [v26.02.01] - 2026-04-24
+
+### Added
+
+- Llama3 LoRa finetuning support for B300 and B200.
+- PyTorch Profiler support for selected Megatron-Bridge recipes, including DeepSeek V3, GPT-OSS 120B, Llama3.1, Nemotron-H, Qwen3, and Llama3 LoRa finetuning.
+
+### Changed
+
+- Updated recipes to NeMo 26.02.01 where applicable.
+- Refreshed Blackwell recipe configurations, including GPT-OSS 120B, Qwen3, and Llama3.1.
+
+### Fixed
+
+- Improved `llmb-install` reliability when resuming failed installs, creating virtual environments, and auto-detecting SLURM GRES on heterogeneous partitions.
+- Improved `llmb-run submit` validation and error messages for explicit workload selections.
+
+### Known Issues
+
+- Qwen3 on select B300 Granite Rapids systems may benefit from the optional `qwen3/pretrain/b300_numa_cpu_pinning.patch` workaround when PCT is available and enabled.
+- EFA incompatibility for certain recipes, see Known Issues section of README
+for more details.
+
 ## [v26.02] - 2026-03-23
 
 ### Added

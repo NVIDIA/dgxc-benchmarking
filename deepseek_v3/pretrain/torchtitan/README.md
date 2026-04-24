@@ -6,7 +6,7 @@ TorchTitan is a proof-of-concept for Large-scale LLM training using native PyTor
 
 ## Supported GPU Configurations
 
-This recipe supports **H100**, **B200**, and **GB200** GPUs. The tables below show the **default benchmark configurations**; all values can be overridden via environment variables (see [Run Training](#run-training)).
+This recipe supports **GB200**, **B200**, and **H100** GPUs. The tables below summarize benchmark configurations associated with this recipe; the current launch-script defaults and overridable environment variables are documented in [Run Training](#run-training).
 
 BF16 is supported on all GPUs; FP8 is supported on B200 and GB200 only.
 
@@ -14,25 +14,25 @@ BF16 is supported on all GPUs; FP8 is supported on B200 and GB200 only.
 
 | Size | Precision | GPUs | SeqLen | Steps | DP  | TP  | EP  | PP  | MBS | GBS  | GA  | Dataset |
 | ---- | :-------: | :--: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :--: | :-: | :-----: |
-| 671B |   BF16    | 256  |  4096  |  200  | 256 |  1  | 64  |  1  |  8  | 2048 |  1  |   C4    |
-| 671B |    FP8    | 256  |  4096  |  200  | 256 |  1  | 64  |  1  |  8  | 2048 |  1  |   C4    |
+| 671B |   BF16    | 256  |  4096  |  60   | 256 |  1  | 64  |  1  |  8  | 2048 |  1  |   C4    |
+| 671B |    FP8    | 256  |  4096  |  60   | 256 |  1  | 64  |  1  |  8  | 2048 |  1  |   C4    |
 
 ## B200
 
 | Size | Precision | GPUs | SeqLen | Steps | DP  | TP  | EP  | PP  | MBS | GBS  | GA  | Dataset |
 | ---- | :-------: | :--: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :--: | :-: | :-----: |
-| 671B |   BF16    | 256  |  4096  |  200  | 256 |  1  | 64  |  1  |  8  | 2048 |  1  |   C4    |
-| 671B |    FP8    | 256  |  4096  |  200  | 256 |  1  | 64  |  1  |  8  | 2048 |  1  |   C4    |
+| 671B |   BF16    | 256  |  4096  |  60   | 256 |  1  | 64  |  1  |  8  | 2048 |  1  |   C4    |
+| 671B |    FP8    | 256  |  4096  |  60   | 256 |  1  | 64  |  1  |  8  | 2048 |  1  |   C4    |
 
 ## H100
 
 | Size | Precision | GPUs | SeqLen | Steps | DP  | TP  | EP  | PP  | MBS | GBS  | GA  | Dataset |
 | ---- | :-------: | :--: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :--: | :-: | :-----: |
-| 671B |   BF16    | 512  |  4096  |  200  | 64  |  1  | 64  |  8  | 16  | 1024 |  1  |   C4    |
+| 671B |   BF16    | 512  |  4096  |  60   | 64  |  1  | 64  |  8  | 16  | 1024 |  1  |   C4    |
 
 | Size | Precision | GPUs | SeqLen | Steps | DP  | TP  | EP  | PP  | MBS | GBS  | GA  | Dataset |
 | ---- | :-------: | :--: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :--: | :-: | :-----: |
-| 671B |   BF16    | 1024 |  4096  |  200  | 128 |  1  | 64  |  8  | 16  | 2048 |  1  |   C4    |
+| 671B |   BF16    | 1024 |  4096  |  60   | 128 |  1  | 64  |  8  | 16  | 2048 |  1  |   C4    |
 
 # Prerequisites
 
@@ -49,7 +49,7 @@ export HF_TOKEN=<your token>
 
 ## Python Requirements
 
-Requires Python 3.12.x, or conda.
+Use the installer-managed Python environment for installation, setup tasks, and `llmb-run`.
 
 ## Request Access
 
@@ -83,12 +83,11 @@ The following directory layout and key variables are used in the recipe:
 
 The installer will automatically:
 
-1. Pull and convert the PyTorch container image (nvidia/pytorch:25.10-py3)
-2. Clone the TorchTitan repository (commit: f1a96b34ff4c752b246a3e381976b7d74387bee6)
+1. Pull and convert the PyTorch container image (`nvidia/pytorch:25.12-py3`)
+2. Clone the TorchTitan repository (`https://github.com/elfiegg/torchtitan.git` at commit `b5351f166b2751684aeb1d2cb15ceb619d383ae0`)
 3. Install TorchTitan into the container (`install_torchtitan_to_container.sh`)
 4. Download the DeepSeek-V3.1-Base tokenizer from HuggingFace (`download_hf_assets.sh`)
 5. Download the C4 dataset from HuggingFace (`download_dataset.sh`)
-6. Apply the DeepSeek-V3 fix patch (`apply_fix.sh`)
 
 **Note**: The tokenizer and dataset downloads are performed automatically as part of the setup tasks defined in `metadata.yaml`.
 
@@ -99,17 +98,18 @@ The C4 dataset is automatically downloaded during the environment setup process.
 If you need to manually download or re-download the dataset, you can run:
 
 ```bash
-cd $LLMB_WORKLOAD
-sbatch download_dataset.sh
+export LLMB_INSTALL=<path to your install directory>
+cd $LLMB_INSTALL/workloads/pretrain_deepseek-v3-torchtitan
+sbatch $LLMB_INSTALL/llmb_repo/deepseek_v3/pretrain/torchtitan/download_dataset.sh
 ```
 
 # Run Training
 
-Once the environment has been prepared, it is time to train the model. The training runs for 200 steps by default (configurable). Log files and results are stored under `${LLMB_WORKLOAD}/experiments/` in per-job folders (see [Output Locations](#output-locations) for details).
+Once the environment has been prepared, it is time to train the model. The launch script runs for 60 steps by default (configurable with `TRAINING_STEPS`). Log files and results are stored under `${LLMB_WORKLOAD}/experiments/` in per-job folders (see [Output Locations](#output-locations) for details).
 
 ## Using llmb-run (Recommended)
 
-The easiest way to run benchmarks is using the llmb-run launcher tool. This method handles configuration automatically and provides a streamlined interface.
+The easiest way to run benchmarks is using the llmb-run launcher tool. This method handles configuration automatically, creates managed experiment directories, and should be the default path for most users.
 
 ```bash
 # Navigate to your installation directory
@@ -118,6 +118,9 @@ cd $LLMB_INSTALL
 # Run DeepSeek-V3 671B BF16 (scale = number of GPUs)
 llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype bf16 --scale 256
 llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype bf16 --scale 512
+
+# Run FP8 on supported GPU types
+llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype fp8 --scale 256
 ```
 
 ### Additional SLURM Parameters
@@ -148,12 +151,20 @@ ADDITIONAL_SLURM_PARAMS="nodelist=node001,node002;reservation=my_reservation;exc
 
 For more details on llmb-run usage, see the [llmb-run documentation](../../../cli/llmb-run/README.md).
 
+Most environment-variable overrides documented below can also be passed through `llmb-run` by prefixing them on the submit command. For example:
+
+```bash
+EXPERT_PARALLEL_DEGREE=16 llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype bf16 --scale 256
+TRAINING_STEPS=5000 LOCAL_BATCH_SIZE=8 llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype bf16 --scale 256
+```
+
 ## Direct Method
 
 **Important**:
 
-- Ensure your virtual environment is activated before running the training commands below. If you used the installer with conda, run `conda activate $LLMB_INSTALL/venvs/<env_name>`. If you used the installer with python venv, run `source $LLMB_INSTALL/venvs/<env_name>/bin/activate`.
+- Use the direct `sbatch launch.sh` path below only when you specifically want to bypass `llmb-run`, for example when you need lower-level control or when `llmb-run` does not expose something you need.
 - Run the launch script from the installed recipe directory: `cd $LLMB_INSTALL/llmb_repo/deepseek_v3/pretrain/torchtitan/`
+- No activated Python environment is required just to submit `launch.sh`; the workload executes inside the configured container.
 
 ### Environment variables
 
@@ -172,17 +183,21 @@ For more details on llmb-run usage, see the [llmb-run documentation](../../../cl
 **Optional:**
 
 - `GPUS_PER_NODE`: Number of GPUs per node (default: 8 for H100/B200, 4 for GB200)
-- `DATA_PARALLEL_SHARD_DEGREE`: Data parallel sharding degree (default: 64 for H100, 32 for B200, 32 for GB200)
-- `EXPERT_PARALLEL_DEGREE`: Expert parallel degree for MoE (default: 32)
-- `PIPELINE_PARALLEL_DEGREE`: Pipeline parallel degree (default: 8)
+- `DTYPE`: Training precision (default: `bf16`; `fp8` is also supported on B200 and GB200)
+- `DATA_PARALLEL_SHARD_DEGREE`: Data parallel sharding degree (default: 64 for H100 on 512 GPUs, 128 for H100 on 1024 GPUs, `-1` for B200/GB200)
+- `EXPERT_PARALLEL_DEGREE`: Expert parallel degree for MoE (default: 64)
+- `PIPELINE_PARALLEL_DEGREE`: Pipeline parallel degree (default: 8 for H100, 1 for B200/GB200)
+- `PIPELINE_PARALLEL_SCHEDULE`: Pipeline schedule (default: `1F1B` for H100, `Interleaved1F1B` for B200/GB200)
+- `ACTIVATION_CHECKPOINT_MODE`: Activation checkpoint mode (default: `selective` for H100, `full` for B200/GB200)
 - `DATASET_PATH`: Path to the dataset (default: `$LLMB_INSTALL/datasets/c4`)
 - `SEQ_LEN`: Sequence length (default: 4096)
-- `TRAINING_STEPS`: Number of training steps (default: 200)
-- `LOCAL_BATCH_SIZE`: Local batch size per GPU (default: 16)
-- `LOG_RANK`: Rank to log from (default: 448 for H100/B200, 224 for GB200)
+- `TRAINING_STEPS`: Number of training steps (default: 60)
+- `LOCAL_BATCH_SIZE`: Local batch size per GPU (default: 16 for H100, 8 for B200/GB200)
+- `LOG_RANK`: Rank to log from (default: 448 for H100 on 512 GPUs, 896 for H100 on 1024 GPUs, 224 for B200/GB200)
+- `EP_COMM_BACKEND`: Expert parallel communication backend (default: `deepep` for H100/B200, `hybridep` for GB200)
 - `RUN_CONF_IMAGE`: Override container image path
 - `RUN_CONF_MOUNTS`: Additional container mounts
-- `ADDITIONAL_SLURM_PARAMS`: Extra `sbatch` flags (e.g. `--nodelist`, `--reservation`), semicolon-separated
+- `ADDITIONAL_SLURM_PARAMS`: Extra `srun` flags (for example `nodelist=...`, `reservation=...`, `exclusive`), semicolon-separated
   - Example: `"nodelist=node001,node002;reservation=my_reservation;exclusive"`
 
 ## Running the Launch Script
@@ -207,10 +222,22 @@ Train on B200 GPUs:
 GPU_TYPE=b200 JOB_TOTAL_GPUS=256 sbatch launch.sh
 ```
 
+Train on B200 GPUs with FP8:
+
+```bash
+GPU_TYPE=b200 DTYPE=fp8 JOB_TOTAL_GPUS=256 sbatch launch.sh
+```
+
 Train on GB200 GPUs:
 
 ```bash
 GPU_TYPE=gb200 JOB_TOTAL_GPUS=256 sbatch launch.sh
+```
+
+Train on GB200 GPUs with FP8:
+
+```bash
+GPU_TYPE=gb200 DTYPE=fp8 JOB_TOTAL_GPUS=256 sbatch launch.sh
 ```
 
 Train with custom training steps:
@@ -248,11 +275,13 @@ This file contains:
 - Profiling settings (disabled by default)
 - Metrics logging settings (log_freq=10)
 
-Command-line arguments passed to the launch script will override the settings in the TOML file.
+Environment variables set when invoking `launch.sh` override parts of the TOML configuration through explicit TorchTitan CLI arguments.
 
 # Output Locations
 
-All job outputs are organized in a **two-level directory structure** under `$LLMB_WORKLOAD/experiments/`:
+All job outputs are organized under `$LLMB_WORKLOAD/experiments/`, but the final run-directory name depends on how the job is launched.
+
+When launched with `llmb-run` (`configured_sbatch`), the launcher pre-creates a timestamped experiment directory:
 
 ```text
 $LLMB_WORKLOAD/experiments/<workload>_<size>_<dtype>_gpus<number>/
@@ -260,13 +289,21 @@ $LLMB_WORKLOAD/experiments/<workload>_<size>_<dtype>_gpus<number>/
     ├── llmb-config_<SLURM_JOB_ID>.yaml       # Job configuration (created by llmb-run)
     ├── slurm-<SLURM_JOB_ID>.out              # Main Slurm job output
     ├── log-torchtitan_*.out                  # Training stdout (per-rank logs)
-    ├── log-torchtitan_*.err                  # Training stderr
     └── outputs/                              # Training outputs and dumps
         ├── profile_trace/                    # Profiling traces (if enabled)
         └── memory_snapshot/                  # Memory snapshots (if enabled)
 ```
 
-**Note:** The `<unix_timestamp>` subdirectory name is the Unix epoch timestamp (in seconds) when the job was launched.
+When launched directly with `sbatch launch.sh`, the script creates a job-based directory instead:
+
+```text
+$LLMB_WORKLOAD/experiments/<workload>_<size>_<dtype>_gpus<number>/
+└── job_<SLURM_JOB_ID>/
+    ├── log-torchtitan_*.out                  # Training logs
+    └── outputs/                              # Training outputs and dumps
+```
+
+**Note:** The `<unix_timestamp>` subdirectory is specific to `llmb-run` managed launches.
 
 **Example:** For a 671B BF16 model run on 512 GPUs, outputs are stored in:
 
@@ -281,7 +318,6 @@ where `1769818909` is the Unix timestamp of the job launch time.
 - `llmb-config_*.yaml` - Job configuration including model, scale, and cluster info
 - `slurm-*.out` - Slurm job outputs (main job, parsing, uploader)
 - `log-torchtitan_*.out` - Training step timing and performance metrics
-- `log-torchtitan_*.err` - Training error messages and warnings
 
 Additional outputs (if enabled in the TOML config):
 
@@ -306,11 +342,11 @@ ls -lt  # List experiment configurations
 # Navigate to a specific experiment configuration (e.g., 671B BF16 on 512 GPUs)
 cd pretrain_deepseek-v3-torchtitan_671b_bf16_gpus512/
 
-# List runs by Unix timestamp (most recent first)
+# List runs (timestamped if launched with llmb-run, job_<id> if launched directly)
 ls -lt
 
-# Navigate to a specific run directory (using the Unix timestamp)
-cd <unix_timestamp>/
+# Navigate to a specific run directory
+cd <run_dir>/
 
 # View the training log
 tail -f log-torchtitan_*.out
@@ -384,7 +420,7 @@ If you encounter OOM errors:
 
 1. Reduce `LOCAL_BATCH_SIZE`
 2. Increase parallelism degrees (especially pipeline parallel)
-3. Enable full activation checkpointing (already enabled by default)
+3. On H100, increase activation checkpointing, for example `ACTIVATION_CHECKPOINT_MODE=full`
 
 ### NCCL Timeout
 
@@ -426,6 +462,7 @@ There are two ways to enable PyTorch/TorchTitan profiling:
 ### Option 1: Using the launch flag or environment variable
 
 Set `ENABLE_PROFILE=true` when launching (or use the `-p` flag). The launch script will pass the TorchTitan override `--profiling.enable_profiling` and write traces to the `outputs/` directory within your run folder.
+With the launch-script flag path, traces are written under `outputs/torchtitan_<model>_<gpus>gpus_<jobid>_profile_trace/`.
 
 Example:
 

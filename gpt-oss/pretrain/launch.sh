@@ -31,7 +31,7 @@ set -eu -o pipefail
 export WORKLOAD_TYPE=pretrain
 export MODEL_FAMILY=gpt_oss
 export MODEL_RECIPE=gpt_oss_120b
-export FW_VERSION=26.02.00
+export FW_VERSION=26.02.01
 
 export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh}
 
@@ -57,6 +57,8 @@ FP8_RECIPE=${FP8_RECIPE,,}
 CONFIG_VARIANT=${CONFIG_VARIANT:-v2}
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 PROFILE_ENABLED=${PROFILE_ENABLED,,}
+PYTORCH_PROFILE_ENABLED=${ENABLE_PYTORCH_PROFILE:-false}
+PYTORCH_PROFILE_ENABLED=${PYTORCH_PROFILE_ENABLED,,}
 ENABLED_GPU_METRICS=${ENABLE_GPU_METRICS:-false}
 ENABLED_GPU_METRICS=${ENABLED_GPU_METRICS,,}
 ENABLE_VBOOST=${ENABLE_VBOOST:-false}
@@ -106,7 +108,7 @@ fi
 if [[ -n ${VP-} ]]; then
     CONFIG_OVERRIDES+="-vp $VP "
 fi
-if [[ -z ${EP-} ]] && [[ $GPU_TYPE == "b300" ]]; then
+if [[ -z ${EP-} ]] && [[ $GPU_TYPE == "b300" || $GPU_TYPE == "b200" ]]; then
     EP=8
 fi
 if [[ -n ${EP-} ]]; then
@@ -150,11 +152,26 @@ if [[ -n ${CONTAINER_MOUNTS} ]]; then
     CONFIG_OVERRIDES+=" --custom_mounts=$CONTAINER_MOUNTS"
 fi
 
+if [[ $PROFILE_ENABLED == "true" ]] && [[ $PYTORCH_PROFILE_ENABLED == "true" ]]; then
+    echo "Error: ENABLE_PROFILE and ENABLE_PYTORCH_PROFILE are mutually exclusive." >&2
+    exit 1
+fi
+
 if [[ $PROFILE_ENABLED == "true" ]]; then
-    CONFIG_OVERRIDES+=" --enable_nsys --profiling_start_step=$PROFILE_START_STEP --profiling_stop_step=$PROFILE_STOP_STEP "
+    CONFIG_OVERRIDES+=" --enable_nsys "
+    CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
+    CONFIG_OVERRIDES+=" --profiling_stop_step=$PROFILE_STOP_STEP "
+    PROFILE_RANKS=$(seq -s, 0 $((JOB_TOTAL_GPUS - 1)))
+    CONFIG_OVERRIDES+=" --profiling_ranks=$PROFILE_RANKS"
+    CONFIG_OVERRIDES+=" --nsys_trace=cuda,nvtx "
+    CONFIG_OVERRIDES+=" --nsys_extra_args=--nvtx-domain-include=NCCL "
     if [[ $ENABLED_GPU_METRICS == true ]]; then
         CONFIG_OVERRIDES+=" --profiling_gpu_metrics "
     fi
+fi
+
+if [[ $PYTORCH_PROFILE_ENABLED == "true" ]]; then
+    CONFIG_OVERRIDES+=" --pytorch_profiler true "
 fi
 
 if [[ $DTYPE == "fp8" ]]; then
@@ -193,9 +210,9 @@ python scripts/performance/setup_experiment.py \
     --container_image $IMAGE \
     --num_gpus $JOB_TOTAL_GPUS \
     --gpus_per_node $GPUS_PER_NODE \
-    --offline \
     --config_variant $CONFIG_VARIANT \
     --enable_vboost $ENABLE_VBOOST \
+    --offline \
     $CONFIG_OVERRIDES \
     --account $SBATCH_ACCOUNT \
     --partition $SBATCH_PARTITION \

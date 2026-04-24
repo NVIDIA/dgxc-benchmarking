@@ -30,7 +30,7 @@ set -eu -o pipefail
 
 export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=nemotron-h
-export FW_VERSION=26.02.00
+export FW_VERSION=26.02.01
 
 export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 
@@ -53,6 +53,8 @@ MODEL_SIZE=${MODEL_SIZE,,}
 
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 PROFILE_ENABLED=${PROFILE_ENABLED,,}
+PYTORCH_PROFILE_ENABLED=${ENABLE_PYTORCH_PROFILE:-false}
+PYTORCH_PROFILE_ENABLED=${PYTORCH_PROFILE_ENABLED,,}
 PROFILE_START_STEP=${PROFILE_START_STEP:-45}
 PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
 GPU_METRICS_ENABLED=${ENABLE_GPU_METRICS:-false}
@@ -89,6 +91,11 @@ if [[ -n ${CONTAINER_MOUNTS} ]]; then
     CONFIG_OVERRIDES+=" --custom_mounts $CONTAINER_MOUNTS"
 fi
 
+if [[ $PROFILE_ENABLED == "true" ]] && [[ $PYTORCH_PROFILE_ENABLED == "true" ]]; then
+    echo "Error: ENABLE_PROFILE and ENABLE_PYTORCH_PROFILE are mutually exclusive." >&2
+    exit 1
+fi
+
 if [[ $PROFILE_ENABLED == "true" ]]; then
     CONFIG_OVERRIDES+=" --enable_nsys "
     CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
@@ -100,6 +107,10 @@ if [[ $PROFILE_ENABLED == "true" ]]; then
     if [[ $GPU_METRICS_ENABLED == true ]]; then
         CONFIG_OVERRIDES+=" --profiling_gpu_metrics "
     fi
+fi
+
+if [[ $PYTORCH_PROFILE_ENABLED == "true" ]]; then
+    CONFIG_OVERRIDES+=" --pytorch_profiler true "
 fi
 
 if [[ $ENABLE_VBOOST == true ]]; then

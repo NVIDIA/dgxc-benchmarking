@@ -50,7 +50,7 @@ workloads:
   - pretrain_llama3.1_405b:
       dtypes: [fp8, nvfp4]
   - pretrain_llama3.1_70b:
-      dtypes: [fp8, nvfp4]
+      dtypes: [fp8]
   - pretrain_nemotron-h_56b:
       dtypes: [fp8]
   - pretrain_nemotron4-340b_340b:

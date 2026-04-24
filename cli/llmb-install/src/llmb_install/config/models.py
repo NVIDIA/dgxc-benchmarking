@@ -62,6 +62,17 @@ class InstallConfig:
         False  # True if this is an incremental install (adding workloads to existing installation)
     )
 
+    def __post_init__(self):
+        """Enforce environment_vars contract: all values must be strings, no None."""
+        if self.environment_vars:
+            null_keys = [k for k, v in self.environment_vars.items() if v is None]
+            if null_keys:
+                raise ValueError(
+                    f"environment_vars contains null values for: {null_keys}. "
+                    "Use empty strings ('') instead of null/blank values, or remove the keys entirely."
+                )
+            self.environment_vars = {k: str(v) for k, v in self.environment_vars.items()}
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary for serialization."""
         result = {

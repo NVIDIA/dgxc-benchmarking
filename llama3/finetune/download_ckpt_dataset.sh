@@ -29,7 +29,7 @@ set -eu -o pipefail
 
 export WORKLOAD_TYPE=finetune
 export MODEL_NAME=llama3
-export FW_VERSION=26.02.00
+export FW_VERSION=26.02.01
 
 # --- Required environment variables (provided by the installer) ---
 : "${HF_TOKEN:?Required variable Hugging Face token}"
@@ -59,6 +59,8 @@ srun \
     --time="$TIME_LIMIT" \
     --container-image="$IMAGE" \
     --container-mounts="$LLMB_WORKLOAD:$LLMB_WORKLOAD" \
+    --container-writable \
+    --no-container-mount-home \
     python3 $SCRIPT_NAME import \
     --hf-model meta-llama/Meta-Llama-3-70B \
     --megatron-path $LLMB_WORKLOAD/checkpoint_and_dataset/llama3_70b \

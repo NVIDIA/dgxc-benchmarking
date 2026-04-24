@@ -7,7 +7,7 @@ We consider two CPU overhead scenarios:
 - **Pytorch kernel launch latency**: In this test, we measure how fast the CPU can push tiny kernels into the GPU. The higher the average execution time per benchmark, the worse the CPU overhead.
 - **Tokenization throughput**: This test measures CPU-only performance through the tokenization step used in inference and RL. The higher the time taken to generate N tokens, the worse the CPU overhead.
 
-The script uses TRT-LLM release containers to benchmark tokenization throughput for the [GPT-OSS-120B](https://huggingface.co/openai/gpt-oss-120b) model on GB300/GB200/B200/H100 platforms.
+The script uses TRT-LLM release containers to benchmark tokenization throughput for the [GPT-OSS-120B](https://huggingface.co/openai/gpt-oss-120b) model on GB300/GB200/B300/B200/H100 platforms.
 
 # Prerequisites
 

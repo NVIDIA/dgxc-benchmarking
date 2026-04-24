@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.11] - 2026-04-14
+
+### Fixed
+
+- Archive now excludes experiment-level `checkpoints/` directories, preventing Megatron-Bridge `*.distcp` checkpoint shards from bloating archives.
+
+## [1.10.10] - 2026-04-10
+
+### Fixed
+
+- Archive now excludes `*.pt.trace.json` files produced by newer PyTorch profiling output.
+
+## [1.10.9] - 2026-04-06
+
+### Added
+
+- `llmb-run submit`: `--force` flag to bypass dtype/scale validation for one explicit task.
+
+### Fixed
+
+- `llmb-run submit`: reject conflicting `-w workload_size -s different_size` with a clear error instead of a cryptic "workload not found" message. Matching suffixes (e.g., `-w pretrain_foo_7b -s 7b`) are now normalized automatically.
+
+## [1.10.8] - 2026-03-31
+
+### Added
+
+- Nsys and CUPTI mount paths for nemo containers `25.11.01`, `26.02.00`, and `26.02.01`.
+
 ## [1.10.7] - 2026-03-11
 
 ### Changed

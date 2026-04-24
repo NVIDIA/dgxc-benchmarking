@@ -59,11 +59,10 @@ def _print_gres_detection_result(ui: UIInterface, partition: str, is_gpu_partiti
 
     if gpu_count is not None:
         if partition_info["is_heterogeneous"]:
-            unique_counts = sorted(set(partition_info["gpu_counts"]))
-            ui.log(
-                f"Warning: Partition '{partition}' has nodes with different GPU counts: {unique_counts}. "
-                f"Using most common value: {gpu_count}"
-            )
+            ui.log(f"⚠ Partition '{partition}' has nodes with different GPU counts:")
+            for gc, nc in partition_info["nodes_by_gpu_count"].items():
+                ui.log(f"  {gc} GPUs — {nc} node{'s' if nc != 1 else ''}")
+            ui.log(f"  Using {gpu_count} GPUs (majority).")
         ui.log(f"✓ Auto-detected {label} GRES: {gpu_count} GPUs per node")
     else:
         if not partition_info["has_gpu_lines"]:

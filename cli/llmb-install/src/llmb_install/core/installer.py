@@ -2203,10 +2203,12 @@ class Installer:
         # Save initial state (if not dev mode)
         if not install_config.dev_mode:
             try:
-                # Save initial state (no completed workloads yet, no venvs yet)
-                # Save BEFORE directory creation so if makedirs fails, we still have state for resume
-                # For incremental installs, also save the existing cluster config
-                save_install_state(install_config, completed_workloads, {}, existing_cluster_config)
+                # Save initial state BEFORE directory creation so if makedirs fails,
+                # we still have state for resume.
+                # Include existing workload venvs so that resumed installs preserve
+                # venv paths for previously completed workloads in the state file.
+                initial_venvs = dict(existing_workload_venvs) if existing_workload_venvs else {}
+                save_install_state(install_config, completed_workloads, initial_venvs, existing_cluster_config)
 
             except Exception as e:
                 print(f"Warning: Could not initialize state tracking: {e}")
@@ -2261,7 +2263,12 @@ class Installer:
             print("\n")
             fetch_and_install_tools(required_tools, install_config.install_path, install_config.node_architecture)
 
-        workload_venvs = {}  # To store venv path for each workload
+        # Initialize with existing venvs so that state saves during resume always
+        # include venv paths for previously completed workloads. Without this,
+        # _save_installation_progress would persist only current-run venvs to the
+        # state file, causing previously completed workloads to lose their venv
+        # paths if the resumed install is interrupted again.
+        workload_venvs = dict(existing_workload_venvs) if existing_workload_venvs else {}
         dep_groups = group_workloads_by_dependencies(filtered_workloads, install_config.selected_workloads)
 
         # Build reverse mapping: dep_hash -> venv_path for incremental installs
@@ -2367,8 +2374,7 @@ class Installer:
                         env['MANUAL_INSTALL'] = 'false'
                         env['GPU_TYPE'] = install_config.gpu_type
                         if install_config.environment_vars:
-                            env_vars_str = {k: str(v) for k, v in install_config.environment_vars.items()}
-                            env.update(env_vars_str)
+                            env.update(install_config.environment_vars)
 
                         for workload_key in workload_keys:
                             workload_data = filtered_workloads[workload_key]
@@ -2441,8 +2447,7 @@ class Installer:
                         env['MANUAL_INSTALL'] = 'false'
                         env['GPU_TYPE'] = install_config.gpu_type
                         if install_config.environment_vars:
-                            env_vars_str = {k: str(v) for k, v in install_config.environment_vars.items()}
-                            env.update(env_vars_str)  # Ensure things like HF_TOKEN are set in the setup env.
+                            env.update(install_config.environment_vars)
 
                         first_workload_dir = os.path.join(install_config.install_path, "workloads", first_workload_key)
                         install_dependencies(venv_path, install_config.venv_type, dependencies, first_workload_dir, env)

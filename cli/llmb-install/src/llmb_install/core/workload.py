@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -290,8 +290,7 @@ def install_scripted_workload(
     env['MANUAL_INSTALL'] = 'false'
     env['GPU_TYPE'] = gpu_type
     if env_vars:
-        env_vars_str = {k: str(v) for k, v in env_vars.items()}
-        env.update(env_vars_str)  # Ensure things like HF_TOKEN are set in the setup env.
+        env.update(env_vars)
 
     source_dir = workload_data['path']
     print(f"Installing {workload_key} to {target_dir}")

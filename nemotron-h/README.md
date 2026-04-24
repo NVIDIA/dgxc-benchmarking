@@ -286,7 +286,7 @@ The `<experiment_name>` typically follows the pattern: `pretrain_nemotron-h_56b_
 
 # Profiling
 
-Profiling is supported with Nsight Systems.
+Profiling is supported with Nsight Systems or PyTorch Profiler.
 
 ## Run Nsight Profiling
 
@@ -338,3 +338,17 @@ In order to view the profile traces (\*.nsys-rep files) interactively:
 Since most of the benchmarking jobs run on multiple GPUs, there will be multiple .nsys-rep files generated for each run. [Multi-Report Analysis Guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#multi-report-analysis) will be very helpful to automate the analysis and get to results quicker by using Nsight recipes.
 
 **See** these [tutorials](https://developer.nvidia.com/nsight-systems/get-started#tutorials) to get a quick start if you are new to Nsight profiling.
+
+## PyTorch Profiling
+
+PyTorch Profiling is intended for rare, advanced debugging scenarios such as NCCL correlation analysis. To enable it, set `ENABLE_PYTORCH_PROFILE=true` when submitting your job.
+
+> **Note:** This option is mutually exclusive with Nsight profiling (`ENABLE_PROFILE`). Both cannot be enabled at the same time.
+
+**Example command:**
+
+```shell
+ENABLE_PYTORCH_PROFILE=true llmb-run submit -w pretrain_nemotron-h --dtype fp8 --scale 128
+```
+
+For details on the PyTorch Profiler and how to view resulting traces, see the [PyTorch Profiler documentation](https://docs.pytorch.org/tutorials/recipes/recipes/profiler_recipe.html).

@@ -10,7 +10,7 @@ This directory contains performance recipes for DeepSeek V3 pre-training workloa
 - **Description**: Large-scale LLM training using native PyTorch with FSDP, tensor parallelism, pipeline parallelism, and expert parallelism
 - **Model Size**: 671B parameters
 - **Supported GPUs**: GB200, B200, H100
-- **Precision**: BF16 (FP8 not currently supported in this variant)
+- **Precision**: BF16 on H100/B200/GB200, FP8 on B200/GB200
 
 ### Megatron-Bridge
 

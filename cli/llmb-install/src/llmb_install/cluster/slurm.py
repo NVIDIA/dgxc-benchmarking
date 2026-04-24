@@ -24,7 +24,6 @@
 
 import os
 import subprocess
-from collections import Counter
 from typing import Any, Dict, List, Optional, Tuple
 
 
@@ -282,10 +281,11 @@ def detect_partition_gres(partitions: list[str]) -> Dict[str, Dict[str, Any]]:
         Dict mapping the original partition strings to their GRES info:
         {
             'partition_name': {
-                'gpu_count': Optional[int],     # consolidated GPU count or None
-                'has_gpu_lines': bool,          # at least one line contained 'gpu:'
-                'unparseable_lines': list[str], # gpu lines we failed to parse
-                'is_heterogeneous': bool        # multiple distinct counts detected
+                'gpu_count': Optional[int],       # GPU count backed by the most nodes
+                'has_gpu_lines': bool,            # at least one line contained 'gpu:'
+                'unparseable_lines': list[str],   # gpu lines we failed to parse
+                'is_heterogeneous': bool,           # multiple distinct counts detected
+                'nodes_by_gpu_count': dict[int,int] # {gpu_count: node_count}, desc by gpu
             }
         }
 
@@ -303,7 +303,7 @@ def detect_partition_gres(partitions: list[str]) -> Dict[str, Dict[str, Any]]:
 
     partition_info = {
         partition: {
-            "gpu_counts": [],
+            "gpu_entries": [],  # list of (gpu_count, node_count) tuples
             "has_gpu_lines": False,
             "unparseable_lines": [],
         }
@@ -312,7 +312,7 @@ def detect_partition_gres(partitions: list[str]) -> Dict[str, Dict[str, Any]]:
 
     try:
         result = subprocess.run(
-            ["sinfo", "--noheader", "-p", ",".join(expanded_partitions), "-o", "%P,%G"],
+            ["sinfo", "--noheader", "-p", ",".join(expanded_partitions), "-o", "%P,%G,%D"],
             capture_output=True,
             text=True,
             check=True,
@@ -330,15 +330,27 @@ def detect_partition_gres(partitions: list[str]) -> Dict[str, Dict[str, Any]]:
         print("Cannot auto-detect GRES information. Will prompt for manual input.")
         raise RuntimeError(f"sinfo command failed: {e}") from e
 
-    # Parse sinfo output
+    # Parse sinfo output (format: partition,gres,node_count)
     for line in sinfo_lines:
         if not line.strip() or "," not in line:
             continue
 
-        partition_name, gres_raw = [s.strip() for s in line.split(",", 1)]
-        partition_name = partition_name.rstrip("*")  # Remove default partition marker
+        # Split node count (last field) first, then partition from gres
+        rest, _, node_count_raw = line.rstrip().rpartition(",")
+        if not rest:
+            continue
+        partition_name, _, gres_raw = rest.partition(",")
+        if not gres_raw:
+            continue
+        partition_name = partition_name.strip().rstrip("*")
+        gres_raw = gres_raw.strip()
 
         if partition_name not in partition_info:
+            continue
+
+        try:
+            node_count = int(node_count_raw)
+        except ValueError:
             continue
 
         if "gpu:" in gres_raw:
@@ -346,7 +358,7 @@ def detect_partition_gres(partitions: list[str]) -> Dict[str, Dict[str, Any]]:
 
         gpu_count = parse_gpu_gres(gres_raw)
         if gpu_count is not None:
-            partition_info[partition_name]["gpu_counts"].append(gpu_count)
+            partition_info[partition_name]["gpu_entries"].append((gpu_count, node_count))
         elif "gpu:" in gres_raw:
             # Keep track of lines we failed to parse that should have GPU info
             partition_info[partition_name]["unparseable_lines"].append(gres_raw)
@@ -356,24 +368,28 @@ def detect_partition_gres(partitions: list[str]) -> Dict[str, Dict[str, Any]]:
     for composite_partition, individual_partitions in partition_to_requested_names.items():
         if not individual_partitions:
             composite_partition_info[composite_partition] = {
-                "gpu_counts": [],
                 "gpu_count": None,
                 "has_gpu_lines": False,
                 "unparseable_lines": [],
                 "is_heterogeneous": False,
+                "nodes_by_gpu_count": {},
             }
             continue
 
-        merged = {"gpu_counts": [], "has_gpu_lines": False, "unparseable_lines": []}
+        merged = {"gpu_entries": [], "has_gpu_lines": False, "unparseable_lines": []}
         per_partition_gpu_count = {}
 
         for name in individual_partitions:
             info = partition_info[name]
-            merged["gpu_counts"].extend(info["gpu_counts"])
+            merged["gpu_entries"].extend(info["gpu_entries"])
             merged["has_gpu_lines"] = merged["has_gpu_lines"] or info["has_gpu_lines"]
             merged["unparseable_lines"].extend(info["unparseable_lines"])
+            # Aggregate node counts per gpu_count, then pick the dominant one
+            nodes_by_gpu: dict[int, int] = {}
+            for gc, nc in info["gpu_entries"]:
+                nodes_by_gpu[gc] = nodes_by_gpu.get(gc, 0) + nc
             per_partition_gpu_count[name] = (
-                Counter(info["gpu_counts"]).most_common(1)[0][0] if info["gpu_counts"] else None
+                max(nodes_by_gpu, key=lambda g: (nodes_by_gpu[g], g)) if nodes_by_gpu else None
             )
 
         if len(set(per_partition_gpu_count.values())) > 1:
@@ -383,14 +399,24 @@ def detect_partition_gres(partitions: list[str]) -> Dict[str, Dict[str, Any]]:
                 "Use partitions with matching GRES settings."
             )
 
-        unique_counts = set(merged["gpu_counts"])
-        if not unique_counts:
-            merged["gpu_count"] = None
-            merged["is_heterogeneous"] = False
-        else:
-            merged["gpu_count"] = Counter(merged["gpu_counts"]).most_common(1)[0][0]
-            merged["is_heterogeneous"] = len(unique_counts) > 1
+        # Aggregate node counts per gpu_count
+        nodes_by_gpu: dict[int, int] = {}
+        for gc, nc in merged["gpu_entries"]:
+            nodes_by_gpu[gc] = nodes_by_gpu.get(gc, 0) + nc
 
-        composite_partition_info[composite_partition] = merged
+        if not nodes_by_gpu:
+            gpu_count = None
+            is_heterogeneous = False
+        else:
+            gpu_count = max(nodes_by_gpu, key=lambda gc: (nodes_by_gpu[gc], gc))
+            is_heterogeneous = len(nodes_by_gpu) > 1
+
+        composite_partition_info[composite_partition] = {
+            "gpu_count": gpu_count,
+            "has_gpu_lines": merged["has_gpu_lines"],
+            "unparseable_lines": merged["unparseable_lines"],
+            "is_heterogeneous": is_heterogeneous,
+            "nodes_by_gpu_count": dict(sorted(nodes_by_gpu.items(), reverse=True)),
+        }
 
     return composite_partition_info

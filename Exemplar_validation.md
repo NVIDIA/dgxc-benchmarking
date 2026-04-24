@@ -83,7 +83,7 @@ Scale: **512 GPUs** | Repeats: **3x** | Profiling: enabled for 1 of the 3 total 
 | GPT (OSS)   | 120B | BF16       |
 | Grok-1      | 314B | BF16, FP8  |
 | Llama 3.1   | 405B | FP8, NVFP4 |
-| Llama 3.1   | 70B  | FP8, NVFP4 |
+| Llama 3.1   | 70B  | FP8        |
 | Nemotron-H  | 56B  | FP8        |
 | Nemotron-4  | 340B | BF16, FP8  |
 | Qwen3       | 235B | BF16       |

@@ -26,8 +26,12 @@ general:
   framework: megatron_bridge
 
 container:
-  images: 
-    - 'nvcr.io#nvidia/nemo:26.02.00'
+  images:
+    by_gpu:
+      default:
+        - 'nvcr.io#nvidia/nemo:26.02.01'
+      gb300:
+        - 'nvcr.io#nvidia/nemo:26.02.00'
 
 downloads:
   huggingface:
@@ -35,12 +39,21 @@ downloads:
     - repo_id: 'Qwen/Qwen3-235B-A22B'
 
 repositories:
-  megatron_bridge:
-    url: "https://github.com/NVIDIA-NeMo/Megatron-Bridge.git"
-    commit: "6b3b5ba7ef64182caba23faa8d7abc0125aa3807"
-  nemo_run:
-    url: "https://github.com/NVIDIA-NeMo/Run.git"
-    commit: "ab0c4328275c4c731f1bdea3ceb0e68a9a17a6a2"
+  by_gpu:
+    default:
+      megatron_bridge:
+        url: "https://github.com/NVIDIA-NeMo/Megatron-Bridge.git"
+        commit: "aeead1ae667d795ebe725cb4a608581a21f402cc"
+      nemo_run:
+        url: "https://github.com/NVIDIA-NeMo/Run.git"
+        commit: "525d68bfce2d6baed86ed3d7d0edbae07833ea0d"
+    gb300:
+      megatron_bridge:
+        url: "https://github.com/NVIDIA-NeMo/Megatron-Bridge.git"
+        commit: "6b3b5ba7ef64182caba23faa8d7abc0125aa3807"
+      nemo_run:
+        url: "https://github.com/NVIDIA-NeMo/Run.git"
+        commit: "ab0c4328275c4c731f1bdea3ceb0e68a9a17a6a2"
 
 setup:
   venv_req: true

@@ -312,11 +312,18 @@ def _submit_impl(ctx: typer.Context, request: TaskGenerationRequest, dryrun: boo
             _handle_no_tasks_error(app_ctx, request)
             raise typer.Exit(code=EXIT_VALIDATION_ERROR)
 
-        # Validate tasks
-        validated_tasks, error_summary = validate_bulk_tasks(task_list, app_ctx.workloads, app_ctx.cluster_config)
+        if request.force:
+            # _generate_forced_explicit_task already skipped dtype/scale filtering
+            # during generation; we must also skip validate_bulk_tasks here because
+            # it would re-reject the same dtype/scale combinations.
+            logger.warning("⚠️  --force: bypassing dtype/scale validation.")
+            validated_tasks = task_list
+        else:
+            # Validate tasks
+            validated_tasks, error_summary = validate_bulk_tasks(task_list, app_ctx.workloads, app_ctx.cluster_config)
 
-        # Report results
-        report_validation_results(validated_tasks, error_summary, task_list, app_ctx.cluster_config, mode_name)
+            # Report results
+            report_validation_results(validated_tasks, error_summary, task_list, app_ctx.cluster_config, mode_name)
 
         # Print the concrete jobs we’re about to submit (kept concise; launcher output follows).
         logger.info(f"Jobs ({len(validated_tasks)}):")
@@ -387,6 +394,13 @@ def submit(
         bool,
         typer.Option('--dry-run', help='List jobs without submitting them.'),
     ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(
+            '--force',
+            help='Bypass dtype/scale validation for one explicit task. Use with caution.',
+        ),
+    ] = False,
     nice: Annotated[
         Optional[int], typer.Option('--nice', help='Lower the priority of the job using Slurm --nice feature.')
     ] = None,
@@ -414,6 +428,7 @@ def submit(
         repeats=repeats,
         profile=profile,
         proxy=proxy,
+        force=force,
         extra_slurm_params=extra_slurm_params,
     )
 
@@ -460,7 +475,11 @@ def single(
         bool, typer.Option('-d', '--dryrun', help='List the job to be submitted without actually submitting it.')
     ] = False,
     force: Annotated[
-        bool, typer.Option('-f', '--force', help='Skip workload validation (deprecated, validation always runs).')
+        bool,
+        typer.Option(
+            '--force',
+            help='Bypass dtype/scale validation for one explicit task. Use with caution.',
+        ),
     ] = False,
 ):
     """
@@ -472,9 +491,6 @@ def single(
 
     app_ctx: AppContext = ctx.obj
 
-    # Note: 'force' is ignored in this redirect as _submit_impl enforces bulk validation.
-    # However, validate_bulk_tasks validates against metadata, so it behaves similarly to standard validation.
-
     request = TaskGenerationRequest(
         workloads=app_ctx.workloads,
         cluster_config=app_ctx.cluster_config,
@@ -483,6 +499,7 @@ def single(
         dtype=dtype,
         scale=scale,  # Passed as string, TaskGenerationRequest handles parsing
         profile=profile,
+        force=force,
     )
 
     _submit_impl(ctx, request, dryrun, mode_name="single")

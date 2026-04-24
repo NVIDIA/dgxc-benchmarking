@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project uses [PEP 440](https://www.python.org/dev/peps/pep-0440/) versioning with semantic versioning semantics:
 **MAJOR.MINOR.PATCH** for feature parity with [SemVer](https://semver.org/).
 
+## [1.8.6] - 2026-03-31
+
+### Fixed
+
+- Resume from failed install now preserves venv paths for previously completed workloads in the state file; repeated failures no longer produce a `cluster_config.yaml` with missing venv entries.
+- venv creation errors now include full stderr output alongside the failed command; previously only the exit code was shown.
+- uv venv creation now removes existing directory before creating instead of relying on `uv venv --clear`, which can fail in edge-cases.
+- GRES auto-detection now uses sinfo node counts (`%D`) to pick the GPU count backed by the most nodes; previously heterogeneous partitions could randomly select the minority value.
+
+## [1.8.5] - 2026-03-24
+
+### Fixed
+
+- `InstallConfig` now raises on null `environment_vars` values and coerces remaining values to strings; prevents YAML nulls from leaking into subprocess env dicts.
+- Top-level error handler now includes exception type and hints at `--verbose` for full traceback.
+
 ## [1.8.4] - 2026-03-23
 
 ### Fixed

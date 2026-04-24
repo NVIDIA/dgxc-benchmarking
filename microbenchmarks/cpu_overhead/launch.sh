@@ -56,15 +56,24 @@ export MOUNT_DIR=$LLMB_WORKLOAD
 export TRT_DIR=$LLMB_WORKLOAD/TensorRT-LLM
 export RESULT_DIR=$LLMB_WORKLOAD/experiments/cpu_overhead_tests
 export USE_CASES=${USE_CASES:-"kernel_launch tokenization"}
-
 export NUM_PROMPTS=${NUM_PROMPTS:-100000}
+
+GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
+GPU_TYPE=${GPU_TYPE,,}
+
+# Decide binding option based on GPU_TYPE
+if [ "$GPU_TYPE" == "b300" ]; then
+    CPU_BIND="--physcpubind=0"
+else
+    CPU_BIND="--cpunodebind=0"
+fi
 
 # Loop over each use case
 for value in $USE_CASES; do
     LOG_NAME=${value}_overhead
 
     if [ ${value} == "kernel_launch" ]; then
-        CMD="numactl --cpunodebind=0 --membind=0 python $LLMB_WORKLOAD/pytorch_kernel_launch_latency.py \
+        CMD="numactl ${CPU_BIND} --membind=0 python $LLMB_WORKLOAD/pytorch_kernel_launch_latency.py \
 	    --start_size 4 --end_size 512 --iters 1000000"
     elif [ ${value} == "tokenization" ]; then
         export DATASET_FILE=$LLMB_WORKLOAD/dataset_1000_1000_${NUM_PROMPTS}_${SLURM_PROCID}.txt

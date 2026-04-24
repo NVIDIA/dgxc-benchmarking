@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -46,6 +46,9 @@ logger = logging.getLogger('llmb_run.nsys_mount_handler')
 CONTAINER_NSYS_INSTALL_DIRS: Dict[str, str] = {
     'nvcr.io#nvidia/nemo:25.07.01': '/usr/local/cuda-12.9/NsightSystems-cli-2025.1.1',
     'nvcr.io#nvidia/nemo:25.09.00': '/usr/local/cuda-12.9/NsightSystems-cli-2025.4.1',
+    'nvcr.io#nvidia/nemo:25.11.01': '/usr/local/cuda-13.0/NsightSystems-cli-2025.5.1',
+    'nvcr.io#nvidia/nemo:26.02.00': '/usr/local/cuda-13.0/NsightSystems-cli-2025.5.1',
+    'nvcr.io#nvidia/nemo:26.02.01': '/usr/local/cuda-13.0/NsightSystems-cli-2026.1.0',
 }
 
 # Container image to CUPTI library path lookup table
@@ -60,6 +63,30 @@ CONTAINER_CUPTI_PATHS: Dict[Tuple[str, str], str] = {
         'nvcr.io#nvidia/nemo:25.09.00',
         'aarch64',
     ): '/usr/local/cuda-12.9/NsightSystems-cli-2025.4.1/target-linux-sbsa-armv8/libcupti-sbsa.so.13.0',
+    (
+        'nvcr.io#nvidia/nemo:25.11.01',
+        'x86_64',
+    ): '/usr/local/cuda-13.0/NsightSystems-cli-2025.5.1/target-linux-x64/libcupti.so.13.0',
+    (
+        'nvcr.io#nvidia/nemo:25.11.01',
+        'aarch64',
+    ): '/usr/local/cuda-13.0/NsightSystems-cli-2025.5.1/target-linux-sbsa-armv8/libcupti-sbsa.so.13.0',
+    (
+        'nvcr.io#nvidia/nemo:26.02.00',
+        'x86_64',
+    ): '/usr/local/cuda-13.0/NsightSystems-cli-2025.5.1/target-linux-x64/libcupti.so.13.0',
+    (
+        'nvcr.io#nvidia/nemo:26.02.00',
+        'aarch64',
+    ): '/usr/local/cuda-13.0/NsightSystems-cli-2025.5.1/target-linux-sbsa-armv8/libcupti-sbsa.so.13.0',
+    (
+        'nvcr.io#nvidia/nemo:26.02.01',
+        'x86_64',
+    ): '/usr/local/cuda-13.0/NsightSystems-cli-2026.1.0/target-linux-x64/libcupti.so.13.0',
+    (
+        'nvcr.io#nvidia/nemo:26.02.01',
+        'aarch64',
+    ): '/usr/local/cuda-13.0/NsightSystems-cli-2026.1.0/target-linux-sbsa-armv8/libcupti-sbsa.so.13.0',
     # Add entries for other containers as needed
 }
 

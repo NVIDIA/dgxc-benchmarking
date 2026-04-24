@@ -2,6 +2,8 @@
 
 This recipe contains information and scripts to produce performance results for the Llama3.1 8B, 70B, and 405B training workloads. The scripts help perform environment setup and launch benchmark jobs. Configurations use weak scaling methodology (global batch size scales proportionally with GPU count).
 
+**Note:** pretrain_llama3.1 is the correct workload name for all sizes. For 8B and 70B, this recipe intentionally reuses the existing Megatron-Bridge llama3 configs, so setup output may reference Meta-Llama-3-\* and experiment/log names may start with pretrain_llama3. This is expected.
+
 ## GB300
 
 ### FP8
@@ -35,7 +37,6 @@ This recipe contains information and scripts to produce performance results for 
 | Llama3.1 Model Size |  GPUs   | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS    | GA  |  CG   |
 | ------------------- | :-----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :------: | :-: | :---: |
 | 405b                | 256-512 |  NVFP4   |  8192  |  126   | False |  4  | 16  |  1  |  1  |  1  | GPUs/64 |  8  |  1  | GPUs\*6  | 384 | False |
-| 70b                 | 64-512  |  NVFP4   |  8192  |   80   | False |  2  |  4  |  1  |  1  |  1  | GPUs/8  |  5  |  1  | GPUs\*4  | 32  | False |
 | 8b                  |  8-128  |  NVFP4   |  8192  |   32   | False |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  4  | GPUs\*16 |  4  | False |
 
 ## B300
@@ -45,7 +46,8 @@ This recipe contains information and scripts to produce performance results for 
 | Llama3.1 Model Size |   GPUs   | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS   | GA  |  CG   |
 | ------------------- | :------: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :-----: | :-: | :---: |
 | 405b                | 256-1024 |   FP8    |  8192  |  126   | False |  2  |  8  |  2  |  1  |  1  | GPUs/32 |  4  |  1  | GPUs\*6 | 192 | False |
-| 70b                 | 64-1024  |   FP8    |  8192  |   80   | True  |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  1  | GPUs\*4 |  4  | False |
+| 70b                 |  64-128  |   FP8    |  8192  |   80   | True  |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  1  | GPUs\*4 |  4  | False |
+| 70b                 | 256-512  |   FP8    |  8192  |   80   | False |  1  |  4  |  1  |  1  |  1  | GPUs/4  |  5  |  1  | GPUs\*4 | 16  | False |
 
 ## B200
 
@@ -291,12 +293,6 @@ Train Llama3.1 405B with FP8 precision on 128 GB200 GPUs:
 JOB_TOTAL_GPUS=128 GPU_TYPE=gb200 ./launch.sh
 ```
 
-Train Llama3.1 70B with NVFP4 precision on 64 GB200 GPUs:
-
-```shell
-MODEL_SIZE=70b DTYPE=nvfp4 JOB_TOTAL_GPUS=64 GPU_TYPE=gb200 ./launch.sh
-```
-
 Train with FP8 precision on 256 GB200 GPUs:
 
 ```shell
@@ -343,7 +339,7 @@ The `<experiment_name>` typically follows these patterns:
 
 # Profiling
 
-Profiling is supported with Nsight Systems.
+Profiling is supported with Nsight Systems or PyTorch Profiler.
 
 ## Run Nsight Profiling
 
@@ -395,6 +391,20 @@ In order to view the profile traces (\*.nsys-rep files) interactively:
 Since most of the benchmarking jobs run on multiple GPUs, there will be multiple .nsys-rep files generated for each run. [Multi-Report Analysis Guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#multi-report-analysis) will be very helpful to automate the analysis and get to results quicker by using Nsight recipes.
 
 **See** these [tutorials](https://developer.nvidia.com/nsight-systems/get-started#tutorials) to get a quick start if you are new to Nsight profiling.
+
+## PyTorch Profiling
+
+PyTorch Profiling is intended for rare, advanced debugging scenarios such as NCCL correlation analysis. To enable it, set `ENABLE_PYTORCH_PROFILE=true` when submitting your job.
+
+> **Note:** This option is mutually exclusive with Nsight profiling (`ENABLE_PROFILE`). Both cannot be enabled at the same time.
+
+**Example command:**
+
+```shell
+ENABLE_PYTORCH_PROFILE=true llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128
+```
+
+For details on the PyTorch Profiler and how to view resulting traces, see the [PyTorch Profiler documentation](https://docs.pytorch.org/tutorials/recipes/recipes/profiler_recipe.html).
 
 # Run With Checkpoints
 

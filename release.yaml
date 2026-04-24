@@ -22,5 +22,5 @@
 # Top-level release metadata for the LLM Benchmarking Collection
 # This file centralizes version management across all recipes
 
-llmb_version: '26.02'
+llmb_version: '26.02.01'
 

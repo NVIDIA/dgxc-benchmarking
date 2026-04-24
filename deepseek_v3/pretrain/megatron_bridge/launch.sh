@@ -44,7 +44,7 @@ DTYPE=${DTYPE,,}
 if [[ $GPU_TYPE == "h100" ]]; then
     FW_VERSION=25.09.00
 else
-    FW_VERSION=26.02.00
+    FW_VERSION=26.02.01
 fi
 
 if [[ $DTYPE == "fp8" ]]; then
@@ -64,6 +64,8 @@ JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
 
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 PROFILE_ENABLED=${PROFILE_ENABLED,,}
+PYTORCH_PROFILE_ENABLED=${ENABLE_PYTORCH_PROFILE:-false}
+PYTORCH_PROFILE_ENABLED=${PYTORCH_PROFILE_ENABLED,,}
 PROFILE_START_STEP=${PROFILE_START_STEP:-45}
 PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
 GPU_METRICS_ENABLED=${ENABLE_GPU_METRICS:-false}
@@ -96,11 +98,16 @@ if [[ -n ${CONTAINER_MOUNTS} ]]; then
     CONFIG_OVERRIDES+=" --custom_mounts $CONTAINER_MOUNTS"
 fi
 
+if [[ $PROFILE_ENABLED == "true" ]] && [[ $PYTORCH_PROFILE_ENABLED == "true" ]]; then
+    echo "Error: ENABLE_PROFILE and ENABLE_PYTORCH_PROFILE are mutually exclusive." >&2
+    exit 1
+fi
+
 if [[ $PROFILE_ENABLED == "true" ]]; then
     CONFIG_OVERRIDES+=" --enable_nsys "
     CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
     CONFIG_OVERRIDES+=" --profiling_stop_step=$PROFILE_STOP_STEP "
-    if [[ $FW_VERSION == "26.02.00" ]]; then
+    if [[ $FW_VERSION == "26.02.01" ]]; then
         PROFILE_RANKS=$(seq -s, 0 $((JOB_TOTAL_GPUS - 1)))
         CONFIG_OVERRIDES+=" --profiling_ranks=$PROFILE_RANKS"
         CONFIG_OVERRIDES+=" --nsys_trace=cuda "
@@ -109,6 +116,10 @@ if [[ $PROFILE_ENABLED == "true" ]]; then
     if [[ $GPU_METRICS_ENABLED == true ]]; then
         CONFIG_OVERRIDES+=" --profiling_gpu_metrics "
     fi
+fi
+
+if [[ $PYTORCH_PROFILE_ENABLED == "true" ]]; then
+    CONFIG_OVERRIDES+=" --pytorch_profiler true "
 fi
 
 if [[ $ENABLE_VBOOST == true ]]; then
@@ -131,11 +142,6 @@ if [[ $GPU_TYPE == "gb300" ]] || [[ $GPU_TYPE == "gb200" ]]; then
     fi
     GPUS_PER_NODE=4
 elif [[ $GPU_TYPE == "b300" ]] || [[ $GPU_TYPE == "b200" ]] || [[ $GPU_TYPE == "h100" ]]; then
-    if [[ $GPU_TYPE == "b300" ]] && [[ $DTYPE == "bf16" ]]; then
-        CONFIG_OVERRIDES+=" -pp 8 "
-        CONFIG_OVERRIDES+=" -vp None "
-        CONFIG_OVERRIDES+=" --recompute_modules=mla_up_proj "
-    fi
     GPUS_PER_NODE=8
 fi
 
@@ -145,7 +151,7 @@ fi
 
 # run command
 pushd $LLMB_WORKLOAD/Megatron-Bridge
-if [[ $FW_VERSION == "26.02.00" ]]; then
+if [[ $FW_VERSION == "26.02.01" ]]; then
     python3 scripts/performance/setup_experiment.py \
         --container_image $IMAGE \
         --compute_dtype $COMPUTE_TYPE \

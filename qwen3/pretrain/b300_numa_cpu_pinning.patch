@@ -1,0 +1,19 @@
+# Restore optional PCT-related fixed-core CPU binding for the B300 reference configuration.
+# Apply only on systems where GNR PCT is available and enabled.
+#
+# Apply from the root of the Megatron-Bridge checkout:
+#   git apply /path/to/b300_numa_cpu_pinning.patch
+#
+--- a/scripts/performance/utils/executors.py
++++ b/scripts/performance/utils/executors.py
+@@ -124,6 +124,8 @@ def slurm_executor(
+                     segment = segment_candidate
+                     break
+ 
+     numa_divisor = 2 if gpu.lower() in ["gb200", "gb300"] else 4
+     numa_cmd = f"numactl --cpunodebind=$((SLURM_LOCALID/{numa_divisor})) --membind=$((SLURM_LOCALID/{numa_divisor}))"
++    if gpu.lower() in ["b300"]:
++        numa_cmd += " -C $((SLURM_LOCALID * 16)),$((SLURM_LOCALID * 16 + 1))"
+     custom_bash_cmds.append(numa_cmd)
+ 
+     launcher = SlurmTemplate(

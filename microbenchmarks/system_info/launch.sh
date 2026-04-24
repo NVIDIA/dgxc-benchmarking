@@ -109,13 +109,30 @@ check_enroot_conf() {
     if grep -Eq "^[[:space:]]*ENROOT_ROOTFS_WRITABLE[[:space:]=]+yes" "${conf}"; then
         echo "[OK] ENROOT_ROOTFS_WRITABLE = yes"
     else
-        echo "[WARNING] ENROOT_ROOTFS_WRITABLE not set to yes (recommended)."
+        echo "[WARNING] ENROOT_ROOTFS_WRITABLE not set to yes."
+        echo "          LLMB setup and launch paths expect writable container filesystems."
     fi
     if grep -Eq "^[[:space:]]*ENROOT_REMAP_ROOT[[:space:]=]+yes" "${conf}"; then
         echo "[OK] ENROOT_REMAP_ROOT = yes"
     else
-        echo "[WARNING] ENROOT_REMAP_ROOT not set to yes (recommended)."
+        echo "[WARNING] ENROOT_REMAP_ROOT not set to yes."
+        echo "          LLMB recipes recommend remapping root in containerized Slurm jobs."
     fi
+}
+
+# shellcheck disable=SC2317  # invoked indirectly via declare -f
+enroot_environ_has_assignment() {
+    local envdir="$1"
+    local var_name="$2"
+    local f
+
+    for f in "${envdir}"/*; do
+        if [ -f "$f" ] && grep -Eq "^[[:space:]]*${var_name}[[:space:]]*=" "$f" 2> /dev/null; then
+            return 0
+        fi
+    done
+
+    return 1
 }
 
 # shellcheck disable=SC2317  # invoked indirectly via declare -f
@@ -145,15 +162,17 @@ check_enroot_environ() {
         echo "          This is a common cause of hard-to-debug failures when containers"
         echo "          do not inherit the required network/GPU environment."
     fi
-    if grep -rq NCCL_IB_HCA "${envdir}/" 2> /dev/null; then
+    if enroot_environ_has_assignment "${envdir}" "NCCL_IB_HCA"; then
         echo "[OK] NCCL_IB_HCA is set in environ.d."
     else
         echo "[WARNING] NCCL_IB_HCA not found in environ.d -- multi-node NCCL jobs may fail or use wrong HCAs."
     fi
 }
 
-run_step "11a" "enroot config - enroot.conf" "$(declare -f check_enroot_conf); check_enroot_conf"
-run_step "11b" "enroot config - environ.d" "$(declare -f check_enroot_environ); check_enroot_environ"
+run_step "11a" "enroot config - enroot.conf" \
+    "$(declare -f check_enroot_conf); check_enroot_conf"
+run_step "11b" "enroot config - environ.d" \
+    "$(declare -f enroot_environ_has_assignment); $(declare -f check_enroot_environ); check_enroot_environ"
 
 run_step "12" "srun container nvidia-smi - GPU visibility inside container (${IMAGE})" \
     "srun --nodes=1 --ntasks=1 --container-image '${IMAGE}' --container-writable --no-container-mount-home nvidia-smi"

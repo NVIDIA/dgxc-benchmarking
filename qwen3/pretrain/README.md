@@ -15,10 +15,10 @@ Configurations use weak scaling methodology (global batch size scales proportion
 
 | Precision | GPUs | SeqLen | Layers |  TP |  PP |  CP |  EP |  DP |  VP | MBS | GBS  |  GA |
 | :-------- | :--: | :----: | :----: | --: | --: | --: | --: | --: | --: | --: | :--: | --: |
-| BF16      |  8   |  4096  |   48   |   1 |   1 |   1 |   8 |   8 |   1 |   8 | 512  |   8 |
-| BF16      |  16  |  4096  |   48   |   1 |   1 |   1 |   8 |  16 |   1 |   8 | 1024 |   8 |
-| BF16      |  32  |  4096  |   48   |   1 |   1 |   1 |   8 |  32 |   1 |   8 | 2048 |   8 |
-| BF16      |  64  |  4096  |   48   |   1 |   1 |   1 |   8 |  64 |   1 |   8 | 4096 |   8 |
+| BF16      |  8   |  4096  |   48   |   1 |   1 |   1 |   8 |   8 | N/A |   8 | 512  |   8 |
+| BF16      |  16  |  4096  |   48   |   1 |   1 |   1 |   8 |  16 | N/A |   8 | 1024 |   8 |
+| BF16      |  32  |  4096  |   48   |   1 |   1 |   1 |   8 |  32 | N/A |   8 | 2048 |   8 |
+| BF16      |  64  |  4096  |   48   |   1 |   1 |   1 |   8 |  64 | N/A |   8 | 4096 |   8 |
 
 #### Qwen3 235B
 
@@ -33,17 +33,17 @@ Configurations use weak scaling methodology (global batch size scales proportion
 
 | Precision | GPUs | SeqLen | Layers |  TP |  PP |  CP |  EP |  DP |  VP | MBS | GBS  |  GA |
 | :-------- | :--: | :----: | :----: | --: | --: | --: | --: | --: | --: | --: | :--: | --: |
-| BF16      |  8   |  4096  |   48   |   1 |   1 |   1 |   8 |   8 |   1 |   4 | 512  |  16 |
-| BF16      |  16  |  4096  |   48   |   1 |   1 |   1 |   8 |  16 |   1 |   4 | 1024 |  16 |
-| BF16      |  32  |  4096  |   48   |   1 |   1 |   1 |   8 |  32 |   1 |   4 | 2048 |  16 |
-| BF16      |  64  |  4096  |   48   |   1 |   1 |   1 |   8 |  64 |   1 |   4 | 4096 |  16 |
+| BF16      |  8   |  4096  |   48   |   1 |   1 |   1 |   8 |   8 | N/A |   4 | 512  |  16 |
+| BF16      |  16  |  4096  |   48   |   1 |   1 |   1 |   8 |  16 | N/A |   4 | 1024 |  16 |
+| BF16      |  32  |  4096  |   48   |   1 |   1 |   1 |   8 |  32 | N/A |   4 | 2048 |  16 |
+| BF16      |  64  |  4096  |   48   |   1 |   1 |   1 |   8 |  64 | N/A |   4 | 4096 |  16 |
 
 #### Qwen3 235B
 
 | Precision | GPUs | SeqLen | Layers |  TP |  PP |  CP |  EP |  DP |  VP | MBS |  GBS  |  GA |
 | :-------- | :--: | :----: | :----: | --: | --: | --: | --: | --: | --: | --: | :---: | --: |
-| BF16      | 256  |  4096  |   94   |   1 |   8 |   1 |   8 |  32 |   1 |   1 | 8192  | 256 |
-| BF16      | 512  |  4096  |   94   |   1 |   8 |   1 |   8 |  64 |   1 |   1 | 16384 | 256 |
+| BF16      | 256  |  4096  |   94   |   1 |   8 |   1 |   8 |  32 | N/A |   1 | 8192  | 256 |
+| BF16      | 512  |  4096  |   94   |   1 |   8 |   1 |   8 |  64 | N/A |   1 | 16384 | 256 |
 
 ## B300
 
@@ -51,17 +51,17 @@ Configurations use weak scaling methodology (global batch size scales proportion
 
 | Precision | GPUs | SeqLen | Layers |  TP |  PP |  CP |  EP |  DP |  VP | MBS | GBS  |  GA |
 | :-------- | :--: | :----: | :----: | --: | --: | --: | --: | --: | --: | --: | :--: | --: |
-| BF16      |  8   |  4096  |   48   |   1 |   1 |   1 |   8 |   8 |   1 |   8 | 512  |   8 |
-| BF16      |  16  |  4096  |   48   |   1 |   1 |   1 |   8 |  16 |   1 |   8 | 1024 |   8 |
-| BF16      |  32  |  4096  |   48   |   1 |   1 |   1 |   8 |  32 |   1 |   8 | 2048 |   8 |
-| BF16      |  64  |  4096  |   48   |   1 |   1 |   1 |   8 |  64 |   1 |   8 | 4096 |   8 |
+| BF16      |  8   |  4096  |   48   |   1 |   1 |   1 |   8 |   8 | N/A |   8 | 512  |   8 |
+| BF16      |  16  |  4096  |   48   |   1 |   1 |   1 |   8 |  16 | N/A |   8 | 1024 |   8 |
+| BF16      |  32  |  4096  |   48   |   1 |   1 |   1 |   8 |  32 | N/A |   8 | 2048 |   8 |
+| BF16      |  64  |  4096  |   48   |   1 |   1 |   1 |   8 |  64 | N/A |   8 | 4096 |   8 |
 
 #### Qwen3 235B
 
 | Precision | GPUs | SeqLen | Layers |  TP |  PP |  CP |  EP |  DP |  VP | MBS |  GBS  |  GA |
 | :-------- | :--: | :----: | :----: | --: | --: | --: | --: | --: | --: | --: | :---: | --: |
-| BF16      | 256  |  4096  |   94   |   1 |   8 |   1 |   8 |  32 |   4 |   1 | 8192  | 256 |
-| BF16      | 512  |  4096  |   94   |   1 |   8 |   1 |   8 |  64 |   4 |   1 | 16384 | 256 |
+| BF16      | 256  |  4096  |   94   |   1 |   8 |   1 |   8 |  32 | N/A |   1 | 8192  | 256 |
+| BF16      | 512  |  4096  |   94   |   1 |   8 |   1 |   8 |  64 | N/A |   1 | 16384 | 256 |
 
 ## B200
 
@@ -69,10 +69,10 @@ Configurations use weak scaling methodology (global batch size scales proportion
 
 | Precision | GPUs | SeqLen | Layers |  TP |  PP |  CP |  EP |  DP |  VP | MBS | GBS  |  GA |
 | :-------- | :--: | :----: | :----: | --: | --: | --: | --: | --: | --: | --: | :--: | --: |
-| BF16      |  8   |  4096  |   48   |   1 |   1 |   1 |   8 |   8 |   1 |   1 | 512  |  64 |
-| BF16      |  16  |  4096  |   48   |   1 |   1 |   1 |   8 |  16 |   1 |   1 | 1024 |  64 |
-| BF16      |  32  |  4096  |   48   |   1 |   1 |   1 |   8 |  32 |   1 |   1 | 2048 |  64 |
-| BF16      |  64  |  4096  |   48   |   1 |   1 |   1 |   8 |  64 |   1 |   1 | 4096 |  64 |
+| BF16      |  8   |  4096  |   48   |   1 |   1 |   1 |   8 |   8 | N/A |   4 | 512  |  16 |
+| BF16      |  16  |  4096  |   48   |   1 |   1 |   1 |   8 |  16 | N/A |   4 | 1024 |  16 |
+| BF16      |  32  |  4096  |   48   |   1 |   1 |   1 |   8 |  32 | N/A |   4 | 2048 |  16 |
+| BF16      |  64  |  4096  |   48   |   1 |   1 |   1 |   8 |  64 | N/A |   4 | 4096 |  16 |
 
 #### Qwen3 235B
 
@@ -87,9 +87,9 @@ Configurations use weak scaling methodology (global batch size scales proportion
 
 | Precision | GPUs | SeqLen | Layers |  TP |  PP |  CP |  EP |  DP |  VP | MBS | GBS  |  GA |
 | :-------- | :--: | :----: | :----: | --: | --: | --: | --: | --: | --: | --: | :--: | --: |
-| BF16      |  16  |  4096  |   48   |   1 |   2 |   1 |   8 |   8 |  12 |   1 | 1024 | 128 |
-| BF16      |  32  |  4096  |   48   |   1 |   2 |   1 |   8 |  16 |  12 |   1 | 2048 | 128 |
-| BF16      |  64  |  4096  |   48   |   1 |   2 |   1 |   8 |  32 |  12 |   1 | 4096 | 128 |
+| BF16      |  16  |  4096  |   48   |   1 |   1 |   1 |  16 |  16 | N/A |   1 | 1024 |  64 |
+| BF16      |  32  |  4096  |   48   |   1 |   1 |   1 |  16 |  32 | N/A |   1 | 2048 |  64 |
+| BF16      |  64  |  4096  |   48   |   1 |   1 |   1 |  16 |  64 | N/A |   1 | 4096 |  64 |
 
 #### Qwen3 235B
 
@@ -325,7 +325,7 @@ The `<experiment_name>` typically follows the pattern: `pretrain_qwen3_<model_si
 
 # Profiling
 
-Profiling is supported with Nsight Systems.
+Profiling is supported with Nsight Systems or PyTorch Profiler.
 
 ## Run Nsight Profiling
 
@@ -377,3 +377,17 @@ In order to view the profile traces (\*.nsys-rep files) interactively:
 Since most of the benchmarking jobs run on multiple GPUs, there will be multiple .nsys-rep files generated for each run. [Multi-Report Analysis Guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#multi-report-analysis) will be very helpful to automate the analysis and get to results quicker by using Nsight recipes.
 
 **See** these [tutorials](https://developer.nvidia.com/nsight-systems/get-started#tutorials) to get a quick start if you are new to Nsight profiling.
+
+## PyTorch Profiling
+
+PyTorch Profiling is intended for rare, advanced debugging scenarios such as NCCL correlation analysis. To enable it, set `ENABLE_PYTORCH_PROFILE=true` when submitting your job.
+
+> **Note:** This option is mutually exclusive with Nsight profiling (`ENABLE_PROFILE`). Both cannot be enabled at the same time.
+
+**Example command:**
+
+```shell
+ENABLE_PYTORCH_PROFILE=true llmb-run submit -w pretrain_qwen3 -s 235b --dtype bf16 --scale 256
+```
+
+For details on the PyTorch Profiler and how to view resulting traces, see the [PyTorch Profiler documentation](https://docs.pytorch.org/tutorials/recipes/recipes/profiler_recipe.html).

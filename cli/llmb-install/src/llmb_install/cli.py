@@ -25,6 +25,7 @@ This module handles CLI argument parsing and provides the entry point for the in
 """
 
 import argparse
+import traceback
 
 from llmb_install.constants import EXIT_CANCELLED
 
@@ -164,5 +165,9 @@ def main() -> None:
         print("\n\nInstallation cancelled by user.")
         raise SystemExit(EXIT_CANCELLED) from None
     except Exception as e:
-        print(f"\nError: {e}")
+        print(f"\nError: {type(e).__name__}: {e}")
+        if getattr(args, 'verbose', False):
+            traceback.print_exc()
+        else:
+            print("Run with --verbose for the full traceback.")
         raise SystemExit(1) from e

@@ -4,33 +4,33 @@ This recipe contains information and scripts to produce performance results for 
 
 ## GB300
 
-| GPT OSS Model Size |  GPUs  | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS    | GA  |  CG   |
-| ------------------ | :----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :------: | :-: | :---: |
-| 120b               | 64-512 |   BF16   |  4096  |   36   | False |  1  |  1  |  1  | 64  |  1  | GPUs/64 | NA  |  4  | GPUs\*20 |  5  | False |
+| GPT OSS Model Size |  GPUs  | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |  DP  | VP  | MBS |   GBS    | GA  |  CG   |
+| ------------------ | :----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :--: | :-: | :-: | :------: | :-: | :---: |
+| 120b               | 64-512 |   BF16   |  4096  |   36   | False |  1  |  1  |  1  | 64  |  1  | GPUs | NA  |  4  | GPUs\*20 |  5  | False |
 
 ## GB200
 
-| GPT OSS Model Size |  GPUs  | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS    | GA  |  CG   |
-| ------------------ | :----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :------: | :-: | :---: |
-| 120b               | 64-512 |   BF16   |  4096  |   36   | False |  1  |  1  |  1  | 64  |  1  | GPUs/64 | NA  |  4  | GPUs\*20 |  5  | False |
+| GPT OSS Model Size |  GPUs  | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |  DP  | VP  | MBS |   GBS    | GA  |  CG   |
+| ------------------ | :----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :--: | :-: | :-: | :------: | :-: | :---: |
+| 120b               | 64-512 |   BF16   |  4096  |   36   | False |  1  |  1  |  1  | 64  |  1  | GPUs | NA  |  4  | GPUs\*20 |  5  | False |
 
 ## B300
 
-| GPT OSS Model Size |  GPUs  | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP   | VP  | MBS |   GBS    | GA  |  CG   |
-| ------------------ | :----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :----: | :-: | :-: | :------: | :-: | :---: |
-| 120b               | 64-512 |   BF16   |  4096  |   36   | False |  1  |  1  |  1  |  8  |  1  | GPUs/8 | NA  |  4  | GPUs\*20 |  5  | False |
+| GPT OSS Model Size |  GPUs  | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |  DP  | VP  | MBS |   GBS    | GA  |  CG   |
+| ------------------ | :----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :--: | :-: | :-: | :------: | :-: | :---: |
+| 120b               | 64-512 |   BF16   |  4096  |   36   | False |  1  |  1  |  1  |  8  |  1  | GPUs | NA  |  4  | GPUs\*20 |  5  | False |
 
 ## B200
 
-| GPT OSS Model Size |  GPUs  | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS    | GA  |  CG   |
-| ------------------ | :----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :------: | :-: | :---: |
-| 120b               | 64-512 |   BF16   |  4096  |   36   | False |  1  |  1  |  1  | 64  |  1  | GPUs/64 | NA  |  4  | GPUs\*20 |  5  | False |
+| GPT OSS Model Size |  GPUs  | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |  DP  | VP  | MBS |   GBS    | GA  |  CG   |
+| ------------------ | :----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :--: | :-: | :-: | :------: | :-: | :---: |
+| 120b               | 64-512 |   BF16   |  4096  |   36   | False |  1  |  1  |  1  |  8  |  1  | GPUs | NA  |  4  | GPUs\*20 |  5  | False |
 
 ## H100
 
-| GPT OSS Model Size |  GPUs   | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS    | GA  |  CG   |
-| ------------------ | :-----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :------: | :-: | :---: |
-| 120b               | 64-1024 |   BF16   |  4096  |   36   | False |  1  |  4  |  1  |  8  |  1  | GPUs/32 | NA  |  1  | GPUs\*20 | 80  | False |
+| GPT OSS Model Size |  GPUs   | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP   | VP  | MBS |   GBS    | GA  |  CG   |
+| ------------------ | :-----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :----: | :-: | :-: | :------: | :-: | :---: |
+| 120b               | 64-1024 |   BF16   |  4096  |   36   | False |  1  |  4  |  1  |  8  |  1  | GPUs/4 | NA  |  1  | GPUs\*20 | 80  | False |
 
 # Performance Measurement and Analysis
 
@@ -231,7 +231,7 @@ The `<experiment_name>` typically follows these patterns:
 
 # Profiling
 
-Profiling is supported with Nsight Systems.
+Profiling is supported with Nsight Systems or PyTorch Profiler.
 
 ## Run Nsight Profiling
 
@@ -283,5 +283,19 @@ In order to view the profile traces (\*.nsys-rep files) interactively:
 Since most of the benchmarking jobs run on multiple GPUs, there will be multiple .nsys-rep files generated for each run. [Multi-Report Analysis Guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#multi-report-analysis) will be very helpful to automate the analysis and get to results quicker by using Nsight recipes.
 
 **See** these [tutorials](https://developer.nvidia.com/nsight-systems/get-started#tutorials) to get a quick start if you are new to Nsight profiling.
+
+## PyTorch Profiling
+
+PyTorch Profiling is intended for rare, advanced debugging scenarios such as NCCL correlation analysis. To enable it, set `ENABLE_PYTORCH_PROFILE=true` when submitting your job.
+
+> **Note:** This option is mutually exclusive with Nsight profiling (`ENABLE_PROFILE`). Both cannot be enabled at the same time.
+
+**Example command:**
+
+```shell
+ENABLE_PYTORCH_PROFILE=true llmb-run submit -w pretrain_gpt_oss --scale 64
+```
+
+For details on the PyTorch Profiler and how to view resulting traces, see the [PyTorch Profiler documentation](https://docs.pytorch.org/tutorials/recipes/recipes/profiler_recipe.html).
 
 <!-- NCCL trace support removed. Documentation section deleted intentionally. -->

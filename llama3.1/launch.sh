@@ -30,9 +30,7 @@ set -eu -o pipefail
 
 export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=llama3.1
-export FW_VERSION=26.02.00
-
-export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh}
+export FW_VERSION=26.02.01
 
 export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 
@@ -51,6 +49,8 @@ MODEL_SIZE=${MODEL_SIZE:-405b}
 MODEL_SIZE=${MODEL_SIZE,,}
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 PROFILE_ENABLED=${PROFILE_ENABLED,,}
+PYTORCH_PROFILE_ENABLED=${ENABLE_PYTORCH_PROFILE:-false}
+PYTORCH_PROFILE_ENABLED=${PYTORCH_PROFILE_ENABLED,,}
 ENABLED_GPU_METRICS=${ENABLE_GPU_METRICS:-false}
 ENABLED_GPU_METRICS=${ENABLED_GPU_METRICS,,}
 ENABLE_VBOOST=${ENABLE_VBOOST:-false}
@@ -61,6 +61,12 @@ PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
 GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
 GPU_TYPE=${GPU_TYPE,,}
 JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
+
+if [[ $GPU_TYPE == "b200" ]]; then
+    FW_VERSION=26.02.00
+fi
+
+export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh}
 
 # Handle additional SLURM parameters from environment variable
 ADDITIONAL_SLURM_PARAMS=${ADDITIONAL_SLURM_PARAMS:-""}
@@ -97,6 +103,11 @@ ENABLE_CHECKPOINT=${ENABLE_CHECKPOINT:-false}
 ENABLE_CHECKPOINT=${ENABLE_CHECKPOINT,,}
 CHECKPOINT_INTERVAL=${CHECKPOINT_INTERVAL:-$MAX_STEPS} # Default: save checkpoint at end of training
 
+if [[ $GPU_TYPE == "gb200" ]] && [[ $MODEL_SIZE == "70b" ]] && [[ $DTYPE == "nvfp4" ]]; then
+    echo "Error: NVFP4 is not supported for Llama3.1 70B on GB200." >&2
+    exit 1
+fi
+
 if { [[ $GPU_TYPE == "b300" ]] || [[ $GPU_TYPE == "b200" ]]; } && [[ $MODEL_SIZE == "405b" ]]; then
     GBS=$((JOB_TOTAL_GPUS * 6))
 fi
@@ -112,6 +123,14 @@ fi
 
 if [[ $GPU_TYPE == "b300" ]] && { [[ $MODEL_SIZE == "70b" ]] || [[ $MODEL_SIZE == "405b" ]]; } && [[ $JOB_TOTAL_GPUS -ge 512 ]]; then
     export NCCL_IB_QPS_PER_CONNECTION=${NCCL_IB_QPS_PER_CONNECTION:-4}
+fi
+
+if [[ $GPU_TYPE == "b300" ]] && [[ $MODEL_SIZE == "70b" ]] && [[ $DTYPE == "fp8" ]]; then
+    if [[ $JOB_TOTAL_GPUS -le 128 ]]; then
+        FP8_RECIPE=cs
+    elif [[ $JOB_TOTAL_GPUS -ge 256 ]]; then
+        FP8_RECIPE=mx
+    fi
 fi
 
 if [[ $GPU_TYPE == "b200" ]] && [[ $MODEL_SIZE == "70b" ]] && [[ $DTYPE == "fp8" ]] && [[ $JOB_TOTAL_GPUS -ge 256 ]]; then
@@ -193,6 +212,11 @@ if [[ -n ${CONTAINER_MOUNTS} ]]; then
     CONFIG_OVERRIDES+=" --custom_mounts=$CONTAINER_MOUNTS"
 fi
 
+if [[ $PROFILE_ENABLED == "true" ]] && [[ $PYTORCH_PROFILE_ENABLED == "true" ]]; then
+    echo "Error: ENABLE_PROFILE and ENABLE_PYTORCH_PROFILE are mutually exclusive." >&2
+    exit 1
+fi
+
 if [[ $PROFILE_ENABLED == "true" ]]; then
     PROFILE_RANKS=${PROFILE_RANKS:-$(seq -s, 0 $((JOB_TOTAL_GPUS - 1)))}
     CONFIG_OVERRIDES+=" --enable_nsys --profiling_start_step=$PROFILE_START_STEP --profiling_stop_step=$PROFILE_STOP_STEP --profiling_ranks $PROFILE_RANKS "
@@ -201,6 +225,10 @@ if [[ $PROFILE_ENABLED == "true" ]]; then
     if [[ $ENABLED_GPU_METRICS == true ]]; then
         CONFIG_OVERRIDES+=" --profiling_gpu_metrics "
     fi
+fi
+
+if [[ $PYTORCH_PROFILE_ENABLED == "true" ]]; then
+    CONFIG_OVERRIDES+=" --pytorch_profiler true "
 fi
 
 if [[ $DTYPE == "fp8" ]]; then

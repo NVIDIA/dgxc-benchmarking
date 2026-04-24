@@ -26,13 +26,17 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from llmb_run.config_manager import ClusterConfig
-from llmb_run.metadata_utils import normalize_model_dtype_config
+from llmb_run.metadata_utils import normalize_model_dtype_config, parse_workload_name
 from llmb_run.task_loader import (
     flatten_yaml_tasks,
     gen_tasks,
     get_tasks_wrapper,
 )
 from llmb_run.tasks import WorkloadTask
+from llmb_run.workload_validator import (
+    format_validation_error,
+    validate_workload_with_details,
+)
 
 logger = logging.getLogger('llmb_run.task_generation')
 
@@ -64,6 +68,7 @@ class TaskGenerationRequest:
     repeats: int = 1
     profile: bool = False
     proxy: bool = False
+    force: bool = False
     extra_slurm_params: Optional[Dict[str, Any]] = None
 
     def validate(self) -> None:
@@ -92,6 +97,19 @@ class TaskGenerationRequest:
                     "  llmb-run submit -w pretrain_llama3.1_70b,pretrain_nemotron-h"
                 )
 
+            # Strip redundant size suffix from workload name when -s is also provided.
+            # e.g., -w pretrain_llama_7b -s 7b -> workload becomes "pretrain_llama"
+            parsed_key, parsed_size = parse_workload_name(self.workload)
+            if parsed_size:
+                if parsed_size == self.model_size:
+                    self.workload = parsed_key
+                else:
+                    raise ValidationError(
+                        f"Workload name implies size '{parsed_size}' but --model-size is '{self.model_size}'.\n"
+                        f"Use either: -w {parsed_key} -s {self.model_size}\n"
+                        f"        or: -w {self.workload}"
+                    )
+
         # Scale mutual exclusivity
         if self.scale and (self.max_scale or self.min_scale):
             raise ValidationError(
@@ -109,6 +127,41 @@ class TaskGenerationRequest:
                     "Or use discovery: --max-scale 512 or --min-scale"
                 )
 
+        if self.force:
+            # Resolve model_size from workload name if not provided explicitly
+            has_model_size = self.model_size
+            if not has_model_size and self.workload:
+                _, parsed_size = parse_workload_name(self.workload)
+                has_model_size = parsed_size
+
+            if (
+                self.file_path
+                or self.max_scale
+                or self.min_scale
+                or not all((self.workload, has_model_size, self.dtype, self.scale))
+            ):
+                raise ValidationError(
+                    "--force is only supported for a single explicit task.\n"
+                    "Use: llmb-run submit -w WORKLOAD -s MODEL_SIZE --dtype DTYPE --scale SCALE --force\n"
+                    "  or: llmb-run submit -w WORKLOAD_SIZE --dtype DTYPE --scale SCALE --force"
+                )
+
+            multi_value_flags = []
+            if len(parse_comma_list(self.workload)) != 1:
+                multi_value_flags.append("--workload")
+            if self.model_size and len(parse_comma_list(self.model_size)) != 1:
+                multi_value_flags.append("--model-size")
+            if len(parse_comma_list(self.dtype)) != 1:
+                multi_value_flags.append("--dtype")
+            if len(parse_comma_list(self.scale)) != 1:
+                multi_value_flags.append("--scale")
+
+            if multi_value_flags:
+                raise ValidationError(
+                    "--force only supports a single explicit task.\n"
+                    f"These options must be single values: {', '.join(multi_value_flags)}"
+                )
+
 
 def generate_tasks(request: TaskGenerationRequest) -> List[WorkloadTask]:
     """Generate tasks from unified request specification."""
@@ -121,10 +174,13 @@ def generate_tasks(request: TaskGenerationRequest) -> List[WorkloadTask]:
     if request.file_path:
         return _generate_from_file(request)
 
+    if request.force:
+        return _generate_forced_explicit_task(request)
+
     if request.model_size:
         # Has explicit model size
-        # Always use discovery/targeted mode logic which supports metadata validation,
-        # implicit dtypes, and various scale specifications (exact, max, min).
+        # Always use discovery/targeted mode logic which supports metadata-backed
+        # generation, implicit dtypes, and various scale specifications.
         return _generate_explicit_workload_with_scale_discovery(request)
     else:
         # Discovery mode: workload names include size
@@ -223,6 +279,57 @@ def _generate_from_file(request: TaskGenerationRequest) -> List[WorkloadTask]:
             task.extra_slurm_params = request.extra_slurm_params
 
     return tasks
+
+
+def _generate_forced_explicit_task(request: TaskGenerationRequest) -> List[WorkloadTask]:
+    """Generate one explicit task while bypassing dtype/scale compatibility checks."""
+    if request.model_size:
+        workload_key = parse_comma_list(request.workload)[0]
+        model_size = parse_comma_list(request.model_size)[0]
+    else:
+        # Resolve from workload_size name (e.g., "pretrain_foo_7b" -> "pretrain_foo", "7b")
+        workload_key, model_size = parse_workload_name(parse_comma_list(request.workload)[0])
+    dtype = parse_comma_list(request.dtype)[0]
+
+    try:
+        scale = int(parse_comma_list(request.scale)[0])
+    except ValueError as e:
+        raise ValueError(f"Invalid scale format '{request.scale}'. Scale must be a number.") from e
+
+    cluster_gpu_type = request.cluster_config.gpu_type
+    is_valid, error_type, error_msg, suggestions = validate_workload_with_details(
+        request.workloads,
+        workload_key,
+        model_size,
+        cluster_gpu_type,
+        request.cluster_config,
+    )
+    if not is_valid:
+        raise ValueError(
+            format_validation_error(
+                workload_key,
+                model_size,
+                None,
+                None,
+                cluster_gpu_type,
+                error_type,
+                error_msg,
+                suggestions,
+            )
+        )
+
+    return [
+        WorkloadTask(
+            workload_key=workload_key,
+            model_size=model_size,
+            dtype=dtype,
+            scale=scale,
+            profile=request.profile,
+            proxy=request.proxy,
+            extra_slurm_params=request.extra_slurm_params or {},
+        )
+        for _ in range(request.repeats)
+    ]
 
 
 def generate_submit_all_tasks(

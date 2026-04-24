@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -53,7 +53,7 @@ def create_virtual_environment(venv_path: str, venv_type: str) -> None:
                 ['python3', '-m', 'venv', '--clear', venv_path], env=env, check=True, capture_output=True, text=True
             )
         except subprocess.CalledProcessError as e:
-            print(f"Error creating venv environment: {e}")
+            print(f"Error creating venv environment: {e}\n{e.stderr}")
             raise
 
     elif venv_type == 'conda':
@@ -71,10 +71,15 @@ def create_virtual_environment(venv_path: str, venv_type: str) -> None:
                 text=True,
             )
         except subprocess.CalledProcessError as e:
-            print(f"Error creating conda environment: {e}")
+            print(f"Error creating conda environment: {e}\n{e.stderr}")
             raise
 
     elif venv_type == 'uv':
+        # If the venv path already exists, remove it to prevent errors
+        # uv's --clear flag can fail on some filesystems (e.g. shared/network mounts)
+        if os.path.exists(venv_path):
+            shutil.rmtree(venv_path)
+
         uv_cmd = [
             'uv',
             'venv',
@@ -98,7 +103,7 @@ def create_virtual_environment(venv_path: str, venv_type: str) -> None:
                 text=True,
             )
         except subprocess.CalledProcessError as e:
-            print(f"Error creating uv environment: {e}")
+            print(f"Error creating uv environment: {e}\n{e.stderr}")
             raise
 
         # uv does not install pip in new venvs. Installing it manually handles legacy scripts where 'pip install' is used.
@@ -117,7 +122,7 @@ def create_virtual_environment(venv_path: str, venv_type: str) -> None:
                 text=True,
             )
         except subprocess.CalledProcessError as e:
-            print(f"Error installing pip in uv environment: {e}")
+            print(f"Error installing pip in uv environment: {e}\n{e.stderr}")
             raise
     else:
         raise ValueError(f"Unsupported environment type: {venv_type}")

@@ -73,6 +73,12 @@ run:
           dtypes: ['mxfp4']
           scales: [1, 4]
           exact_scales: true
+    b300:
+      model_configs:
+        - model_size: '120b'
+          dtypes: ['mxfp4']
+          scales: [1, 4]
+          exact_scales: true
     b200:
       model_configs:
         - model_size: '120b'

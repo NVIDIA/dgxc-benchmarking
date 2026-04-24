@@ -41,7 +41,7 @@ if [[ $MODEL_SIZE != "70b" ]]; then
     echo "ERROR: Only 70b LoRA is supported. MODEL_SIZE=$MODEL_SIZE is not supported."
     exit 1
 fi
-export FW_VERSION=26.02.00
+export FW_VERSION=26.02.01
 
 export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 
@@ -65,6 +65,8 @@ export PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
 
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 PROFILE_ENABLED=${PROFILE_ENABLED,,}
+PYTORCH_PROFILE_ENABLED=${ENABLE_PYTORCH_PROFILE:-false}
+PYTORCH_PROFILE_ENABLED=${PYTORCH_PROFILE_ENABLED,,}
 GPU_METRICS_ENABLED=${ENABLE_GPU_METRICS:-false}
 GPU_METRICS_ENABLED=${GPU_METRICS_ENABLED,,}
 ENABLE_VBOOST=${ENABLE_VBOOST:-false}
@@ -97,7 +99,7 @@ HIDDEN_SIZE=${HIDDEN_SIZE:-8192}
 
 if [[ $GPU_TYPE == "gb200" ]] || [[ $GPU_TYPE == "gb300" ]]; then
     GPUS_PER_NODE=${GPUS_PER_NODE:-4}
-elif [[ $GPU_TYPE == "b200" ]] || [[ $GPU_TYPE == "h100" ]]; then
+elif [[ $GPU_TYPE == "b200" ]] || [[ $GPU_TYPE == "b300" ]] || [[ $GPU_TYPE == "h100" ]]; then
     GPUS_PER_NODE=${GPUS_PER_NODE:-8}
 else
     echo "$GPU_TYPE not supported"
@@ -136,6 +138,11 @@ if [[ -n ${CUDA_GRAPH_SCOPE:-} ]]; then
     fi
 fi
 
+if [[ $PROFILE_ENABLED == "true" ]] && [[ $PYTORCH_PROFILE_ENABLED == "true" ]]; then
+    echo "Error: ENABLE_PROFILE and ENABLE_PYTORCH_PROFILE are mutually exclusive." >&2
+    exit 1
+fi
+
 if [[ $PROFILE_ENABLED == "true" ]]; then
     CONFIG_OVERRIDES+=" --enable_nsys "
     CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
@@ -148,15 +155,17 @@ if [[ $PROFILE_ENABLED == "true" ]]; then
     fi
 fi
 
+if [[ $PYTORCH_PROFILE_ENABLED == "true" ]]; then
+    CONFIG_OVERRIDES+=" --pytorch_profiler true "
+fi
+
 if [[ $DTYPE == "fp8" ]]; then
-    if [[ $GPU_TYPE == "h100" ]]; then
+    if [[ $GPU_TYPE == "h100" ]] || [[ $GPU_TYPE == "gb200" ]] || [[ $GPU_TYPE == "gb300" ]] || [[ $GPU_TYPE == "b200" ]] || [[ $GPU_TYPE == "b300" ]]; then
         export FP8_RECIPE=${FP8_RECIPE:-fp8_cs}
-        if [[ ${FP8_RECIPE,,} != "fp8_cs" ]]; then
+        if [[ $GPU_TYPE == "h100" ]] && [[ ${FP8_RECIPE,,} != "fp8_cs" ]]; then
             echo "ERROR: fp8_cs is the only fp8 flavor supported on H100 GPUs." >&2
             exit 1
         fi
-    elif [[ $GPU_TYPE == "gb200" ]] || [[ $GPU_TYPE == "gb300" ]]; then
-        export FP8_RECIPE=${FP8_RECIPE:-fp8_cs}
     else
         export FP8_RECIPE=${FP8_RECIPE:-fp8_mx}
     fi

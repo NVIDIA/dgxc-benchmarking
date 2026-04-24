@@ -42,6 +42,8 @@ _ARCHIVE_PREFIX = "llmb-archive"
 # aligns with the standard layout.
 _NCCL_WORKLOAD_NAME = "microbenchmark_nccl"
 _NCCL_TOP_LEVEL_PATTERNS = ("llmb-config_*.yaml", "slurm-*.out")
+_ARCHIVE_EXCLUDED_PATTERNS = ("*.nsys-rep", "*_trace.json", "*.pt.trace.json", "*.tar.*")
+_ARCHIVE_EXCLUDED_DIRS = {"code", "checkpoints"}
 
 
 @dataclass(frozen=True)
@@ -89,7 +91,7 @@ def build_archive_file_list(llmb_install: pathlib.Path) -> list[tuple[pathlib.Pa
         for root, dirs, files in os.walk(experiments_dir, followlinks=False):
             root_path = pathlib.Path(root)
 
-            dirs[:] = [d for d in dirs if d != "code"]
+            dirs[:] = [d for d in dirs if d not in _ARCHIVE_EXCLUDED_DIRS]
 
             symlink_dirs = [d for d in dirs if (root_path / d).is_symlink()]
             files_and_links = files + symlink_dirs
@@ -97,7 +99,7 @@ def build_archive_file_list(llmb_install: pathlib.Path) -> list[tuple[pathlib.Pa
             for entry_name in files_and_links:
                 source_path = root_path / entry_name
                 name = source_path.name
-                if name.endswith(".nsys-rep") or name.endswith("_trace.json") or fnmatch.fnmatch(name, "*.tar.*"):
+                if any(fnmatch.fnmatch(name, pattern) for pattern in _ARCHIVE_EXCLUDED_PATTERNS):
                     continue
 
                 relative_to_experiments = source_path.relative_to(experiments_dir)

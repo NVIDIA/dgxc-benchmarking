@@ -194,7 +194,7 @@ wheels = [
 
 [[package]]
 name = "llmb-run"
-version = "1.10.7"
+version = "1.10.11"
 source = { editable = "." }
 dependencies = [
     { name = "pyyaml" },

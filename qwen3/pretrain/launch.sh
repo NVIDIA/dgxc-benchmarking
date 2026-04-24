@@ -46,14 +46,10 @@ else
     exit 1
 fi
 
-export FW_VERSION=26.02.00
-
 export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 
 export LLMB_WORKLOAD=$LLMB_INSTALL/workloads/${WORKLOAD_TYPE}_${MODEL_NAME}
 export LLMB_REPO=$PWD
-
-export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh}
 
 export NEMORUN_HOME=$LLMB_WORKLOAD
 export NEMO_HOME=${NEMO_HOME:-$LLMB_WORKLOAD}
@@ -63,8 +59,16 @@ export DTYPE=${DTYPE,,}
 export GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
 export GPU_TYPE=${GPU_TYPE,,}
 export JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
+
+if [ "$GPU_TYPE" = "gb300" ]; then
+    FW_VERSION=26.02.00
+else
+    FW_VERSION=26.02.01
+fi
+
+export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh}
 if [ "$MODEL_SIZE" = "235b" ]; then
-    export TIME_LIMIT=${TIME_LIMIT:-"01:40:00"}
+    export TIME_LIMIT=${TIME_LIMIT:-"02:00:00"}
 else
     export TIME_LIMIT=${TIME_LIMIT:-"01:00:00"}
 fi
@@ -74,6 +78,8 @@ export PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
 
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 PROFILE_ENABLED=${PROFILE_ENABLED,,}
+PYTORCH_PROFILE_ENABLED=${ENABLE_PYTORCH_PROFILE:-false}
+PYTORCH_PROFILE_ENABLED=${PYTORCH_PROFILE_ENABLED,,}
 GPU_METRICS_ENABLED=${ENABLE_GPU_METRICS:-false}
 GPU_METRICS_ENABLED=${GPU_METRICS_ENABLED,,}
 ENABLE_VBOOST=${ENABLE_VBOOST:-false}
@@ -141,6 +147,11 @@ if [[ -n ${CUDA_GRAPH_SCOPE:-} ]]; then
     fi
 fi
 
+if [[ $PROFILE_ENABLED == "true" ]] && [[ $PYTORCH_PROFILE_ENABLED == "true" ]]; then
+    echo "Error: ENABLE_PROFILE and ENABLE_PYTORCH_PROFILE are mutually exclusive." >&2
+    exit 1
+fi
+
 if [[ $PROFILE_ENABLED == "true" ]]; then
     CONFIG_OVERRIDES+=" --enable_nsys "
     CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
@@ -152,6 +163,10 @@ if [[ $PROFILE_ENABLED == "true" ]]; then
         CONFIG_OVERRIDES+=" --profiling_gpu_metrics "
     fi
     MAX_STEPS=$PROFILE_STOP_STEP
+fi
+
+if [[ $PYTORCH_PROFILE_ENABLED == "true" ]]; then
+    CONFIG_OVERRIDES+=" --pytorch_profiler true "
 fi
 
 if [[ $DTYPE == "fp8" ]]; then

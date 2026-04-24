@@ -119,14 +119,14 @@ esac
 
 echo "Build: GPU=${GPU_TYPE}, TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}, DeepEP=${DEEPEP_BRANCH}@${DEEPEP_COMMIT:0:8}"
 
-# Install PyTorch nightly
-echo "Installing PyTorch Nightly"
+# Install PyTorch stable (cu130); nightlies roll off the index — pin a GA triple
+echo "Installing PyTorch 2.11+cu130 (stable)"
 python3 -m pip uninstall -y torch torchvision torchaudio 2>/dev/null || true
-python3 -m pip install --pre --no-deps \
-    torch==2.11.0.dev20260205+cu130 \
-    torchvision==0.25.0.dev20260205+cu130 \
-    torchaudio==2.11.0.dev20260205+cu130 \
-    --index-url https://download.pytorch.org/whl/nightly/cu130
+python3 -m pip install --no-deps \
+    torch==2.11.0+cu130 \
+    torchvision==0.26.0+cu130 \
+    torchaudio==2.11.0+cu130 \
+    --index-url https://download.pytorch.org/whl/cu130
 
 # System deps (RDMA libraries for both branches)
 apt-get update && apt-get install -y --no-install-recommends \
@@ -247,6 +247,7 @@ BUILD_AO=${BUILD_AO},DEEPEP_BRANCH=${DEEPEP_BRANCH},\
 DEEPEP_COMMIT=${DEEPEP_COMMIT},TORCHTITAN_REPO=${TORCHTITAN_REPO}" \
     --container-image="${SQSH_FILE}" \
     --container-mounts="${LLMB_WORKLOAD}:${LLMB_WORKLOAD}" \
+    --container-writable \
     --container-save="${MODIFIED_SQSH}" \
     bash "${BUILD_SCRIPT}"
 

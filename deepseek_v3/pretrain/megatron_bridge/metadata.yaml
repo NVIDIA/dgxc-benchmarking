@@ -29,7 +29,7 @@ container:
   images:
     by_gpu:
       default:
-        - 'nvcr.io#nvidia/nemo:26.02.00'
+        - 'nvcr.io#nvidia/nemo:26.02.01'
       h100:
         - 'nvcr.io#nvidia/nemo:25.09.00'
 
@@ -43,10 +43,10 @@ repositories:
     default:
       megatron_bridge:
         url: "https://github.com/NVIDIA-NeMo/Megatron-Bridge.git"
-        commit: "6b3b5ba7ef64182caba23faa8d7abc0125aa3807"
+        commit: "aeead1ae667d795ebe725cb4a608581a21f402cc"
       nemo_run:
         url: "https://github.com/NVIDIA-NeMo/Run.git"
-        commit: "ab0c4328275c4c731f1bdea3ceb0e68a9a17a6a2"
+        commit: "525d68bfce2d6baed86ed3d7d0edbae07833ea0d"
     h100:
       megatron_bridge:
         url: "https://github.com/NVIDIA-NeMo/Megatron-Bridge.git"
@@ -57,7 +57,6 @@ repositories:
       nemo_run:
         url: "https://github.com/NVIDIA-NeMo/Run.git"
         commit: "04f900a9c1cde79ce6beca6a175b4c62b99d7982"
-
 
 setup:
   by_gpu:
@@ -84,6 +83,13 @@ setup:
           - package: nemo_run
             repo_key: nemo_run
 
+tools:
+  nsys:
+    by_gpu:
+      gb300: "2025.5.1.121-3638078"
+      gb200: "2025.5.1.121-3638078"
+      b300: "2025.5.1.121-3638078"
+      b200: "2025.5.1.121-3638078"
 
 # Run
 run:
@@ -123,4 +129,3 @@ run:
           dtypes:
             bf16: [1024]
             fp8: [512, 1024]
-

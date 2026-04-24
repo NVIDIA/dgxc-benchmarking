@@ -18,6 +18,22 @@ This recipe contains information and scripts to produce performance results for 
 |    70b     |   BF16    |  16  |  2048  |   80   |  1  |  1  |  1  | 16  | N/A |  1  | 128 |  8  |
 |    70b     |    FP8    |  16  |  4096  |   80   |  1  |  2  |  1  |  8  | N/A |  1  | 64  |  8  |
 
+## B300
+
+| Model Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | DP  | VP  | MBS | GBS | GA  |
+| :--------: | :-------: | :--: | :----: | :----: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+|    70b     |    FP8    |  8   |  4096  |   80   |  1  |  2  |  1  |  4  | N/A |  1  | 32  |  8  |
+|    70b     |   BF16    |  8   |  4096  |   80   |  1  |  1  |  1  |  8  | N/A |  1  | 32  |  4  |
+|    70b     |    FP8    |  16  |  4096  |   80   |  1  |  2  |  1  |  8  | N/A |  1  | 64  |  8  |
+|    70b     |   BF16    |  16  |  4096  |   80   |  1  |  1  |  1  | 16  | N/A |  1  | 64  |  4  |
+
+## B200
+
+| Model Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | DP  | VP  | MBS | GBS | GA  |
+| :--------: | :-------: | :--: | :----: | :----: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+|    70b     | FP8/BF16  |  8   |  4096  |   80   |  1  |  2  |  1  |  4  | N/A |  1  | 32  |  8  |
+|    70b     | FP8/BF16  |  16  |  4096  |   80   |  1  |  2  |  1  |  8  | N/A |  1  | 64  |  8  |
+
 ## H100
 
 | Model Size | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | DP  | VP  | MBS | GBS | GA  |
@@ -202,6 +218,8 @@ JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] 
 - `GPU_TYPE`: Type of GPU hardware
   - `gb300` - NVIDIA GB300 GPUs
   - `gb200` - NVIDIA GB200 GPUs
+  - `b300` - NVIDIA B300 GPUs
+  - `b200` - NVIDIA B200 GPUs
   - `h100` - NVIDIA H100 GPUs
 
 **Optional:**
@@ -226,6 +244,18 @@ Train with FP8 precision on 8 GB300 GPUs:
 
 ```shell
 JOB_TOTAL_GPUS=8 DTYPE=fp8 GPU_TYPE=gb300 ./launch.sh
+```
+
+Train on 8 B300 GPUs with FP8 precision:
+
+```shell
+JOB_TOTAL_GPUS=8 DTYPE=fp8 GPU_TYPE=b300 ./launch.sh
+```
+
+Train on 8 B200 GPUs with FP8 precision:
+
+```shell
+JOB_TOTAL_GPUS=8 DTYPE=fp8 GPU_TYPE=b200 ./launch.sh
 ```
 
 Train on 8 H100 GPUs with FP8 precision:
@@ -259,7 +289,7 @@ The `<experiment_name>` typically follows the pattern: `lora_llama3_70b_<dtype>_
 
 # Profiling
 
-Profiling is supported with Nsight Systems.
+Profiling is supported with Nsight Systems or PyTorch Profiler.
 
 ## Run Nsight Profiling
 
@@ -300,6 +330,20 @@ In order to view the profile traces (\*.nsys-rep files) interactively:
 Since most of the benchmarking jobs run on multiple GPUs, there will be multiple .nsys-rep files generated for each run. [Multi-Report Analysis Guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#multi-report-analysis) will be very helpful to automate the analysis and get to results quicker by using Nsight recipes.
 
 **See** these [tutorials](https://developer.nvidia.com/nsight-systems/get-started#tutorials) to get a quick start if you are new to Nsight profiling.
+
+## PyTorch Profiling
+
+PyTorch Profiling is intended for rare, advanced debugging scenarios such as NCCL correlation analysis. To enable it, set `ENABLE_PYTORCH_PROFILE=true` when submitting your job.
+
+> **Note:** This option is mutually exclusive with Nsight profiling (`ENABLE_PROFILE`). Both cannot be enabled at the same time.
+
+**Example command:**
+
+```shell
+ENABLE_PYTORCH_PROFILE=true llmb-run submit -w finetune_llama3 --dtype bf16 --scale 8
+```
+
+For details on the PyTorch Profiler and how to view resulting traces, see the [PyTorch Profiler documentation](https://docs.pytorch.org/tutorials/recipes/recipes/profiler_recipe.html).
 
 <!-- NCCL trace support removed. Documentation section deleted intentionally. -->
 
@@ -380,7 +424,7 @@ Once you have the `venv_path`, activate it using one of the following commands, 
 The `download_ckpt_dataset.sh` script relies on several environment variables that are typically set by the installer. When running this script manually, you must ensure these variables are set in your environment:
 
 - `HF_TOKEN`: Your HuggingFace access token. (e.g., `export HF_TOKEN=<your token>`)
-- `GPU_TYPE`: The type of GPU hardware you are using (`gb300`, `gb200` or `h100`). (e.g., `export GPU_TYPE=h100`)
+- `GPU_TYPE`: The type of GPU hardware you are using (`gb300`, `gb200`, `b300`, `b200` or `h100`). (e.g., `export GPU_TYPE=h100`)
 - `LLMB_INSTALL`: The top-level installation directory for all benchmarking artifacts. (e.g., `export LLMB_INSTALL=/path/to/llm_benchmarking_install`)
 - `LLMB_WORKLOAD`: The workload-specific directory. This is usually derived from `LLMB_INSTALL`. (e.g., `export LLMB_WORKLOAD=${LLMB_INSTALL}/workloads/finetune_llama3`)
 - `SBATCH_ACCOUNT`: Your Slurm account. (e.g., `export SBATCH_ACCOUNT=your_slurm_account`)
