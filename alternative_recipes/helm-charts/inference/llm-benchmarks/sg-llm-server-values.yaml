@@ -23,13 +23,13 @@ environment:
   # Server Configuration
   SERVER_TYPE: "SGLang"  # Can be "vLLM", "NIM", or "SGLang"
   SERVER_IMAGE: "lmsysorg/sglang:latest"  # Path to server image
-  SERVER_ARGS: ""
+  SERVER_ARGS: """--mem-fraction-for-model-kv-cache 0.9 --tp 8 --trust-remote-code"
   SERVER_PORT: "8000"  # The port the server will listen on
   SERVER_HEALTH_CHECK_ENDPOINT: "health"  # The endpoint to check if the server is ready
   SERVER_ENDPOINT: "v1/chat/completions"  # The endpoint for chat completions
   
   # Model Configuration
-  MODEL_NAME: "meta-llama/Llama-3.2-1B-Instruct"
+  MODEL_NAME: Llama-3.1-70B-Instruct
   MODEL_NAME_CLEANED: "llama-3.2-1b-instruct"  # used in the benchmark result file name
   MODEL_TOKENIZER: "meta-llama/Llama-3.2-1B-Instruct"  # matches the path of the tokenizer on the HF registry
   HF_TOKEN: ""  # Your Hugging Face API token
@@ -37,9 +37,9 @@ environment:
   # Benchmark Parameters
   MIN_REQUESTS: "20"
   USE_CASES: "chat:128/128 chat:4096/512"
-  CONCURRENCY_RANGE: "1 25 50 100"
+  CONCURRENCY_RANGE: "1 50 100 200 400"
   REQUEST_MULTIPLIER: "5"
-  NUM_GPUS: "1"  # Configure the number of GPUs to use (e.g., "1", "2", "4", "8")
+  NUM_GPUS: "8"  # Configure the number of GPUs to use (e.g., "1", "2", "4", "8")
 
   # Results Configuration
   RESULTS_PATH: "/sg-llm-results"  # Directory where benchmark results will be stored
