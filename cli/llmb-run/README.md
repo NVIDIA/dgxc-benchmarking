@@ -38,6 +38,9 @@ llmb-run list
 
 # Run your first job (example)
 llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 256
+
+# Check submitted jobs and results
+llmb-run jobs
 ```
 
 **Note**: llmb-run requires access to `cluster_config.yaml` which is located in your installation directory. Always run llmb-run commands from this directory.
@@ -101,7 +104,7 @@ Workload configuration:
 
 ## Commands
 
-llmb-run's primary interface is the `submit` command, which handles all job submission modes. The `list` command is also available for discovery.
+llmb-run's primary interface is the `submit` command, which handles all job submission modes. Use `list` to discover available workloads and `jobs` to inspect submitted jobs.
 
 ### CLI Structure (Global vs Command Options)
 
@@ -129,34 +132,38 @@ llmb-run submit -v -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 256
 
 ### Submit Command
 
-The `submit` command is a unified interface for all job submissions. It supports three main workflows:
+The `submit` command is a unified interface for all job submissions. It supports these common workflows:
 
 #### Choose a Submit Workflow
 
 Pick the workflow that matches how you want to run:
 
-- **Explicit (single job)**: You provide `--workload`, `--model_size`, `--dtype`, and `--scale`.
-  - Pattern: `llmb-run submit -w <workload> -s <model_size> --dtype <dtype> --scale <scale>`
+- **Single explicit target**: You provide `--workload`, `--model-size`, `--dtype`, and `--scale`.
+  - Pattern: `llmb-run submit -w <workload> -s <model-size> --dtype <dtype> --scale <scale>`
+- **Target-list selection**: You provide comma-separated `--workload` targets and omit `--model-size`.
+  - Pattern: `llmb-run submit -w <workload>_<model-size>,<workload> --dtype <dtype> --scale <scale>`
+- **File-based (batch; special cases)**: You provide an input file and llmb-run submits the jobs listed in it.
+  - Pattern: `llmb-run submit -f <file_path>`
 - **Auto-discovery (submit all / many)**: You provide discovery constraints and llmb-run generates jobs from installed workload metadata.
   - Pattern: `llmb-run submit --max-scale <num_gpus>`
   - Example: `llmb-run submit --max-scale 512` (submits eligible installed workloads up to 512 GPUs; see the section below for additional limiting flags)
-- **File-based (batch; special cases)**: You provide an input file and llmb-run submits the jobs listed in it.
-  - Pattern: `llmb-run submit -f <file_path>`
 
-#### 1. Single Job Submission (Explicit)
+#### 1. Single Explicit Target
 
-Submit a single workload with specific parameters.
+Submit one workload/model-size target with explicit parameters.
 
 ```bash
-llmb-run submit -w <workload> -s <model_size> --dtype <dtype> --scale <scale>
+llmb-run submit -w <workload> -s <model-size> --dtype <dtype> --scale <scale>
 ```
 
 **Required Flags:**
 
-- `-w, --workload`: Name of the workload (e.g., `pretrain_llama3.1`)
-- `-s, --model_size`: Model size (e.g., `405b`, `70b`).
+- `-w, --workload`: Name of the workload (e.g., `pretrain_llama3.1`).
+- `-s, --model-size`: Model size (e.g., `405b`, `70b`).
 - `--dtype`: Data type (e.g., `fp8`, `bf16`).
 - `--scale`: Number of GPUs. Accepts a single value or a comma-separated list.
+
+Use this form when you are running one workload/model-size target. It keeps workload and model size separate, which is usually easiest to read for a first run.
 
 **Examples:**
 
@@ -171,9 +178,33 @@ llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128,256,512
 llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 16 --proxy
 ```
 
-#### 2. File-Based Submission (Batch)
+#### 2. Target-List Selection
 
-Submit multiple jobs defined in a file. This replaces the old `bulk` command.
+Use a comma-separated `-w` list when you want to apply the same dtype and scale choices across multiple workload targets. Use `--scale` for exact scales, or `--min-scale` / `--max-scale` for scale discovery. In this form, `-s` is not used because it is a single global model-size flag.
+
+Each `-w` entry can be either:
+
+- `<workload>_<model-size>` to select one model size for a multi-model-size workload.
+- `<workload>` to select all installed model sizes for that workload. For workloads with only one model size, the suffix is optional.
+
+Normal dtype and scale validation still applies, so llmb-run only generates supported combinations for the selected targets.
+
+**Examples:**
+
+```bash
+# Run one Llama 3.1 model size plus the single-model-size Nemotron-H workload
+llmb-run submit -w pretrain_llama3.1_70b,pretrain_nemotron-h --dtype fp8 --scale 128
+
+# Run all installed Llama 3.1 model sizes plus Nemotron-H
+llmb-run submit -w pretrain_llama3.1,pretrain_nemotron-h --dtype fp8 --min-scale
+
+# Run target-list selection with scale discovery up to 512 GPUs
+llmb-run submit -w pretrain_llama3.1_70b,pretrain_nemotron-h --dtype fp8 --max-scale 512
+```
+
+#### 3. File-Based Submission (Batch)
+
+Submit multiple jobs defined in a file.
 
 ```bash
 llmb-run submit -f <file_path>
@@ -192,9 +223,9 @@ See [Bulk_Examples.md](Bulk_Examples.md) for detailed file format specifications
 llmb-run submit -f my_experiment.yaml
 ```
 
-#### 3. Auto-Discovery (Submit All)
+#### 4. Auto-Discovery (Submit All)
 
-Automatically discover and submit jobs for installed workloads based on metadata. This replaces the old `submit-all` command.
+Automatically discover and submit jobs for installed workloads based on metadata.
 
 ```bash
 llmb-run submit --max-scale <num_gpus>
@@ -204,10 +235,12 @@ llmb-run submit --max-scale <num_gpus>
 
 - `--max-scale`: Run all workloads up to this scale.
 - `--min-scale`: Run only the minimum supported scale for each workload.
-- `--exact-scales`: Only use scales explicitly listed in workload metadata (no power-of-2 expansion beyond metadata max).
-- `-w, --workload`: Limit discovery to specific workloads (comma-separated).
+- `--exact-scales`: Only use scales explicitly listed in workload metadata. Use this with `--max-scale` when you want all officially listed scales up to a limit, without adding larger power-of-2 scales beyond a workload's metadata.
+- `-w, --workload`: Limit discovery to specific base workloads or workload-size targets (comma-separated).
 - `--scale`: specific scales to run (comma-separated).
 - `--proxy`: In auto-discovery, only workloads with `proxy_scales` defined are included.
+
+By default, `--max-scale` may extend a workload beyond its largest metadata-listed scale by adding power-of-2 scales up to the requested maximum. `--exact-scales` disables that expansion. For example, if a Llama 3.1 8B target lists scales up to 128 GPUs in metadata, `--max-scale 512 --exact-scales` will not add 256- or 512-GPU jobs for that target.
 
 **Examples:**
 
@@ -215,7 +248,7 @@ llmb-run submit --max-scale <num_gpus>
 # Run all installed workloads up to 512 GPUs
 llmb-run submit --max-scale 512
 
-# Run up to 512 GPUs but only at metadata-supported scales (avoid scale expansion)
+# Run all installed workloads up to 512 GPUs, but only at metadata-listed scales
 llmb-run submit --max-scale 512 --exact-scales
 
 # Run specific scales for all workloads
@@ -224,12 +257,53 @@ llmb-run submit --scale 128,256
 
 #### Submit Options (All Submit Modes)
 
-These flags apply to all `llmb-run submit` modes (explicit, file-based, and auto-discovery):
+These flags apply to all `llmb-run submit` modes (single explicit target, target-list, file-based, and auto-discovery):
 
 - `-r, --repeats <N>`: Repeat each job N times (default: 1).
 - `-p, --profile`: Enable profiling for all submitted jobs.
+- `--dump-env`: For Megatron-Bridge workloads, write a rank-0 environment snapshot to a separate job log file, similar to running `env` at job start. Common secret-like keys are redacted. This is ignored for other workloads.
 - `--proxy`: Use proxy scales.
 - `--dry-run`: Print the jobs that would be submitted without running them.
+- `--force`: Bypass dtype/scale validation for one explicit task. Use only when you intentionally need to run a configuration outside workload metadata.
+
+#### Slurm Options
+
+These flags control Slurm submission parameters and apply to all `llmb-run submit` modes:
+
+- `--nice <INT>`: Lower the job priority via Slurm nice.
+- `--nodelist <LIST>`: Restrict the job to a specific node list.
+- `--exclude <LIST>`: Exclude specific nodes from the job.
+- `--reservation <NAME>`: Submit the job under a Slurm reservation.
+- `--segment <INT>`: Set the Slurm segment size for the job.
+- `--env <KEY=VALUE>`: Repeatable environment override for the submitted job. Use this when you need a variable treated as an explicit launcher/container override.
+- `--slurm-arg <KEY=VALUE>`: Pass an arbitrary Slurm parameter. Repeatable. Accepts `key=value` pairs or bare flags (e.g., `exclusive`). Do **not** include a leading `--`.
+
+**Examples:**
+
+```bash
+# Lower job priority
+llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 256 --nice 100
+
+# Pin to specific nodes
+llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 256 --nodelist node[001-032]
+
+# Combine multiple Slurm options
+llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 256 \
+  --reservation my-reservation --exclude node099
+
+# Pass explicit job environment overrides
+llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 256 \
+  --env NCCL_DEBUG=INFO --env OTHER_VAR=test
+
+# Pass arbitrary Slurm flags
+llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 256 \
+  --slurm-arg constraint=gpu --slurm-arg exclusive
+```
+
+**Notes:**
+
+- Parameters that have a dedicated flag (`nodelist`, `exclude`, `reservation`, `segment`, `nice`) must use that flag and cannot be passed via `--slurm-arg`.
+- Slurm CLI flags **cannot** be combined with the `ADDITIONAL_SLURM_PARAMS` environment variable (set in the process environment, cluster config, workload config, or task overrides). If both are present, the command will fail with an error.
 
 ### List Command
 
@@ -259,6 +333,38 @@ llmb-run list
 llmb-run list -w pretrain_llama3.1
 ```
 
+### Jobs Command
+
+The jobs command shows the local job history for the current `$LLMB_INSTALL`. History is stored in `$LLMB_INSTALL/.llmb/jobs.sqlite3`.
+
+#### Basic Usage
+
+```bash
+llmb-run jobs
+llmb-run jobs list
+```
+
+Both commands refresh non-terminal Slurm jobs before printing the table.
+
+The jobs table shows workload, dtype, scale, job ID, Slurm status, elapsed time, and available performance results (`s/iter` and `TFLOPS/GPU`). Result columns are populated from supported NeMo 2 and Megatron-Bridge workload logs after a job reaches a terminal Slurm state. A failed or cancelled job can still show results if the log contains enough data.
+
+#### Other Commands
+
+- `llmb-run jobs show <job_id>`: Show details for one job, including its log directory and any parsed results.
+- `llmb-run jobs log <job_id>`: Show the active log for one job.
+- `llmb-run jobs log <job_id> --follow`: Follow the active log.
+- `llmb-run jobs log <job_id> --path`: Print the active log file path.
+- `llmb-run jobs log <job_id> --dir`: Print the job log directory.
+- `llmb-run jobs log <job_id> --list`: List matching retry log files for the job.
+- `llmb-run jobs refresh <job_id> [job_id ...]`: Re-check specific jobs with Slurm and update any results shown in the jobs table.
+- `llmb-run jobs rebuild`: Rebuild history by scanning `$LLMB_INSTALL/workloads/**/llmb-config_*.yaml`.
+
+Use `llmb-run jobs rebuild` once if you want to populate history from jobs that were submitted before the local history database existed. New jobs submitted with `llmb-run submit` are recorded automatically.
+
+`llmb-run jobs log` supports NeMo/Megatron-Bridge workload logs and managed `configured_sbatch` experiment directories. Legacy `sbatch` jobs are tracked when submitted by `llmb-run`, but log paths cannot be resolved reliably and are skipped by `jobs rebuild`.
+
+A `PURGED` status means `sacct` no longer has a record for the job (typically due to cluster accounting retention). It does not mean the job failed — it means llmb-run has lost track of it.
+
 ### Exemplar Command (Cloud Certification)
 
 The exemplar command runs the cloud certification workload suite.
@@ -272,7 +378,7 @@ llmb-run exemplar
 #### Options
 
 - `--dry-run`: Preview all jobs without submitting
-- `-r, --repeats INTEGER`: Number of times to run each job (must be >= 1, default: 3).
+- `-r, --repeats INTEGER`: Number of times to run each job (must be >= 1). If omitted, uses `exemplar.yaml` `config.repeats` with an llmb-run fallback of 1.
 - Profiling: Controlled by exemplar suite config (no CLI profiling flag).
 
 #### Behavior
@@ -284,7 +390,7 @@ llmb-run exemplar
   - The per‑dtype configuration explicitly lists `scale: 512` (implicit ranges are not used).
   - The workload is listed under `workloads.installed` in `cluster_config.yaml`.
 - Enforces strict validation (install gating): if any workload that meets eligibility is not installed, the command fails.
-- Runs 3 repetitions per job by default. When profiling is enabled in exemplar config, the last repeat is profiled and earlier repeats are non-profiled (default: 2 normal + 1 profiled). You can override repeat count for debugging via `-r/--repeats`.
+- Repeat count and profiling are controlled by `exemplar.yaml` `config.repeats` and `config.profile`; when those keys are omitted, llmb-run falls back to 1 repeat with profiling disabled. When profiling is enabled, the last repeat is profiled and earlier repeats are non-profiled. You can override repeat count for debugging via `-r/--repeats`.
 
 #### Troubleshooting Missing Workloads
 
@@ -325,7 +431,7 @@ llmb-run archive --output /shared/results/my-cluster-results.tar.zst
 
 #### What's Included
 
-The archive collects experiment data from `$LLMB_INSTALL/workloads/*/experiments/`, including logs and `llmb-config_*.yaml` metadata files. Profiling data (`.nsys-rep` files) is excluded to keep the archive compact — profiles are typically only needed for debugging and can be shared separately if requested.
+The archive collects experiment data from `$LLMB_INSTALL/workloads/*/experiments/`, including logs and `llmb-config_*.yaml` metadata files. Profiling data, including Nsight reports and PyTorch profiler traces, is excluded to keep the archive compact — profiles are typically only needed for debugging and can be shared separately if requested.
 
 ### Job Configuration Files
 
@@ -386,14 +492,6 @@ job_config:
 ```
 
 See [example_llmb_config.yaml](example_llmb_config.yaml) for a complete example.
-
-### Deprecated Commands
-
-The following commands are deprecated and will be removed in a future release. Please migrate to `llmb-run submit`.
-
-- `single`: Replaced by `llmb-run submit`
-- `bulk`: Replaced by `llmb-run submit -f <file>`
-- `submit-all`: Replaced by `llmb-run submit` (with discovery flags like `--max-scale`)
 
 ## Troubleshooting
 

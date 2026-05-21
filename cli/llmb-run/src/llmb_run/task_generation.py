@@ -22,8 +22,8 @@
 """Unified task generation logic for llmb-run."""
 
 import logging
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from llmb_run.config_manager import ClusterConfig
 from llmb_run.metadata_utils import normalize_model_dtype_config, parse_workload_name
@@ -39,6 +39,9 @@ from llmb_run.workload_validator import (
 )
 
 logger = logging.getLogger('llmb_run.task_generation')
+
+if TYPE_CHECKING:
+    from llmb_run.slurm_args import SlurmArgs
 
 
 class ValidationError(Exception):
@@ -69,7 +72,9 @@ class TaskGenerationRequest:
     profile: bool = False
     proxy: bool = False
     force: bool = False
-    extra_slurm_params: Optional[Dict[str, Any]] = None
+    slurm_args: Optional['SlurmArgs'] = None
+    explicit_env_overrides: dict[str, str] = field(default_factory=dict)
+    extra_workload_args: tuple[str, ...] = ()
 
     def validate(self) -> None:
         """Validate parameter combinations."""
@@ -84,6 +89,8 @@ class TaskGenerationRequest:
 
         # Model size restrictions
         if self.model_size:
+            self.model_size = self.model_size.strip().lower()
+
             if not self.workload:
                 raise ValidationError("--model-size requires --workload")
 
@@ -94,7 +101,7 @@ class TaskGenerationRequest:
                     "To target specific model sizes, append them to the workload name.\n"
                     "Workloads without a suffix will run ALL available sizes.\n\n"
                     "Example:\n"
-                    "  llmb-run submit -w pretrain_llama3.1_70b,pretrain_nemotron-h"
+                    "  llmb-run submit -w pretrain_llama3.1_70b,pretrain_kimi-k2_1t,pretrain_nemotron-h"
                 )
 
             # Strip redundant size suffix from workload name when -s is also provided.
@@ -172,19 +179,19 @@ def generate_tasks(request: TaskGenerationRequest) -> List[WorkloadTask]:
         raise ValueError(str(e)) from e
 
     if request.file_path:
-        return _generate_from_file(request)
-
-    if request.force:
-        return _generate_forced_explicit_task(request)
-
-    if request.model_size:
+        tasks = _generate_from_file(request)
+    elif request.force:
+        tasks = _generate_forced_explicit_task(request)
+    elif request.model_size:
         # Has explicit model size
         # Always use discovery/targeted mode logic which supports metadata-backed
         # generation, implicit dtypes, and various scale specifications.
-        return _generate_explicit_workload_with_scale_discovery(request)
+        tasks = _generate_explicit_workload_with_scale_discovery(request)
     else:
         # Discovery mode: workload names include size
-        return _generate_discovery_tasks(request)
+        tasks = _generate_discovery_tasks(request)
+
+    return _apply_task_generation_modifiers(tasks, request)
 
 
 def parse_comma_list(value: Optional[str]) -> List[str]:
@@ -198,8 +205,8 @@ def parse_comma_list(value: Optional[str]) -> List[str]:
 def _generate_explicit_workload_with_scale_discovery(request: TaskGenerationRequest) -> List[WorkloadTask]:
     """Generate tasks for explicit workload with scale discovery.
 
-    Example: llmb-run submit -w pretrain_nemotron4 -s 340b -d fp8 --max-scale 512
-    Generates: nemotron4_340b at all supported scales up to 512
+    Example: llmb-run submit -w pretrain_kimi-k2 -s 1t -d fp8 --max-scale 512
+    Generates: pretrain_kimi-k2_1t at all supported scales up to 512
     """
     workload_key = request.workload
     model_size = request.model_size
@@ -217,7 +224,7 @@ def _generate_explicit_workload_with_scale_discovery(request: TaskGenerationRequ
     else:
         specific_scales = None
 
-    return generate_submit_all_tasks(
+    tasks = generate_submit_all_tasks(
         request.workloads,
         request.cluster_config,
         request.max_scale,
@@ -228,9 +235,10 @@ def _generate_explicit_workload_with_scale_discovery(request: TaskGenerationRequ
         dtype_filter=dtype_filter,
         workload_filter=workload_filter,
         specific_scales=specific_scales,
-        extra_slurm_params=request.extra_slurm_params,
+        slurm_args=request.slurm_args,
         proxy=request.proxy,
     )
+    return tasks
 
 
 def _generate_discovery_tasks(request: TaskGenerationRequest) -> List[WorkloadTask]:
@@ -247,7 +255,7 @@ def _generate_discovery_tasks(request: TaskGenerationRequest) -> List[WorkloadTa
     else:
         specific_scales = None
 
-    return generate_submit_all_tasks(
+    tasks = generate_submit_all_tasks(
         request.workloads,
         request.cluster_config,
         request.max_scale,
@@ -258,9 +266,10 @@ def _generate_discovery_tasks(request: TaskGenerationRequest) -> List[WorkloadTa
         dtype_filter=dtype_filter,
         workload_filter=workload_filter,
         specific_scales=specific_scales,
-        extra_slurm_params=request.extra_slurm_params,
+        slurm_args=request.slurm_args,
         proxy=request.proxy,
     )
+    return tasks
 
 
 def _generate_from_file(request: TaskGenerationRequest) -> List[WorkloadTask]:
@@ -273,10 +282,9 @@ def _generate_from_file(request: TaskGenerationRequest) -> List[WorkloadTask]:
     else:
         tasks = gen_tasks(tasks_parsed)
 
-    # Propagate extra_slurm_params to all generated tasks
-    if request.extra_slurm_params:
+    if request.slurm_args:
         for task in tasks:
-            task.extra_slurm_params = request.extra_slurm_params
+            task.slurm_args = request.slurm_args
 
     return tasks
 
@@ -287,7 +295,7 @@ def _generate_forced_explicit_task(request: TaskGenerationRequest) -> List[Workl
         workload_key = parse_comma_list(request.workload)[0]
         model_size = parse_comma_list(request.model_size)[0]
     else:
-        # Resolve from workload_size name (e.g., "pretrain_foo_7b" -> "pretrain_foo", "7b")
+        # Resolve from workload_size name (e.g., "pretrain_foo_1t" -> "pretrain_foo", "1t")
         workload_key, model_size = parse_workload_name(parse_comma_list(request.workload)[0])
     dtype = parse_comma_list(request.dtype)[0]
 
@@ -318,7 +326,7 @@ def _generate_forced_explicit_task(request: TaskGenerationRequest) -> List[Workl
             )
         )
 
-    return [
+    tasks = [
         WorkloadTask(
             workload_key=workload_key,
             model_size=model_size,
@@ -326,10 +334,41 @@ def _generate_forced_explicit_task(request: TaskGenerationRequest) -> List[Workl
             scale=scale,
             profile=request.profile,
             proxy=request.proxy,
-            extra_slurm_params=request.extra_slurm_params or {},
+            slurm_args=request.slurm_args,
         )
         for _ in range(request.repeats)
     ]
+    return tasks
+
+
+def _apply_task_generation_modifiers(tasks: List[WorkloadTask], request: TaskGenerationRequest) -> List[WorkloadTask]:
+    """Apply request-level modifiers to generated tasks."""
+    tasks = _apply_explicit_env_overrides(tasks, request.explicit_env_overrides)
+    tasks = _apply_extra_workload_args(tasks, request.extra_workload_args)
+    return tasks
+
+
+def _apply_explicit_env_overrides(tasks: List[WorkloadTask], overrides: dict[str, str]) -> List[WorkloadTask]:
+    """Apply explicit CLI env vars to generated tasks."""
+    if not overrides:
+        return tasks
+
+    for task in tasks:
+        task.env_overrides = {**task.env_overrides, **overrides}
+        task.explicit_env_overrides = {**task.explicit_env_overrides, **overrides}
+
+    return tasks
+
+
+def _apply_extra_workload_args(tasks: List[WorkloadTask], args: tuple[str, ...]) -> List[WorkloadTask]:
+    """Apply request-level extra workload args to generated tasks."""
+    if not args:
+        return tasks
+
+    for task in tasks:
+        task.extra_workload_args = (*task.extra_workload_args, *args)
+
+    return tasks
 
 
 def generate_submit_all_tasks(
@@ -343,7 +382,7 @@ def generate_submit_all_tasks(
     dtype_filter=None,
     workload_filter=None,
     specific_scales=None,
-    extra_slurm_params: Optional[Dict[str, Any]] = None,
+    slurm_args: Optional['SlurmArgs'] = None,
     proxy=False,
 ):
     """Generate tasks for all installed workloads up to max_scale.
@@ -363,7 +402,7 @@ def generate_submit_all_tasks(
         dtype_filter: List of dtypes to filter by, or None for all (default: None)
         workload_filter: List of workloads to filter by, or None for all (default: None)
         specific_scales: List of specific scales to run, or None to use max_scale/min_scale logic (default: None)
-        extra_slurm_params: Optional dictionary of extra Slurm parameters to apply to jobs.
+        slurm_args: Optional canonical Slurm submit args to apply to jobs.
         proxy: If True, use proxy_scales instead of production scales (default: False)
 
     Returns:
@@ -402,10 +441,9 @@ def generate_submit_all_tasks(
 
         # Apply workload filter if specified
         if workload_filter:
-            # Check if workload_key matches any filter (either exact match or filter starts with workload_key)
+            # Match a base workload filter or a model-size-specific filter for the same workload.
             workload_matches = False
             for filter_item in workload_filter:
-                # Exact match or filter starts with workload (e.g., pretrain_nemotron matches pretrain_nemotron_340b)
                 if workload_key == filter_item or filter_item.startswith(workload_key + '_'):
                     workload_matches = True
                     break
@@ -436,7 +474,7 @@ def generate_submit_all_tasks(
             dtype_filter=dtype_filter,
             workload_filter=workload_filter,
             specific_scales=specific_scales,
-            extra_slurm_params=extra_slurm_params,
+            slurm_args=slurm_args,
             proxy=proxy,
         )
 
@@ -457,7 +495,7 @@ def _generate_workload_tasks(
     dtype_filter=None,
     workload_filter=None,
     specific_scales=None,
-    extra_slurm_params: Optional[Dict[str, Any]] = None,
+    slurm_args: Optional['SlurmArgs'] = None,
     proxy=False,
 ):
     """Generate tasks for a single workload and add them to task_list.
@@ -475,7 +513,7 @@ def _generate_workload_tasks(
         dtype_filter: List of dtypes to filter by, or None for all (default: None)
         workload_filter: List of workload filters, may include workload_modelsize (default: None)
         specific_scales: List of specific scales to run, or None to use max_scale/min_scale logic (default: None)
-        extra_slurm_params: Optional dictionary of extra Slurm parameters to apply to jobs.
+        slurm_args: Optional canonical Slurm submit args to apply to jobs.
         proxy: If True, use proxy_scales instead of production scales (default: False)
     """
     metadata = workload_data['metadata']
@@ -611,7 +649,7 @@ def _generate_workload_tasks(
                             scale=scale,
                             profile=profile,
                             proxy=proxy,
-                            extra_slurm_params=extra_slurm_params or {},
+                            slurm_args=slurm_args,
                         )
                     )
 

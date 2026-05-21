@@ -1,14 +1,13 @@
 # Bulk Job Submission Examples
 
 Note: Bulk mode is now accessed via `llmb-run submit -f <file>`.
-The standalone `bulk` command is deprecated but still works.
 
 ## YAML Header Format
 
 **Required format:** `workload_key_modelsize:`
 
 The header must include both the workload name and model size, separated by an underscore.
-The model size must end with `b` (for billion parameters).
+The model size must end with `b` (billions of parameters) or `t` (trillions of parameters).
 
 ### Valid Examples
 
@@ -19,7 +18,10 @@ pretrain_llama3.1_70b:      # Workload with decimal version
 pretrain_nemotron-h_56b:    # Workload with hyphen
   tasks: [...]
 
-pretrain_grok1_314b:        # Large model
+pretrain_deepseek-v3_671b:  # Large model
+  tasks: [...]
+
+pretrain_kimi-k2_1t:        # Trillion-parameter model
   tasks: [...]
 ```
 
@@ -29,7 +31,7 @@ pretrain_grok1_314b:        # Large model
 pretrain_nemotron-h:        # ❌ Missing model size
   tasks: [...]
 
-pretrain_llama_7x:          # ❌ Invalid format (must end with 'b')
+pretrain_llama_7x:          # ❌ Invalid format (must end with 'b' or 't')
   tasks: [...]
 ```
 
@@ -39,7 +41,7 @@ ______________________________________________________________________
 
 ## Job Specification Formats
 
-There are two supported file formats for bulk job submission:
+There are two supported file formats for file-based bulk job submission:
 
 1. **YAML Format** (.yaml) - **Recommended**. Supports all features including environment variables and overrides.
 2. **Text Format** (.txt) - **Legacy**. Supports basic configurations (workload, model size, dtype, scale, repeats).
@@ -78,10 +80,10 @@ pretrain_llama3.1_70b:
 ### With Proxy Configuration
 
 ```yaml
-pretrain_nemotron4_340b:
+pretrain_deepseek-v3_671b:
   tasks:
     - dtypes: 'bf16'
-      scales: [16]
+      scales: [64]
       repeats: 1
       proxy: true    # Altered configuration for debug workflows
 ```
@@ -91,17 +93,17 @@ pretrain_nemotron4_340b:
 ### With Environment Variables
 
 ```yaml
-pretrain_grok1_314b:
+pretrain_qwen3_235b:
   defaults:
     env:
       DEBUG: true
   tasks:
-    - dtypes: 'fp8'
-      scales: [128, 256]
+    - dtypes: 'bf16'
+      scales: [256, 512]
       repeats: 3
 ```
 
-**Explanation**: This example sets global environment variables for all jobs. The workload will run with fp8 precision at two scales, with each configuration repeated 3 times. The environment variables will be applied to all 6 jobs.
+**Explanation**: This example sets global environment variables for all jobs. The workload will run with bf16 precision at two scales, with each configuration repeated 3 times. The environment variables will be applied to all 6 jobs.
 
 ### Complex Configuration (Overrides & Profiling)
 
@@ -145,10 +147,10 @@ pretrain_llama3.1_405b:
       scales: [256, 512]
       repeats: 3
 
-pretrain_grok1_314b:
+pretrain_qwen3_235b:
   tasks:
-    - dtypes: 'fp8'
-      scales: [128, 256]
+    - dtypes: 'bf16'
+      scales: [256, 512]
       repeats: 2
 ```
 
@@ -170,10 +172,10 @@ pretrain_llama3.1_405b:
 ### Mixed Text Example
 
 ```
-pretrain_nemotron4_340b:
-(['bf16','fp8'], [128, 256], 2)
+pretrain_qwen3_235b:
+('bf16', [256, 512], 2)
 # True enables profiling
-('fp8', [512], 1, True)
+('bf16', [512], 1, True)
 ```
 
 **Note**: The example above shows the correct way to add comments - on their own lines. Inline comments like `('fp8', [512], 1, True)  # comment` will cause parsing errors.

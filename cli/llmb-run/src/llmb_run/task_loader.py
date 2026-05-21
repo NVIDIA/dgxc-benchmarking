@@ -29,6 +29,7 @@ import re
 import yaml
 
 from llmb_run.config_manager import ClusterConfig
+from llmb_run.env_args import validate_env_key, validate_shell_safe_env_value
 from llmb_run.metadata_utils import parse_workload_name
 from llmb_run.tasks import WorkloadTask
 from llmb_run.workload_validator import (
@@ -57,10 +58,10 @@ def get_tasks_simple(workloads, input_file, cluster_config: ClusterConfig | None
     (dtype_list, scale_list, repeats, profile=False)
 
     Example:
-    pretraining_grok1_314b:
-    (['fp8', 'bf16'], [128, 256], 3)
+    pretrain_llama3.1_70b:
+    ('bf16', [128, 256], 3)
     # With profiling enabled
-    ('fp8', [128, 256, 512], 1, True)
+    ('bf16', [512], 1, True)
 
     Note: Inline trailing comments on task lines are not supported.
     Put comments on their own lines instead.
@@ -181,8 +182,9 @@ def get_tasks_yaml(input_file, workloads=None, cluster_config: ClusterConfig | N
                 f"  Examples:\n"
                 f"    • pretrain_llama3.1_70b:\n"
                 f"    • pretrain_nemotron-h_56b:\n"
+                f"    • pretrain_kimi-k2_1t:\n"
                 f"\n"
-                f"Model size must match pattern: _<digits>b or _<digits>.<digits>b\n"
+                f"Model size must match pattern: _<digits>(b|t) or _<digits>.<digits>(b|t)\n"
                 f"\n"
                 f"To see available workloads:\n"
                 f"  llmb-run list"
@@ -229,6 +231,14 @@ def get_tasks_yaml(input_file, workloads=None, cluster_config: ClusterConfig | N
 
             # Env Overrides
             task_env = merge_dicts(default_env, overrides.get("env", {}))
+            normalized_task_env = {}
+            for _env_key, _env_value in task_env.items():
+                env_key = validate_env_key(_env_key, source='YAML env')
+                if env_key in normalized_task_env:
+                    raise ValueError(f"Duplicate YAML env variable '{env_key}' was specified more than once.")
+                validate_shell_safe_env_value(env_key, str(_env_value))
+                normalized_task_env[env_key] = _env_value
+            task_env = normalized_task_env
 
             # Model Specific Overrides
             param_overrides = overrides.get("params", {})
@@ -324,7 +334,15 @@ def flatten_yaml_tasks(advanced_tasks):
                 w, m, dt, scale, profile, proxy, env_overrides, model_overrides = t
                 task_list.append(
                     WorkloadTask(
-                        w, m, dt, scale, profile, proxy, env_overrides=env_overrides, model_overrides=model_overrides
+                        w,
+                        m,
+                        dt,
+                        scale,
+                        profile,
+                        proxy,
+                        env_overrides=env_overrides,
+                        explicit_env_overrides=env_overrides,
+                        model_overrides=model_overrides,
                     )
                 )
     return task_list

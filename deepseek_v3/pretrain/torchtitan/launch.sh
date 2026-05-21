@@ -118,30 +118,6 @@ export DATASET_PATH=${DATASET_PATH:-$LLMB_INSTALL/datasets/c4}
 export SEQ_LEN=${SEQ_LEN:-4096}
 export TRAINING_STEPS=${TRAINING_STEPS:-60}
 
-# Handle additional SLURM parameters from environment variable
-ADDITIONAL_SLURM_PARAMS=${ADDITIONAL_SLURM_PARAMS:-""}
-ADDITIONAL_SRUN_ARGS=""
-if [ -n "$ADDITIONAL_SLURM_PARAMS" ]; then
-    # Parse semicolon-separated params: key=value pairs or standalone flags
-    IFS=';' read -ra PARAMS <<< "$ADDITIONAL_SLURM_PARAMS"
-    for param in "${PARAMS[@]}"; do
-        param=$(echo "$param" | xargs) # Trim whitespace
-        if [ -n "$param" ]; then
-            if [[ $param == *"="* ]]; then
-                # Key=value pair
-                key=$(echo "$param" | cut -d'=' -f1 | xargs)
-                value=$(echo "$param" | cut -d'=' -f2- | xargs)
-                if [ -n "$key" ] && [ -n "$value" ]; then
-                    ADDITIONAL_SRUN_ARGS+=" --${key}=${value}"
-                fi
-            else
-                # Standalone flag (no value)
-                ADDITIONAL_SRUN_ARGS+=" --${param}"
-            fi
-        fi
-    done
-fi
-
 CONTAINER_MOUNTS="$TORCHTITAN_HOME:$TORCHTITAN_HOME:rw,$SLURM_LOG_DIR:$SLURM_LOG_DIR:rw,$LLMB_OUTPUT_DIR:$LLMB_OUTPUT_DIR:rw,$LLMB_REPO:$LLMB_REPO:ro,$DATASET_PATH:$DATASET_PATH:ro"
 if [[ -n ${RUN_CONF_MOUNTS:-} ]]; then
     CONTAINER_MOUNTS+=",${RUN_CONF_MOUNTS}"
@@ -171,6 +147,11 @@ fi
 MXFP8_TRAIN_ARGS=""
 if [[ $DTYPE == "fp8" ]]; then
     MXFP8_TRAIN_ARGS="--model.converters=quantize.linear.mx,quantize.grouped_mm.mx --quantize.linear.mx.recipe_name=mxfp8_cublas --quantize.grouped_mm.mx.fqns=experts --quantize.grouped_mm.mx.recipe_name=mxfp8 "
+fi
+
+CONTAINER_ENV_KEYS="LOG_RANK"
+if [[ -n ${LLMB_CONTAINER_ENV:-} ]]; then
+    CONTAINER_ENV_KEYS+=",${LLMB_CONTAINER_ENV}"
 fi
 
 TRAIN_CMD="\
@@ -203,9 +184,8 @@ $PROFILE_ARGS"
 srun --container-image="$IMAGE" \
     --container-name=deepseek-v3-torchtitan \
     --container-mounts="$CONTAINER_MOUNTS" \
-    --container-env="LOG_RANK" \
+    --container-env="$CONTAINER_ENV_KEYS" \
     --output "$SLURM_LOG_DIR/log-torchtitan_${MODEL_NAME}_${JOB_TOTAL_GPUS}gpus_%j_${SLURM_RESTART_COUNT:-0}.out" \
     --no-container-mount-home \
     --container-writable \
-    $ADDITIONAL_SRUN_ARGS \
     bash -c "$TRAIN_CMD"

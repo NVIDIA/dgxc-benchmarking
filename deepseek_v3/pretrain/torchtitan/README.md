@@ -125,31 +125,33 @@ llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype fp8 --scale 256
 
 ### Additional SLURM Parameters
 
-Use a SLURM reservation:
+For `llmb-run submit`, use the built-in Slurm flags. This workload uses the `configured_sbatch` launcher, so these flags are applied to the outer `sbatch` submission.
+
+Use a Slurm reservation:
 
 ```bash
-ADDITIONAL_SLURM_PARAMS="reservation=my_reservation" llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype bf16 --scale 256
+llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype bf16 --scale 256 --reservation my_reservation
 ```
 
 Run on specific nodes:
 
 ```bash
-ADDITIONAL_SLURM_PARAMS="nodelist=node001,node002" llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype bf16 --scale 256
+llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype bf16 --scale 256 --nodelist node001,node002
 ```
 
 Exclude specific nodes:
 
 ```bash
-ADDITIONAL_SLURM_PARAMS="exclude=node003,node004" llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype bf16 --scale 256
+llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype bf16 --scale 256 --exclude node003,node004
 ```
 
-Combine multiple parameters (semicolon-separated):
+Combine multiple parameters:
 
 ```bash
-ADDITIONAL_SLURM_PARAMS="nodelist=node001,node002;reservation=my_reservation;exclusive" llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype bf16 --scale 256
+llmb-run submit -w pretrain_deepseek-v3-torchtitan --dtype bf16 --scale 256 --nodelist node001,node002 --reservation my_reservation --slurm-arg exclusive
 ```
 
-For more details on llmb-run usage, see the [llmb-run documentation](../../../cli/llmb-run/README.md).
+For more details on `llmb-run` usage, see the [llmb-run documentation](../../../cli/llmb-run/README.md).
 
 Most environment-variable overrides documented below can also be passed through `llmb-run` by prefixing them on the submit command. For example:
 
@@ -197,8 +199,8 @@ TRAINING_STEPS=5000 LOCAL_BATCH_SIZE=8 llmb-run submit -w pretrain_deepseek-v3-t
 - `EP_COMM_BACKEND`: Expert parallel communication backend (default: `deepep` for H100/B200, `hybridep` for GB200)
 - `RUN_CONF_IMAGE`: Override container image path
 - `RUN_CONF_MOUNTS`: Additional container mounts
-- `ADDITIONAL_SLURM_PARAMS`: Extra `srun` flags (for example `nodelist=...`, `reservation=...`, `exclusive`), semicolon-separated
-  - Example: `"nodelist=node001,node002;reservation=my_reservation;exclusive"`
+
+To control the batch allocation in the direct method, pass flags directly to `sbatch` or use the corresponding `SBATCH_*` environment variables.
 
 ## Running the Launch Script
 
@@ -206,6 +208,12 @@ TRAINING_STEPS=5000 LOCAL_BATCH_SIZE=8 llmb-run submit -w pretrain_deepseek-v3-t
 
 ```bash
 GPU_TYPE=<type> JOB_TOTAL_GPUS=<number> sbatch launch.sh
+```
+
+For example, to use a reservation with the direct method:
+
+```bash
+GPU_TYPE=<type> JOB_TOTAL_GPUS=<number> sbatch --reservation=my_reservation launch.sh
 ```
 
 ### Example Commands

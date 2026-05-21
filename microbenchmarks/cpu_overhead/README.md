@@ -65,8 +65,8 @@ Results for the workload are stored at `$LLMB_INSTALL/workloads/microbenchmark_c
 You should expect to see separate logs for each use case:
 
 ```
-├── <use_case>_overhead_%j.err  # Error logs
-├── <use_case>_overhead_%j.out  # Benchmarking output
+├── <use_case>_overhead_%N_%j.err  # Error logs
+├── <use_case>_overhead_%N_%j.out  # Benchmarking output
 ```
 
 The `*.out` file provides key performance metrics:

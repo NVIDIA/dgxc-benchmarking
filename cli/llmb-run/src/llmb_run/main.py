@@ -21,18 +21,32 @@
 
 import logging
 import os
+import pathlib
 import sys
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as package_version
 from typing import Annotated, Optional
 
 import typer
+import yaml
 
 from llmb_run.archive import run_archive
 from llmb_run.config_manager import ClusterConfig, get_cluster_config
+from llmb_run.env_args import parse_cli_env_args
 from llmb_run.exemplar import generate_exemplar_tasks
+from llmb_run.job_history import (
+    format_job_details,
+    format_jobs_table,
+    get_job,
+    list_jobs,
+    rebuild_history,
+    refresh_non_terminal_jobs,
+    refresh_requested_jobs,
+)
 from llmb_run.job_launcher import run_tests
+from llmb_run.job_logs import active_job_log, find_configured_sbatch_logs, find_job_logs, follow_tail, read_tail
 from llmb_run.metadata_utils import parse_workload_name
+from llmb_run.slurm_args import build_cli_slurm_args, validate_no_additional_slurm_params_conflict
 from llmb_run.task_generation import TaskGenerationRequest, ValidationError, generate_tasks
 from llmb_run.tasks import (
     format_task_output,
@@ -88,6 +102,13 @@ app = typer.Typer(
     add_completion=True,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
+jobs_app = typer.Typer(
+    help='View llmb-run job history and logs.',
+    no_args_is_help=False,
+    invoke_without_command=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
+app.add_typer(jobs_app, name="jobs")
 
 
 class AppContext:
@@ -99,6 +120,31 @@ class AppContext:
         self.verbose = False
 
 
+def _get_recipe_version() -> Optional[tuple[str, str]]:
+    """Return (recipe_version, abs_repo_path) if discoverable, else None.
+
+    Lightweight: never raises, never logs. Uses the same cluster_config.yaml
+    resolution as the launcher (CWD takes precedence over $LLMB_INSTALL).
+    """
+    try:
+        candidates = [pathlib.Path.cwd() / 'cluster_config.yaml']
+        if install := os.environ.get('LLMB_INSTALL'):
+            candidates.append(pathlib.Path(install) / 'cluster_config.yaml')
+        cfg_path = next((p for p in candidates if p.exists()), None)
+        if cfg_path is None:
+            return None
+        cfg = yaml.safe_load(cfg_path.read_text()) or {}
+        repo = cfg.get('llmb_repo') or (cfg.get('launcher') or {}).get('llmb_repo')
+        if not repo:
+            return None
+        release_data = yaml.safe_load((pathlib.Path(repo) / 'release.yaml').read_text()) or {}
+        if version := release_data.get('llmb_version'):
+            return str(version), str(pathlib.Path(repo).resolve())
+        return None
+    except Exception:
+        return None
+
+
 def version_callback(value: bool):
     if value:
         try:
@@ -106,6 +152,10 @@ def version_callback(value: bool):
         except PackageNotFoundError:
             version = "unknown"
         typer.echo(f"llmb-run {version}")
+        recipe = _get_recipe_version()
+        if recipe is not None:
+            recipe_version, repo_path = recipe
+            typer.echo(f"Recipe Version {recipe_version} ({repo_path})")
         raise typer.Exit()
 
 
@@ -149,6 +199,11 @@ def main_callback(
         logger.error(f"Configuration error: {e}")
         raise typer.Exit(code=EXIT_VALIDATION_ERROR) from e
 
+    # Archive and most jobs history commands only require cluster config.
+    # `jobs rebuild` loads workload metadata in its command handler.
+    if ctx.invoked_subcommand in {'archive', 'jobs'}:
+        return
+
     # Best-effort gsw-common image freshness check
     try:
         from llmb_run.internal.image_updater import check_gsw_common_update
@@ -158,10 +213,6 @@ def main_callback(
         pass
     except Exception as e:
         logger.debug(f"gsw-common update check skipped: {e}")
-
-    # Archive only requires cluster config; skip workload metadata loading.
-    if ctx.invoked_subcommand == 'archive':
-        return
 
     # Load workloads
     try:
@@ -252,7 +303,7 @@ def report_validation_results(validated_tasks, error_summary, task_list, cluster
         error_summary: Dictionary of validation errors
         task_list: Original list of all tasks
         cluster_config: Cluster configuration
-        mode_name: Name of the mode for error messages (e.g., "bulk", "submit-all")
+        mode_name: Name of the mode for error messages (e.g., "submit", "exemplar")
     """
     cluster_gpu_type = cluster_config.gpu_type
 
@@ -297,11 +348,191 @@ def report_validation_results(validated_tasks, error_summary, task_list, cluster
         logger.debug(f"✅ All {len(task_list)} tasks validated successfully.")
 
 
+def _ctx_app_context(ctx: typer.Context) -> AppContext:
+    current = ctx
+    while current is not None:
+        if isinstance(current.obj, AppContext):
+            return current.obj
+        current = current.parent
+    raise RuntimeError("Missing llmb-run application context.")
+
+
+def _jobs_list_impl(ctx: typer.Context) -> None:
+    app_ctx = _ctx_app_context(ctx)
+    _, refresh_error = refresh_non_terminal_jobs(app_ctx.cluster_config)
+    rows = list_jobs(app_ctx.cluster_config)
+    typer.echo(format_jobs_table(rows))
+    if refresh_error:
+        # Print after the table so users notice it even when the table scrolls.
+        logger.warning(f"sacct unavailable; status may be stale ({refresh_error}).")
+
+
+def _get_job_or_exit(app_ctx: AppContext, job_id: int):
+    row = get_job(app_ctx.cluster_config, job_id)
+    if row is None:
+        logger.error(f"Job {job_id} was not found in llmb-run history.")
+        raise typer.Exit(code=EXIT_VALIDATION_ERROR)
+    return row
+
+
+@jobs_app.callback()
+def jobs_callback(ctx: typer.Context):
+    """View llmb-run job history."""
+    if ctx.invoked_subcommand is None:
+        _jobs_list_impl(ctx)
+
+
+@jobs_app.command(name="list")
+def jobs_list(ctx: typer.Context):
+    """List known jobs and refresh non-terminal Slurm states."""
+    _jobs_list_impl(ctx)
+
+
+@jobs_app.command(name="show")
+def jobs_show(ctx: typer.Context, job_id: Annotated[int, typer.Argument(help='Slurm job ID to show.')]):
+    """Show details for a single job, including its log directory."""
+    app_ctx = _ctx_app_context(ctx)
+    _, refresh_error = refresh_non_terminal_jobs(app_ctx.cluster_config)
+    row = _get_job_or_exit(app_ctx, job_id)
+    typer.echo(format_job_details(row))
+    if refresh_error:
+        logger.warning(f"sacct unavailable; status may be stale ({refresh_error}).")
+
+
+@jobs_app.command(name="log")
+def jobs_log(
+    ctx: typer.Context,
+    job_id: Annotated[int, typer.Argument(help='Slurm job ID to inspect.')],
+    tail_lines: Annotated[int, typer.Option('--tail', min=1, help='Number of lines to show.')] = 200,
+    follow: Annotated[
+        bool, typer.Option('-f', '--follow', help='Follow the active log file after printing the initial tail.')
+    ] = False,
+    print_path: Annotated[bool, typer.Option('--path', help='Print the active log file path only.')] = False,
+    print_dir: Annotated[bool, typer.Option('--dir', help='Print the job log directory only.')] = False,
+    list_files: Annotated[bool, typer.Option('--list', help='List all matching retry log files for the job.')] = False,
+):
+    """Show or follow the active log for a single job."""
+    app_ctx = _ctx_app_context(ctx)
+    row = _get_job_or_exit(app_ctx, job_id)
+    launcher_type = row["launcher_type"]
+    if launcher_type == 'sbatch':
+        logger.error(f"Job {job_id} uses legacy sbatch logging, which llmb-run cannot resolve reliably.")
+        raise typer.Exit(code=EXIT_VALIDATION_ERROR)
+
+    log_dir = row["log_dir"]
+    if not log_dir:
+        logger.error(f"Job {job_id} does not have a log directory recorded. Run `llmb-run jobs rebuild` to rescan.")
+        raise typer.Exit(code=EXIT_VALIDATION_ERROR)
+
+    selected_modes = sum(bool(value) for value in (print_path, print_dir, list_files))
+    if selected_modes > 1:
+        logger.error("Use only one of --path, --dir, or --list.")
+        raise typer.Exit(code=EXIT_VALIDATION_ERROR)
+    if follow and selected_modes:
+        logger.error("--follow can only be used when printing log contents.")
+        raise typer.Exit(code=EXIT_VALIDATION_ERROR)
+
+    if print_dir:
+        typer.echo(log_dir)
+        return
+
+    try:
+        if launcher_type in {'nemo', 'megatron_bridge'}:
+            logs = find_job_logs(log_dir, job_id)
+        elif launcher_type == 'configured_sbatch':
+            logs = find_configured_sbatch_logs(log_dir, job_id)
+        else:
+            logger.error(f"Job {job_id} has unsupported launcher type '{launcher_type}'.")
+            raise typer.Exit(code=EXIT_VALIDATION_ERROR)
+    except FileNotFoundError as e:
+        logger.error(str(e))
+        raise typer.Exit(code=EXIT_VALIDATION_ERROR) from e
+
+    active_log = active_job_log(logs)
+    if list_files:
+        if not logs:
+            logger.info(f"No log files found for job {job_id} in {log_dir}.")
+            return
+        for log_file in logs:
+            suffix = " (active)" if log_file == active_log else ""
+            label = str(log_file.retry) if log_file.retry is not None else "slurm"
+            typer.echo(f"{label}: {log_file.path}{suffix}")
+        return
+
+    if active_log is None:
+        logger.error(f"No log file found for job {job_id} in {log_dir}.")
+        raise typer.Exit(code=EXIT_VALIDATION_ERROR)
+
+    if print_path:
+        typer.echo(active_log.path)
+        return
+
+    try:
+        if follow:
+            raise typer.Exit(code=follow_tail(active_log.path, tail_lines))
+        tail_output = read_tail(active_log.path, tail_lines)
+    except ValueError as e:
+        logger.error(str(e))
+        raise typer.Exit(code=EXIT_VALIDATION_ERROR) from e
+    except OSError as e:
+        logger.error(f"Unable to read log file {active_log.path}: {e}")
+        raise typer.Exit(code=EXIT_SYSTEM_ERROR) from e
+
+    if tail_output:
+        typer.echo(tail_output)
+
+
+@jobs_app.command(name="refresh")
+def jobs_refresh(
+    ctx: typer.Context,
+    job_ids: Annotated[list[int], typer.Argument(help='Slurm job ID(s) to force refresh.')],
+):
+    """Force-refresh one or more job records."""
+    app_ctx = _ctx_app_context(ctx)
+    requested_job_ids = sorted({int(job_id) for job_id in job_ids})
+    missing_job_ids = [job_id for job_id in requested_job_ids if get_job(app_ctx.cluster_config, job_id) is None]
+    if missing_job_ids:
+        ids = ", ".join(str(job_id) for job_id in missing_job_ids)
+        logger.error(f"Job ID(s) not found in llmb-run history: {ids}.")
+        raise typer.Exit(code=EXIT_VALIDATION_ERROR)
+
+    refreshed, refresh_error = refresh_requested_jobs(app_ctx.cluster_config, requested_job_ids)
+    if refresh_error:
+        logger.error(f"sacct unavailable: {refresh_error}.")
+        raise typer.Exit(code=EXIT_SYSTEM_ERROR)
+    logger.info(f"Refreshed {refreshed} job status records.")
+
+
+@jobs_app.command(name="rebuild")
+def jobs_rebuild(ctx: typer.Context):
+    """Rebuild job history by scanning llmb-config files under $LLMB_INSTALL."""
+    app_ctx = _ctx_app_context(ctx)
+    try:
+        workloads = get_workloads(app_ctx.cluster_config)
+    except Exception as e:
+        logger.error(f"Failed to load workloads: {e}")
+        raise typer.Exit(code=EXIT_SYSTEM_ERROR) from e
+
+    stats = rebuild_history(app_ctx.cluster_config, workloads)
+    logger.info(f"Job history database: {stats.db_path}")
+    logger.info(f"Scanned {stats.scanned} llmb-config files; imported {stats.imported}, skipped {stats.skipped}.")
+    if stats.refresh_error:
+        logger.warning(f"sacct unavailable; refreshed statuses may be stale ({stats.refresh_error}).")
+
+
 def _submit_impl(ctx: typer.Context, request: TaskGenerationRequest, dryrun: bool, mode_name: str = "submit"):
     """Shared implementation for all submission commands."""
     app_ctx: AppContext = ctx.obj
 
     try:
+        # Early check: fail fast if CLI slurm flags conflict with env/cluster-level
+        # ADDITIONAL_SLURM_PARAMS. Per-workload/task checks remain in the launcher.
+        if request.slurm_args:
+            validate_no_additional_slurm_params_conflict(
+                cli_args=request.slurm_args,
+                cluster_environment=app_ctx.cluster_config.environment,
+            )
+
         # Generate tasks
         task_list = generate_tasks(request)
 
@@ -324,6 +555,16 @@ def _submit_impl(ctx: typer.Context, request: TaskGenerationRequest, dryrun: boo
 
             # Report results
             report_validation_results(validated_tasks, error_summary, task_list, app_ctx.cluster_config, mode_name)
+
+        if request.slurm_args:
+            for task in validated_tasks:
+                workload_environment = app_ctx.cluster_config.workload_config(task.workload_key).get("environment", {})
+                validate_no_additional_slurm_params_conflict(
+                    cli_args=request.slurm_args,
+                    cluster_environment=app_ctx.cluster_config.environment,
+                    workload_environment=workload_environment,
+                    task_environment=task.env_overrides,
+                )
 
         # Print the concrete jobs we’re about to submit (kept concise; launcher output follows).
         logger.info(f"Jobs ({len(validated_tasks)}):")
@@ -357,7 +598,7 @@ def submit(
         typer.Option(
             '-s',
             '--model-size',
-            help='Size of the model (e.g., 7b, 13b). Requires explicit single workload via -w.',
+            help='Size of the model (e.g., 7b, 13b, 1t). Requires explicit single workload via -w.',
         ),
     ] = None,
     dtype: Annotated[
@@ -389,6 +630,13 @@ def submit(
     ] = None,
     repeats: Annotated[int, typer.Option('-r', '--repeats', help='Number of repeats for each test configuration.')] = 1,
     profile: Annotated[bool, typer.Option('-p', '--profile', help='Enable Profiling for jobs.')] = False,
+    dump_env: Annotated[
+        bool,
+        typer.Option(
+            '--dump-env',
+            help='Write a redacted rank-0 environment snapshot for Megatron-Bridge workloads. Ignored for other workloads.',
+        ),
+    ] = False,
     proxy: Annotated[bool, typer.Option('--proxy', help='Use proxy scales.')] = False,
     dryrun: Annotated[
         bool,
@@ -402,7 +650,39 @@ def submit(
         ),
     ] = False,
     nice: Annotated[
-        Optional[int], typer.Option('--nice', help='Lower the priority of the job using Slurm --nice feature.')
+        Optional[int],
+        typer.Option('--nice', help='Lower the job priority via Slurm nice.', rich_help_panel='Slurm'),
+    ] = None,
+    nodelist: Annotated[
+        Optional[str],
+        typer.Option('--nodelist', help='Restrict the job to a specific node list.', rich_help_panel='Slurm'),
+    ] = None,
+    exclude: Annotated[
+        Optional[str], typer.Option('--exclude', help='Exclude specific nodes from the job.', rich_help_panel='Slurm')
+    ] = None,
+    reservation: Annotated[
+        Optional[str],
+        typer.Option('--reservation', help='Submit the job under a Slurm reservation.', rich_help_panel='Slurm'),
+    ] = None,
+    segment: Annotated[
+        Optional[int],
+        typer.Option('--segment', help='Set the Slurm segment size for the job.', rich_help_panel='Slurm'),
+    ] = None,
+    slurm_arg_values: Annotated[
+        Optional[list[str]],
+        typer.Option(
+            '--slurm-arg',
+            help='Repeatable raw Slurm parameter in `key=value` or bare-flag form.',
+            rich_help_panel='Slurm',
+        ),
+    ] = None,
+    env_values: Annotated[
+        Optional[list[str]],
+        typer.Option(
+            '--env',
+            help='Repeatable environment variable override in `KEY=value` form.',
+            rich_help_panel='Slurm',
+        ),
     ] = None,
 ):
     """
@@ -410,9 +690,24 @@ def submit(
     """
     app_ctx: AppContext = ctx.obj
 
-    extra_slurm_params = {}
-    if nice is not None:
-        extra_slurm_params['nice'] = nice
+    try:
+        explicit_env_overrides = parse_cli_env_args(env_values)
+    except ValueError as e:
+        logger.error(str(e))
+        raise typer.Exit(code=EXIT_VALIDATION_ERROR) from e
+
+    try:
+        slurm_args = build_cli_slurm_args(
+            nodelist=nodelist,
+            exclude=exclude,
+            reservation=reservation,
+            segment=segment,
+            nice=nice,
+            slurm_args=slurm_arg_values,
+        )
+    except ValueError as e:
+        logger.error(str(e))
+        raise typer.Exit(code=EXIT_VALIDATION_ERROR) from e
 
     request = TaskGenerationRequest(
         workloads=app_ctx.workloads,
@@ -429,7 +724,9 @@ def submit(
         profile=profile,
         proxy=proxy,
         force=force,
-        extra_slurm_params=extra_slurm_params,
+        slurm_args=slurm_args,
+        explicit_env_overrides=explicit_env_overrides,
+        extra_workload_args=("--dump_env",) if dump_env else (),
     )
 
     _submit_impl(ctx, request, dryrun, mode_name="submit")
@@ -462,169 +759,6 @@ def list_workloads(
 
 
 @app.command()
-def single(
-    ctx: typer.Context,
-    workload: Annotated[
-        str, typer.Option('-w', '--workload', help='Name of the workload (e.g., "pretraining_nemotron").')
-    ],
-    model_size: Annotated[str, typer.Option('-s', '--model-size', help='Size of the model (e.g., 7b, 13b).')],
-    dtype: Annotated[str, typer.Option('--dtype', help='Data type (e.g., fp16, bf16).')],
-    scale: Annotated[str, typer.Option('--scale', help='Scale parameter indicating the number of GPUs.')],
-    profile: Annotated[bool, typer.Option('-p', '--profile', help='Enable Profiling for job.')] = False,
-    dryrun: Annotated[
-        bool, typer.Option('-d', '--dryrun', help='List the job to be submitted without actually submitting it.')
-    ] = False,
-    force: Annotated[
-        bool,
-        typer.Option(
-            '--force',
-            help='Bypass dtype/scale validation for one explicit task. Use with caution.',
-        ),
-    ] = False,
-):
-    """
-    (DEPRECATED) Submit a single job. Use 'llmb-run submit' instead.
-    """
-    logger.warning("⚠️  'single' command is deprecated. Please use 'llmb-run submit' instead.")
-    logger.warning("   Use:")
-    logger.warning(f"     ↳ llmb-run submit -w {workload} -s {model_size} --dtype {dtype} --scale {scale}")
-
-    app_ctx: AppContext = ctx.obj
-
-    request = TaskGenerationRequest(
-        workloads=app_ctx.workloads,
-        cluster_config=app_ctx.cluster_config,
-        workload=workload,
-        model_size=model_size,
-        dtype=dtype,
-        scale=scale,  # Passed as string, TaskGenerationRequest handles parsing
-        profile=profile,
-        force=force,
-    )
-
-    _submit_impl(ctx, request, dryrun, mode_name="single")
-
-
-@app.command()
-def bulk(
-    ctx: typer.Context,
-    input_file: Annotated[
-        str, typer.Argument(help='Path to the workload specification file (simple .txt or advanced .yaml).')
-    ],
-    dryrun: Annotated[
-        bool, typer.Option('-d', '--dryrun', help='List all jobs to be submitted without actually submitting them.')
-    ] = False,
-):
-    """
-    (DEPRECATED) Submit multiple jobs from a specification file. Use 'llmb-run submit -f' instead.
-    """
-    logger.warning("⚠️  'bulk' command is deprecated. Please use 'llmb-run submit -f <file>' instead.")
-    logger.warning("   Use:")
-    logger.warning(f"     ↳ llmb-run submit -f {input_file}{' --dry-run' if dryrun else ''}")
-
-    app_ctx: AppContext = ctx.obj
-
-    request = TaskGenerationRequest(
-        workloads=app_ctx.workloads,
-        cluster_config=app_ctx.cluster_config,
-        file_path=input_file,
-    )
-
-    _submit_impl(ctx, request, dryrun, mode_name="bulk")
-
-
-@app.command()
-def submit_all(
-    ctx: typer.Context,
-    max_scale: Annotated[
-        Optional[int], typer.Option('--max-scale', help='Maximum scale (number of GPUs) to test up to.')
-    ] = None,
-    min_scale: Annotated[
-        bool,
-        typer.Option(
-            '--min-scale', help='When set, only run the minimum scale per the metadata for all installed workloads.'
-        ),
-    ] = False,
-    scales: Annotated[
-        Optional[str],
-        typer.Option(
-            '--scales',
-            help='Comma-separated list of specific scales to run (e.g., "8,16,32" or "16"). Mutually exclusive with --min-scale and --max-scale.',
-        ),
-    ] = None,
-    dtype: Annotated[
-        Optional[str],
-        typer.Option(
-            '--dtype',
-            help='Comma separated list of dtypes to run. If unset, run all available dtypes per metadata for a workload.',
-        ),
-    ] = None,
-    workloads: Annotated[
-        Optional[str],
-        typer.Option(
-            '-w',
-            '--workloads',
-            help='Comma separated list of workloads to run. Reduces scope to only the specified workloads.',
-        ),
-    ] = None,
-    repeats: Annotated[int, typer.Option('--repeats', help='Number of repeats for each test configuration.')] = 1,
-    profile: Annotated[bool, typer.Option('-p', '--profile', help='Enable profiling for all jobs.')] = False,
-    dryrun: Annotated[
-        bool, typer.Option('-d', '--dryrun', help='List all jobs to be submitted without actually submitting them.')
-    ] = False,
-    nice: Annotated[
-        Optional[int], typer.Option('--nice', help='Lower the priority of the job using Slurm --nice feature.')
-    ] = None,
-):
-    """
-    (DEPRECATED) Submit jobs for all installed recipes. Use 'llmb-run submit' instead.
-    """
-    logger.warning("⚠️  'submit-all' command is deprecated. Please use 'llmb-run submit' instead.")
-    logger.warning("   Use:")
-    submit_all_cmd = "llmb-run submit"
-    if workloads:
-        submit_all_cmd += f" -w {workloads}"
-    if dtype:
-        submit_all_cmd += f" --dtype {dtype}"
-    if scales:
-        submit_all_cmd += f" --scale {scales}"
-    if max_scale is not None:
-        submit_all_cmd += f" --max-scale {max_scale}"
-    if min_scale:
-        submit_all_cmd += " --min-scale"
-    if repeats != 1:
-        submit_all_cmd += f" -r {repeats}"
-    if profile:
-        submit_all_cmd += " -p"
-    if nice is not None:
-        submit_all_cmd += f" --nice {nice}"
-    if dryrun:
-        submit_all_cmd += " --dry-run"
-    logger.warning(f"     ↳ {submit_all_cmd}")
-
-    app_ctx: AppContext = ctx.obj
-
-    extra_slurm_params = {}
-    if nice is not None:
-        extra_slurm_params['nice'] = nice
-
-    request = TaskGenerationRequest(
-        workloads=app_ctx.workloads,
-        cluster_config=app_ctx.cluster_config,
-        workload=workloads,
-        dtype=dtype,
-        scale=scales,
-        max_scale=max_scale,
-        min_scale=min_scale,
-        repeats=repeats,
-        profile=profile,
-        extra_slurm_params=extra_slurm_params,
-    )
-
-    _submit_impl(ctx, request, dryrun, mode_name="submit-all")
-
-
-@app.command()
 def exemplar(
     ctx: typer.Context,
     dry_run: Annotated[
@@ -637,7 +771,7 @@ def exemplar(
             '-r',
             '--repeats',
             min=1,
-            help='Number of repeats for each test configuration. If not provided, uses value from exemplar.yaml config.repeats (default: 3).',
+            help='Number of repeats for each test configuration. If not provided, uses exemplar.yaml config.repeats (fallback: 1).',
         ),
     ] = None,
 ):
@@ -647,7 +781,7 @@ def exemplar(
     Runs workloads listed in exemplar.yaml for your cluster's GPU type.
     All workloads must be installed.
 
-    Defaults: scale=512, profile=true, repeats=3 (override with -r).
+    Fallbacks when omitted from exemplar.yaml: scale=512, profile=false, repeats=1 (override repeats with -r).
     If profile=true, the last repeat is profiled and earlier repeats are non-profiled.
     """
     app_ctx: AppContext = ctx.obj

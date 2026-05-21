@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -52,8 +52,5 @@ HF_CACHE_DIR=$LLMB_INSTALL/.cache/huggingface
 mkdir -p $HF_CACHE_DIR
 
 pushd $LLMB_WORKLOAD
-if [ ! -d "${MODEL_WEIGHTS_DIR}" ]; then
-    hf download openai/gpt-oss-120b --cache-dir $HF_CACHE_DIR --local-dir $MODEL_PATH
-fi
-
+hf download openai/gpt-oss-120b --cache-dir $HF_CACHE_DIR --local-dir $MODEL_PATH
 popd

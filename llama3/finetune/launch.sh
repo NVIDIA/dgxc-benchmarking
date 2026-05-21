@@ -89,7 +89,10 @@ if [[ -n ${RUN_CONF_MOUNTS:-""} ]]; then
     CONTAINER_MOUNTS+="${RUN_CONF_MOUNTS}"
 fi
 
-CONFIG_OVERRIDES=""
+CONFIG_OVERRIDES="${CONFIG_OVERRIDES:-}"
+if [[ -n ${CONFIG_OVERRIDES} ]]; then
+    CONFIG_OVERRIDES+=" "
+fi
 if [[ -n ${CONTAINER_MOUNTS} ]]; then
     CONFIG_OVERRIDES+=" --custom_mounts $CONTAINER_MOUNTS"
 fi

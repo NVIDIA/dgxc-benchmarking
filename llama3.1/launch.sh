@@ -30,7 +30,9 @@ set -eu -o pipefail
 
 export WORKLOAD_TYPE=pretrain
 export MODEL_NAME=llama3.1
-export FW_VERSION=26.02.01
+export FW_VERSION=26.04.00
+
+export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh}
 
 export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 
@@ -62,12 +64,6 @@ GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
 GPU_TYPE=${GPU_TYPE,,}
 JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
 
-if [[ $GPU_TYPE == "b200" ]]; then
-    FW_VERSION=26.02.00
-fi
-
-export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh}
-
 # Handle additional SLURM parameters from environment variable
 ADDITIONAL_SLURM_PARAMS=${ADDITIONAL_SLURM_PARAMS:-""}
 
@@ -87,7 +83,10 @@ if [[ -n ${RUN_CONF_MOUNTS:-""} ]]; then
     CONTAINER_MOUNTS+="${RUN_CONF_MOUNTS}"
 fi
 
-CONFIG_OVERRIDES=""
+CONFIG_OVERRIDES="${CONFIG_OVERRIDES:-}"
+if [[ -n ${CONFIG_OVERRIDES} ]]; then
+    CONFIG_OVERRIDES+=" "
+fi
 
 # Time limit: 30 min for 8B/70B, 2 hr for 405B (override with TIME_LIMIT env)
 if [[ -z ${TIME_LIMIT:-} ]]; then
@@ -103,43 +102,18 @@ ENABLE_CHECKPOINT=${ENABLE_CHECKPOINT:-false}
 ENABLE_CHECKPOINT=${ENABLE_CHECKPOINT,,}
 CHECKPOINT_INTERVAL=${CHECKPOINT_INTERVAL:-$MAX_STEPS} # Default: save checkpoint at end of training
 
-if [[ $GPU_TYPE == "gb200" ]] && [[ $MODEL_SIZE == "70b" ]] && [[ $DTYPE == "nvfp4" ]]; then
-    echo "Error: NVFP4 is not supported for Llama3.1 70B on GB200." >&2
-    exit 1
-fi
-
 if { [[ $GPU_TYPE == "b300" ]] || [[ $GPU_TYPE == "b200" ]]; } && [[ $MODEL_SIZE == "405b" ]]; then
     GBS=$((JOB_TOTAL_GPUS * 6))
-fi
-
-if [[ $GPU_TYPE == "b300" ]] && [[ $MODEL_SIZE == "405b" ]] && [[ $DTYPE == "fp8" ]]; then
-    FP8_RECIPE=cs
-    TP=2
-    PP=8
-    CP=2
-    VP=4
-    MBS=1
 fi
 
 if [[ $GPU_TYPE == "b300" ]] && { [[ $MODEL_SIZE == "70b" ]] || [[ $MODEL_SIZE == "405b" ]]; } && [[ $JOB_TOTAL_GPUS -ge 512 ]]; then
     export NCCL_IB_QPS_PER_CONNECTION=${NCCL_IB_QPS_PER_CONNECTION:-4}
 fi
 
-if [[ $GPU_TYPE == "b300" ]] && [[ $MODEL_SIZE == "70b" ]] && [[ $DTYPE == "fp8" ]]; then
-    if [[ $JOB_TOTAL_GPUS -le 128 ]]; then
-        FP8_RECIPE=cs
-    elif [[ $JOB_TOTAL_GPUS -ge 256 ]]; then
-        FP8_RECIPE=mx
-    fi
-fi
-
-if [[ $GPU_TYPE == "b200" ]] && [[ $MODEL_SIZE == "70b" ]] && [[ $DTYPE == "fp8" ]] && [[ $JOB_TOTAL_GPUS -ge 256 ]]; then
+if { [[ $GPU_TYPE == "b300" ]] || [[ $GPU_TYPE == "b200" ]]; } \
+    && [[ $MODEL_SIZE == "70b" ]] && [[ $DTYPE == "fp8" ]] \
+    && [[ $JOB_TOTAL_GPUS -ge 128 ]]; then
     FP8_RECIPE=mx
-    TP=2
-    PP=4
-    CP=1
-    VP=5
-    MBS=1
 fi
 
 if [[ -n ${TP-} ]]; then
@@ -283,6 +257,7 @@ python scripts/performance/setup_experiment.py \
     --partition $SBATCH_PARTITION \
     --log_dir $NEMORUN_HOME \
     --time_limit $TIME_LIMIT \
+    --packager none \
     $SLURM_ARGS
 
 popd

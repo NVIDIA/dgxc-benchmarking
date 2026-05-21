@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -39,7 +39,7 @@ def get_exemplar_workloads(llmb_repo: Path, gpu_type: str) -> List[str]:
 
     Each workload_full_name is parsed by splitting on the last '_':
     - Prefix becomes the base_key (e.g., 'pretrain_llama3.1')
-    - Suffix must match ^\d+(\.\d+)?b$ (lowercase, e.g., '70b', '3.5b')
+    - Suffix must match ^\d+(\.\d+)?[bt]$ (case-insensitive, e.g., '70b', '3.5b', '1t')
 
     Args:
         llmb_repo: Path to the LLMB repository root
@@ -115,13 +115,14 @@ def get_exemplar_workloads(llmb_repo: Path, gpu_type: str) -> List[str]:
 
     # Parse workload_full_names to extract base keys
     base_keys = []
-    size_suffix_pattern = re.compile(r'^\d+(\.\d+)?b$')
+    size_suffix_pattern = re.compile(r'^\d+(\.\d+)?[bt]$')
 
     for full_name in workload_full_names:
         if '_' not in full_name:
             raise ValueError(
                 f"Invalid workload name '{full_name}' in workloads[{matched_key}]: "
-                f"expected format '<workload_key>_<size>b' (e.g., 'pretrain_llama3.1_70b')"
+                f"expected format '<workload_key>_<size><unit>' (e.g., 'pretrain_llama3.1_70b' or "
+                f"'pretrain_kimi-k2_1t')"
             )
 
         base_key, size_suffix = full_name.rsplit('_', 1)
@@ -136,8 +137,8 @@ def get_exemplar_workloads(llmb_repo: Path, gpu_type: str) -> List[str]:
         if not size_suffix_pattern.match(size_suffix.lower()):
             raise ValueError(
                 f"Invalid size suffix in '{full_name}' (workloads[{matched_key}]): "
-                f"'{size_suffix}' does not match pattern '^\\d+(\\.\\d+)?b$' (lowercase). "
-                f"Examples: '70b', '3.5b', '405b'"
+                f"'{size_suffix}' does not match pattern '^\\d+(\\.\\d+)?[bt]$'. "
+                f"Examples: '70b', '3.5b', '405b', '1t'"
             )
 
         base_keys.append(base_key)

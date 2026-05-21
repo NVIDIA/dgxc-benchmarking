@@ -26,13 +26,13 @@ Workload Naming Convention:
 Throughout this codebase, workloads use a consistent naming structure:
 
 - workload_key: Full identifier in format "{workload_type}_{workload}"
-  Example: "pretrain_nemotron4"
+  Example: "pretrain_<workload>"
 
 - workload_type: Category of workload (e.g., "pretrain", "finetune", "inference")
   Example: "pretrain"
 
-- workload: Base workload name (e.g., "nemotron4", "llama3.1")
-  Example: "nemotron4"
+- workload: Base workload name
+  Example: "<workload>"
 
 The relationship is: workload_key = f"{workload_type}_{workload}"
 This format is established when loading metadata and used consistently throughout the tool.
@@ -47,7 +47,7 @@ import yaml
 
 from llmb_run.config_manager import ClusterConfig
 from llmb_run.constants import EXCLUDE_WORKLOADS, METADATA_FILE_PATTERN
-from llmb_run.metadata_utils import normalize_model_dtype_config
+from llmb_run.metadata_utils import model_size_to_billions, normalize_model_dtype_config
 
 logger = logging.getLogger('llmb_run.workload_validator')
 
@@ -164,7 +164,10 @@ def validate_workload_with_details(
             break
 
     if not model_config:
-        available_sizes = sorted({config.get('model_size') for config in model_configs if config.get('model_size')})
+        available_sizes = sorted(
+            {config.get('model_size') for config in model_configs if config.get('model_size')},
+            key=lambda size: (model_size_to_billions(size), size),
+        )
         gpu_info = f" for GPU type '{cluster_gpu_type}'"
         error_msg = f"Model size '{model_size}' not supported for workload '{workload_key}'{gpu_info}."
         return False, ValidationErrorType.MODEL_SIZE_NOT_SUPPORTED, error_msg, available_sizes
@@ -375,7 +378,7 @@ def print_avail_workloads(workloads, cluster_config, cluster_gpu_type=None, verb
                     model_details[model_size]['gpu_types'].add(gpu_type)
 
         if verbose:
-            for model_size in sorted(all_model_sizes):
+            for model_size in sorted(all_model_sizes, key=lambda size: (model_size_to_billions(size), size)):
                 details = model_details[model_size]
                 logger.info(f"  {model_size}:")
                 if details['dtypes']:
@@ -432,7 +435,7 @@ def print_avail_workloads(workloads, cluster_config, cluster_gpu_type=None, verb
                 if len(details['gpu_types']) > 1 or not cluster_gpu_type:
                     logger.info(f"    GPU types: {', '.join(sorted(details['gpu_types']))}")
         else:
-            model_sizes = sorted(all_model_sizes)
+            model_sizes = sorted(all_model_sizes, key=lambda size: (model_size_to_billions(size), size))
             logger.info(f"  Model sizes: {', '.join(model_sizes)}")
 
     if not verbose:

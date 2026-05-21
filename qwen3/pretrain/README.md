@@ -24,8 +24,8 @@ Configurations use weak scaling methodology (global batch size scales proportion
 
 | Precision | GPUs | SeqLen | Layers |  TP |  PP |  CP |  EP |  DP |  VP | MBS |  GBS  |  GA |
 | :-------- | :--: | :----: | :----: | --: | --: | --: | --: | --: | --: | --: | :---: | --: |
-| BF16      | 256  |  4096  |   94   |   1 |   4 |   1 |  16 |  64 |  12 |   2 | 8192  |  64 |
-| BF16      | 512  |  4096  |   94   |   1 |   4 |   1 |  16 | 128 |  12 |   2 | 16384 |  64 |
+| BF16      | 256  |  4096  |   94   |   1 |   4 |   1 |  32 |  64 | N/A |   2 | 8192  |  64 |
+| BF16      | 512  |  4096  |   94   |   1 |   4 |   1 |  32 | 128 | N/A |   2 | 16384 |  64 |
 
 ## GB200
 
@@ -60,8 +60,8 @@ Configurations use weak scaling methodology (global batch size scales proportion
 
 | Precision | GPUs | SeqLen | Layers |  TP |  PP |  CP |  EP |  DP |  VP | MBS |  GBS  |  GA |
 | :-------- | :--: | :----: | :----: | --: | --: | --: | --: | --: | --: | --: | :---: | --: |
-| BF16      | 256  |  4096  |   94   |   1 |   8 |   1 |   8 |  32 | N/A |   1 | 8192  | 256 |
-| BF16      | 512  |  4096  |   94   |   1 |   8 |   1 |   8 |  64 | N/A |   1 | 16384 | 256 |
+| BF16      | 256  |  4096  |   94   |   1 |   8 |   1 |   8 |  32 | N/A |   2 | 8192  | 128 |
+| BF16      | 512  |  4096  |   94   |   1 |   8 |   1 |   8 |  64 | N/A |   2 | 16384 | 128 |
 
 ## B200
 
@@ -100,64 +100,57 @@ Configurations use weak scaling methodology (global batch size scales proportion
 
 # Performance Measurement and Analysis
 
-Performance for Qwen3 training is measured by the achieved GPU FLOPS via the `TFLOPS_per_GPU` metric, which indicates computational throughput efficiency. Additionally, training step timing (seconds per iteration) is captured and logged for every training step in the main training log file [see Output Locations](#output-locations).
+Performance is reported as:
 
-Since the early training steps typically take much longer time (with input prefetch, activation memory allocation, and JIT compilation), we use the `parse_train_timing_mbridge.sh` script to analyze iterations 35-44 and calculate mean and standard deviation for reliable performance metrics for both TFLOPS per GPU and timing measurements.
+- `s/iter` — wall-clock seconds per training step
+- `TFLOPS/GPU` — sustained FLOPS achieved per GPU
 
-### Running the parse_train_timing_mbridge.sh script
+Each benchmark runs 50 steps; iterations 35–44 are averaged to skip warmup (input prefetch, activation allocation, JIT compilation).
 
-To analyze training timing from your experiment results, run the script from the workload directory. In an installed environment, recipe files are available under `$LLMB_INSTALL/llmb_repo` (a copy created by the installer).
+## Viewing results with `llmb-run jobs`
+
+Each `llmb-run jobs` command refreshes Slurm state and parses the training log for any job that has finished (succeeded, failed, or cancelled) — there is no background updater. Run from `$LLMB_INSTALL`:
 
 ```bash
-# Basic usage - parses results in the directory named 'experiments' in the current folder
-$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh
+# List all jobs you've submitted, with parsed metrics
+llmb-run jobs
 
-# Specify a different experiments directory
-$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh /path/to/experiments
+# Full details for one job (Job ID comes from the listing above)
+llmb-run jobs show <job_id>
 
-# Output in CSV format
-$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh --format=csv
-
-# Output in JSON format
-$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh --format=json
-
-# Show full filenames instead of shortened versions
-$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh --full-names
+# Open the training log; --follow tails it, --dir prints the experiment directory
+llmb-run jobs log <job_id>
 ```
 
-Example output:
+Example `llmb-run jobs` output (illustrative values):
 
-```shell
-Elapsed Time (ms) and TFLOPS/GPU Analysis (iterations 35-44)
-================================================================================
-Experiment                                                                                   Status Time Mean (ms) Time Std (ms) TFLOPS_per_GPU Mean TFLOPS_per_GPU Std
------------------------------------------------------------------------------------------- -------- ------------- ------------ ------------------- ------------------
-pretrain_qwen3_235b_a22b_bf16_gpus256_tp2_pp8_cp1_vp4_ep32_mbs1_gbs2048_4006524             Success     25532.270       13.911              190.00               0.11
+```text
+  Workload              DType  Scale   Job ID  Profile  Submit Time       Slurm Status  Elapsed   s/iter  TFLOPS/GPU
+  pretrain_example_8b   bf16     128  1234567  No       2026-04-17 13:42  COMPLETED     00:12:34    4.21     1234.56
+  pretrain_example_70b  fp8      256  1234589  No       2026-04-17 14:05  RUNNING       00:03:11
 ```
 
-To obtain throughput as a tokens per second measurement, follow this formula:
+Blank `s/iter` or `TFLOPS/GPU` means the job has not finished yet, or the log did not contain enough completed iterations. See the [llmb-run README](../../cli/llmb-run/README.md#jobs-command) for the full command reference.
 
-```shell
-(throughput in tokens per second) = (sequence length) * (global batch size) / training_step_timing
+## Derived metrics
+
+To convert step time into tokens per second:
+
+```text
+(throughput in tokens/sec) = (sequence length) * (global batch size) / (s/iter)
 ```
 
-E.g.
+To estimate time-to-train for a target token budget:
 
-To calculate time to train estimate:
-
-```shell
-(time to train in days) = (total tokens) / (throughput in tokens per second) / (number of seconds in a day)
+```text
+(time to train in days) = (total tokens) / (throughput in tokens/sec) / 86400
 ```
 
-E.g.
+To compute model FLOPs utilization (MFU):
 
-To calculate the model flops utilization (MFU):
-
-```shell
-MFU = (achieved TFLOPS_per_GPU) / (peak GPU FLOPS)
+```text
+MFU = TFLOPS/GPU / (peak GPU FLOPS)
 ```
-
-**Peak theoretical throughput across GPUs and Data Types (in TFLOPS)**
 
 For peak theoretical throughput values used in MFU calculations, see the [Peak Theoretical Throughput](../../README.md#peak-theoretical-throughput) section in the main README.
 
@@ -223,31 +216,33 @@ llmb-run submit -w pretrain_qwen3 -s 235b --dtype bf16 --scale 256
 
 ### Additional SLURM Parameters
 
-Use a SLURM reservation:
+For `llmb-run submit`, use the built-in Slurm flags instead of `ADDITIONAL_SLURM_PARAMS`.
+
+Use a Slurm reservation:
 
 ```bash
-ADDITIONAL_SLURM_PARAMS="reservation=my_reservation" llmb-run submit -w pretrain_qwen3 -s 235b --dtype bf16 --scale 256
+llmb-run submit -w pretrain_qwen3 -s 235b --dtype bf16 --scale 256 --reservation my_reservation
 ```
 
 Run on specific nodes:
 
 ```bash
-ADDITIONAL_SLURM_PARAMS="nodelist=node001,node002" llmb-run submit -w pretrain_qwen3 -s 235b --dtype bf16 --scale 256
+llmb-run submit -w pretrain_qwen3 -s 235b --dtype bf16 --scale 256 --nodelist node001,node002
 ```
 
 Exclude specific nodes:
 
 ```bash
-ADDITIONAL_SLURM_PARAMS="exclude=node003,node004" llmb-run submit -w pretrain_qwen3 -s 235b --dtype bf16 --scale 256
+llmb-run submit -w pretrain_qwen3 -s 235b --dtype bf16 --scale 256 --exclude node003,node004
 ```
 
-Combine multiple parameters (semicolon-separated):
+Combine multiple parameters:
 
 ```bash
-ADDITIONAL_SLURM_PARAMS="nodelist=node001,node002;reservation=my_reservation;exclusive" llmb-run submit -w pretrain_qwen3 -s 235b --dtype bf16 --scale 256
+llmb-run submit -w pretrain_qwen3 -s 235b --dtype bf16 --scale 256 --nodelist node001,node002 --reservation my_reservation --slurm-arg exclusive
 ```
 
-For more details on llmb-run usage, see the [llmb-run documentation](../../cli/llmb-run/README.md).
+For more details on `llmb-run` usage, see the [llmb-run documentation](../../cli/llmb-run/README.md).
 
 ## Direct Method
 
@@ -320,7 +315,7 @@ The `<experiment_name>` typically follows the pattern: `pretrain_qwen3_<model_si
 
 **Key files:**
 
-- `log-<experiment_name>.out` - Contains training step timing and performance metrics analyzed by `parse_train_timing_mbridge.sh`
+- `log-<experiment_name>.out` - Contains training step timing and performance metrics parsed by `llmb-run jobs`
 - `nsys_profile/` - Contains profiling traces when using the `-p` flag with `llmb-run` or when `ENABLE_PROFILE=true`
 
 # Profiling
@@ -390,4 +385,4 @@ PyTorch Profiling is intended for rare, advanced debugging scenarios such as NCC
 ENABLE_PYTORCH_PROFILE=true llmb-run submit -w pretrain_qwen3 -s 235b --dtype bf16 --scale 256
 ```
 
-For details on the PyTorch Profiler and how to view resulting traces, see the [PyTorch Profiler documentation](https://docs.pytorch.org/tutorials/recipes/recipes/profiler_recipe.html).
+Trace files are saved to `torch_profile/rank-N.json.gz` in the job output directory, where `N` is the rank number. For details on the PyTorch Profiler and how to view resulting traces, see the [PyTorch Profiler documentation](https://docs.pytorch.org/tutorials/recipes/recipes/profiler_recipe.html).

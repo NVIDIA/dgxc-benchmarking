@@ -59,6 +59,7 @@ logger = logging.getLogger("llmb_run.metadata_utils")
 
 # Known dtype keys supported by our tooling. Extend as needed.
 _KNOWN_DTYPES = {"fp8", "bf16", "nvfp4", "mxfp4"}
+_MODEL_SIZE_SUFFIX_RE = re.compile(r'^(?P<value>\d+(?:\.\d+)?)(?P<unit>[bt])$', re.IGNORECASE)
 
 
 def normalize_model_dtype_config(model_config: dict) -> Dict[str, Dict[str, object]]:
@@ -144,7 +145,7 @@ def normalize_model_dtype_config(model_config: dict) -> Dict[str, Dict[str, obje
 def parse_workload_name(workload_name: str) -> tuple[str, str | None]:
     """Parse workload name into base workload_key and optional model_size suffix.
 
-    The model_size suffix pattern is: _<digits>[.<digits>]b at end of string
+    The model_size suffix pattern is: _<digits>[.<digits>](b|t) at end of string
 
     Args:
         workload_name: Full workload name (e.g., 'pretrain_llama3.1_70b')
@@ -157,6 +158,8 @@ def parse_workload_name(workload_name: str) -> tuple[str, str | None]:
         ('pretrain_foo', '7b')
         >>> parse_workload_name('pretrain_bar_340b')
         ('pretrain_bar', '340b')
+        >>> parse_workload_name('pretrain_kimi-k2_1t')
+        ('pretrain_kimi-k2', '1t')
         >>> parse_workload_name('pretrain_baz')
         ('pretrain_baz', None)
         >>> parse_workload_name('pretrain_invalid_7x')
@@ -169,7 +172,24 @@ def parse_workload_name(workload_name: str) -> tuple[str, str | None]:
     potential_size = parts[1]
 
     # Check if last segment matches model size pattern
-    if re.match(r'^\d+(\.\d+)?b$', potential_size):
-        return parts[0], potential_size
+    if _MODEL_SIZE_SUFFIX_RE.match(potential_size):
+        return parts[0], potential_size.lower()
 
     return workload_name, None
+
+
+def model_size_to_billions(model_size: str) -> float:
+    """Convert a model size suffix to billions for numeric comparisons.
+
+    Examples:
+        "70b" -> 70.0
+        "1t" -> 1000.0
+        "1.5t" -> 1500.0
+    """
+    match = _MODEL_SIZE_SUFFIX_RE.match(model_size)
+    if not match:
+        return 0.0
+
+    value = float(match.group('value'))
+    unit = match.group('unit').lower()
+    return value * 1000 if unit == 't' else value

@@ -26,29 +26,16 @@ general:
   framework: megatron_bridge
 
 container:
-  images:
-    by_gpu:
-      default:
-        - 'nvcr.io#nvidia/nemo:26.02.01'
-      b200:
-        - 'nvcr.io#nvidia/nemo:26.02.00'
+  images: 
+    - 'nvcr.io#nvidia/nemo:26.04.00'
 
-repositories:
-  by_gpu:
-    default:
-      megatron_bridge:
-        url: "https://github.com/NVIDIA-NeMo/Megatron-Bridge.git"
-        commit: "aeead1ae667d795ebe725cb4a608581a21f402cc"
-      nemo_run:
-        url: "https://github.com/NVIDIA-NeMo/Run.git"
-        commit: "525d68bfce2d6baed86ed3d7d0edbae07833ea0d"
-    b200:
-      megatron_bridge:
-        url: "https://github.com/NVIDIA-NeMo/Megatron-Bridge.git"
-        commit: "6b3b5ba7ef64182caba23faa8d7abc0125aa3807"
-      nemo_run:
-        url: "https://github.com/NVIDIA-NeMo/Run.git"
-        commit: "ab0c4328275c4c731f1bdea3ceb0e68a9a17a6a2"
+repositories: 
+  megatron_bridge:
+    url: "https://github.com/NVIDIA-NeMo/Megatron-Bridge.git"
+    commit: "fab68031197b64934027e188c0cb417fdf1e1d7a"
+  nemo_run:
+    url: "https://github.com/NVIDIA-NeMo/Run.git"
+    commit: "64b91e0187b93475ea0d54028317e349ced7ac1b"
 
 downloads:
   huggingface:
@@ -97,7 +84,7 @@ run:
           dtypes: ['fp8', 'nvfp4']
           scales: [256, 512]
         - model_size: '70b'
-          dtypes: ['fp8']
+          dtypes: ['fp8', 'nvfp4']
           scales: [64,128,256,512]
         - model_size: '8b'
           dtypes: ['fp8', 'nvfp4']
@@ -105,19 +92,22 @@ run:
     b300:
       model_configs:
         - model_size: '405b'
-          dtypes: ['fp8']
+          dtypes: ['fp8', 'nvfp4']
           scales: [256, 512]
         - model_size: '70b'
-          dtypes: ['fp8']
+          dtypes: ['fp8', 'nvfp4']
           scales: [64,128,256,512]
+        - model_size: '8b'
+          dtypes: ['fp8', 'nvfp4']
+          scales: [8,16,32,64,128]
     b200:
       model_configs:
         - model_size: '405b'
           dtypes: ['fp8', 'nvfp4']
-          scales: [256, 512, 1024]
+          scales: [256, 512]
         - model_size: '70b'
           dtypes: ['fp8', 'nvfp4']
-          scales: [64,128,256,512,1024]
+          scales: [64,128,256,512]
         - model_size: '8b'
           dtypes: ['fp8', 'nvfp4']
           scales: [8,16,32,64,128]
@@ -128,7 +118,7 @@ run:
           scales:  [1024]
         - model_size: '70b'
           dtypes:  ['bf16', 'fp8']
-          scales:  [64,128,256,512,1024]
+          scales:  [64,128,256,512]
         - model_size: '8b'
           dtypes:  ['bf16', 'fp8']
           scales:  [8,16,32,64,128]

@@ -45,57 +45,57 @@ This recipe contains information and scripts to produce performance results for 
 
 # Performance Measurement and Analysis
 
-Performance for LLAMA3 70B LoRa finetuning is measured by the achieved GPU FLOPS via the `TFLOPS_per_GPU` metric, which indicates computational throughput efficiency. Additionally, finetuning step timing (seconds per iteration) is captured and logged for every finetuning step in the main finetuning log file [see Output Locations](#output-locations).
+Performance is reported as:
 
-Since the early finetuning steps typically take much longer time (with input prefetch, activation memory allocation, and JIT compilation), we use the `parse_train_timing_mbridge.sh` script to analyze iterations 35-44 and calculate mean and standard deviation for reliable performance metrics for both TFLOPS per GPU and timing measurements.
+- `s/iter` — wall-clock seconds per training step
+- `TFLOPS/GPU` — sustained FLOPS achieved per GPU
 
-> **Note:** The `MODEL_TFLOP/s/GPU` value reported by Megatron-Bridge in the training log is incorrect for LoRA finetuning in this release. Use `parse_train_timing_mbridge.sh` to obtain accurate TFLOPS per GPU, which computes the correct value using the LoRA-specific FLOPs formula accounting for the FLOPs breakdown across frozen and trainable parameters.
+Each benchmark runs 50 steps; iterations 35–44 are averaged to skip warmup (input prefetch, activation allocation, JIT compilation).
 
-### Running the parse_train_timing_mbridge.sh script
+## Viewing results with `llmb-run jobs`
 
-To analyze training timing from your experiment results, run the script from the workload directory. In an installed environment, recipe files are available under `$LLMB_INSTALL/llmb_repo` (a copy created by the installer).
+Each `llmb-run jobs` command refreshes Slurm state and parses the training log for any job that has finished (succeeded, failed, or cancelled) — there is no background updater. Run from `$LLMB_INSTALL`:
 
 ```bash
-# Basic usage - parses results in the directory named 'experiments' in the current folder
-$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh
+# List all jobs you've submitted, with parsed metrics
+llmb-run jobs
 
-# Specify a different experiments directory
-$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh /path/to/experiments
+# Full details for one job (Job ID comes from the listing above)
+llmb-run jobs show <job_id>
 
-
-# Show full filenames instead of shortened versions
-$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh --full-names
+# Open the training log; --follow tails it, --dir prints the experiment directory
+llmb-run jobs log <job_id>
 ```
 
-Example output:
+Example `llmb-run jobs` output (illustrative values):
 
-```shell
-Elapsed Time (ms) (iterations 35-44)
-================================================================================
-Experiment                                                                                   Status Time Mean (ms) Time Std (ms) MODEL_TFLOPS_per_GPU Mean MODEL_TFLOPS_per_GPU Std
------------------------------------------------------------------------------------------- -------- ------------- ------------ ------------------- ------------------
-lora_llama3_70b_bf16_gpus8_tp1_pp1_cp1_vpNone_ep1_etpNone_mbs1_gbs32_1097062                Success      3314.210        6.861             1382.35               2.86
+```text
+  Workload              DType  Scale   Job ID  Profile  Submit Time       Slurm Status  Elapsed   s/iter  TFLOPS/GPU
+  pretrain_example_8b   bf16     128  1234567  No       2026-04-17 13:42  COMPLETED     00:12:34    4.21     1234.56
+  pretrain_example_70b  fp8      256  1234589  No       2026-04-17 14:05  RUNNING       00:03:11
 ```
 
-To obtain throughput as a tokens per second measurement, follow this formula:
+Blank `s/iter` or `TFLOPS/GPU` means the job has not finished yet, or the log did not contain enough completed iterations. See the [llmb-run README](../../cli/llmb-run/README.md#jobs-command) for the full command reference.
 
-```shell
-(throughput in tokens per second) = (sequence length) * (global batch size) / training_step_timing
+## Derived metrics
+
+To convert step time into tokens per second:
+
+```text
+(throughput in tokens/sec) = (sequence length) * (global batch size) / (s/iter)
 ```
 
-To calculate time to train estimate:
+To estimate time-to-train for a target token budget:
 
-```shell
-(time to train in days) = (total tokens) / (throughput in tokens per second) / (number of seconds in a day)
+```text
+(time to train in days) = (total tokens) / (throughput in tokens/sec) / 86400
 ```
 
-To calculate the model flops utilization (MFU):
+To compute model FLOPs utilization (MFU):
 
-```shell
-MFU = (achieved TFLOPS_per_GPU) / (peak GPU FLOPS)
+```text
+MFU = TFLOPS/GPU / (peak GPU FLOPS)
 ```
-
-**Peak theoretical throughput across GPUs and Data Types (in TFLOPS)**
 
 For peak theoretical throughput values used in MFU calculations, see the [Peak Theoretical Throughput](../../README.md#peak-theoretical-throughput) section in the main README.
 
@@ -169,31 +169,33 @@ llmb-run submit -w finetune_llama3 --dtype bf16 --scale 8
 
 ### Additional SLURM Parameters
 
-Use a SLURM reservation:
+For `llmb-run submit`, use the built-in Slurm flags instead of `ADDITIONAL_SLURM_PARAMS`.
+
+Use a Slurm reservation:
 
 ```bash
-ADDITIONAL_SLURM_PARAMS="reservation=my_reservation" llmb-run submit -w finetune_llama3 --dtype fp8 --scale 8
+llmb-run submit -w finetune_llama3 --dtype fp8 --scale 8 --reservation my_reservation
 ```
 
 Run on specific nodes:
 
 ```bash
-ADDITIONAL_SLURM_PARAMS="nodelist=node001,node002" llmb-run submit -w finetune_llama3 --dtype bf16 --scale 8
+llmb-run submit -w finetune_llama3 --dtype fp8 --scale 8 --nodelist node001,node002
 ```
 
 Exclude specific nodes:
 
 ```bash
-ADDITIONAL_SLURM_PARAMS="exclude=node003,node004" llmb-run submit -w finetune_llama3 --dtype bf16 --scale 8
+llmb-run submit -w finetune_llama3 --dtype fp8 --scale 8 --exclude node003,node004
 ```
 
-Combine multiple parameters (semicolon-separated):
+Combine multiple parameters:
 
 ```bash
-ADDITIONAL_SLURM_PARAMS="nodelist=node001,node002;reservation=my_reservation;exclusive" llmb-run submit -w finetune_llama3 --dtype bf16 --scale 8
+llmb-run submit -w finetune_llama3 --dtype fp8 --scale 8 --nodelist node001,node002 --reservation my_reservation --slurm-arg exclusive
 ```
 
-For more details on llmb-run usage, see the [llmb-run documentation](../../cli/llmb-run/README.md).
+For more details on `llmb-run` usage, see the [llmb-run documentation](../../cli/llmb-run/README.md).
 
 ## Direct Method
 
@@ -284,7 +286,7 @@ The `<experiment_name>` typically follows the pattern: `lora_llama3_70b_<dtype>_
 
 **Key files:**
 
-- `log-<experiment_name>.out` - Contains training step timing and performance metrics analyzed by `parse_train_timing.sh`
+- `log-<experiment_name>.out` - Contains training step timing and performance metrics parsed by `llmb-run jobs`
 - `nsys_profile/` - Contains profiling traces when using the `-p` flag with `llmb-run` or when `ENABLE_PROFILE=true`
 
 # Profiling

@@ -344,6 +344,7 @@ def create_llmb_config(task, job_id, workdir, config: ClusterConfig, workloads):
     llmb_config = {
         'job_info': {
             'job_id': job_id,
+            'launcher_type': metadata.get('run', {}).get('launcher_type', ''),
             'launch_time': datetime.now().isoformat(),
             'experiment_id': experiment_id,
         },

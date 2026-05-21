@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 This project uses [PEP 440](https://www.python.org/dev/peps/pep-0440/) versioning with semantic versioning semantics:
 **MAJOR.MINOR.PATCH** for feature parity with [SemVer](https://semver.org/).
 
+## [1.9.1] - 2026-05-04
+
+### Fixed
+
+- Accept trillion-parameter (`t`) model-size suffixes when selecting Exemplar Cloud workloads from `exemplar.yaml`.
+
+## [1.9.0] - 2026-04-24
+
+### Changed
+
+- Fresh interactive and express installs now create recipe environments with `uv` without prompting for an environment type; existing conda/venv configs remain supported for resume, incremental, and headless compatibility.
+
+### Removed
+
+- Removed unsupported legacy `setup_script` installation support; recipes should use `setup.tasks`.
+
+### Fixed
+
+- Workloads without Python dependencies no longer run through the legacy scripted-install path or emit deprecation warnings.
+
+## [1.8.7] - 2026-04-01
+
+### Changed
+
+- Migrated config models (`InstallConfig`, `SlurmConfig`, `SystemConfig`) from dataclasses to pydantic v2; field types are now enforced at construction (e.g. `Literal` for `venv_type`, `gpu_type` validated against `SUPPORTED_GPU_TYPES`).
+
 ## [1.8.6] - 2026-03-31
 
 ### Fixed

@@ -30,16 +30,9 @@ uv tool install $LLMB_REPO/cli/llmb-install
 
 #### Option 2: Install as a Package (pip)
 
-It is recommended to run installer in a virtual environment (uv, conda or venv with python 3.12.x). The installer has been tested with these three environment types; other solutions may work but are not officially supported. Make sure to have the environment activated
-before running commands below.
-
-The installer supports multiple Python environment types with automatic detection and preference ordering:
-
-1. **UV** (Recommended) - Modern Python package manager with fast dependency resolution
-2. **System venv** - Python 3.12+ virtual environments using system Python
-3. **Conda** - Anaconda/Miniconda environments
-
-The installer will automatically detect available options and guide you through selection. No pre-activation required.
+It is recommended to run the installer in a virtual environment with Python 3.12.x.
+The top-level installer can run from an existing uv, venv, or conda environment,
+but newly-created recipe environments use `uv`.
 
 ```bash
 # Install installer dependencies
@@ -58,7 +51,7 @@ The installer will guide you through an interactive setup process covering:
 - Installation location selection
 - SLURM cluster configuration
 - Node architecture (x86_64/aarch64)
-- Environment type (automatic detection with uv/venv/conda)
+- Recipe environment setup with uv
 - Installation method (local/SLURM)
 - Workload selection
 
@@ -119,30 +112,22 @@ Express mode uses saved system configuration (SLURM settings, GPU type, image fo
 
 ### System Requirements
 
-- **Python**: 3.12+ (for venv support), OR conda/miniconda. `uv` is installed automatically if missing.
+- **Python**: 3.12+ for the top-level installer environment. `uv` is required for recipe environments and is installed automatically by `install.sh` if missing.
 - **SLURM**: 22.x or newer with job scheduler access
 - **Enroot**: For container image management
 - **Network Access**: Required for downloading container images
 - **Disk Space**: Substantial space required (see [Storage Requirements](#storage-requirements))
 
-### Environment Options
+### Environment Setup
 
-The installer automatically detects and offers available options in preference order:
+Fresh recipe environments are created with `uv`. The bootstrap script still
+detects an already-active uv, venv, or conda environment for the top-level
+`llmb-install` and `llmb-run` tools, but the installer no longer prompts for a
+recipe environment manager.
 
-1. **UV** (Required): Fast, modern Python package manager
-
-   - Installed automatically by `install.sh` if missing
-   - Benefits: Faster dependency resolution, automatic Python version management
-
-2. **System venv**: Uses system Python 3.12+ with venv module
-
-   - Requires: Python 3.12+ with venv support
-   - Benefits: Standard library solution, no additional tools needed
-
-3. **Conda** (Deprecated): Anaconda/Miniconda environments
-
-   - Requires: conda or miniconda installation
-   - Benefits: Cross-platform compatibility, scientific package ecosystem
+- `uv` is installed automatically by `install.sh` if missing
+- Existing conda/venv recipe configs are still supported for resume, incremental,
+  and headless compatibility
 
 ### Python Dependencies
 
@@ -273,26 +258,19 @@ Automatically selecting SLURM-based installation.
 
 ### Python Version Compatibility
 
-**Issue**: No compatible environment available
+**Issue**: uv is not available
 
 ```text
-Error: No compatible environment options available.
+Error: uv is required to create recipe environments.
 ```
 
-**Solutions** (in recommended order):
+**Solution**:
 
-1. **Install UV** (Recommended):
+1. **Install uv**:
    ```bash
    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
-2. **Install conda/miniconda**:
-   ```bash
-   wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-   bash Miniconda3-latest-Linux-x86_64.sh -b -p $CONDA_INSTALL_PATH/miniconda3
-   $CONDA_INSTALL_PATH/miniconda3/bin/conda init
-   source ~/.bashrc
-   ```
-3. **Upgrade system Python** to 3.12+ with venv support
+2. Re-run `./install.sh` so it can install or pin the supported uv version.
 
 ### Cache Directory Warnings
 
@@ -368,6 +346,7 @@ llmb-install express --help
 **Note on image folder**:
 
 - **Purpose**: Highly recommended for multi-user or multi-installation setups. Container images are 5-60 GB each and read-only, so sharing saves significant space with no downsides.
+- **Requirement**: You need write access to the image folder.
 - **Persistence**: The image folder path is saved to `~/.config/llmb/system_config.yaml` after successful installation and automatically reused in future installs.
 - **Override**: Use `-i` flag to override the saved location for a specific installation, or for first time installs.
 
@@ -485,9 +464,9 @@ This project uses `uv` for dependency management and `tox` for multi-environment
 ### Environment Setup
 
 1. **Install uv**: [Follow official instructions](https://docs.astral.sh/uv/getting-started/installation/).
-2. **Sync environment**: Creates a virtualenv and installs dependencies from `uv.lock`.
+2. **Sync environment**: Creates a virtualenv and installs runtime plus development dependencies from `uv.lock`.
    ```bash
-   uv sync
+   uv sync --extra dev
    ```
 
 ### Managing Dependencies
@@ -503,7 +482,7 @@ This project uses `uv` for dependency management and `tox` for multi-environment
 
 - **Quick (Current Python)**:
   ```bash
-  uv run pytest
+  uv run --extra dev pytest
   ```
 - **Full Matrix (Multiple Python versions)**:
   ```bash

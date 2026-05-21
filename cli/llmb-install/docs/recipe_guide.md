@@ -10,7 +10,7 @@ Each workload recipe requires a `metadata.yaml` file that defines:
 - **Container Images**: Runtime environment containers
 - **Repositories**: Git repositories for dependencies
 - **Downloads**: Offline assets (tokenizers, models, datasets)
-- **Setup**: Virtual environment and dependency installation
+- **Setup**: Optional virtual environment, dependency installation, and setup tasks
 - **Tools**: Workload-specific tool versions (e.g., nsys)
 - **Run Configuration**: GPU configs, model sizes, and test scales
 
@@ -35,7 +35,7 @@ tools:  # Optional
   # Tool versions
   
 setup:  # Optional
-  # Dependencies and setup tasks
+  # Dependencies and setup tasks, if needed
   
 run:
   # Launch configuration and GPU configs
@@ -47,10 +47,10 @@ Identifies the workload at a high level:
 
 ```yaml
 general:
-  workload: nemotron4              # workload model name
+  workload: qwen3                  # workload model name
   workload_type: pretrain          # Type of workload
-  framework: nemo2                 # Framework used
-  model: nemotron4                 # Optional: Override model name in llmb-config
+  framework: megatron_bridge       # Framework used
+  model: qwen3                     # Optional: Override model name in llmb-config
 ```
 
 ### Fields
@@ -60,6 +60,7 @@ general:
   - `pretrain` - Pre-training workloads
   - `inference` - Inference workloads
   - `finetune` - Fine-tuning workloads
+  - `microbenchmark` - Microbenchmark workloads
 - **`framework`** (string, required): Framework name (e.g., `nemo2`, `maxtext`, `megatron`)
 - **`model`** (string, optional): Model name to use in `llmb-config_jobid.yaml` for `model_info.model_name`. If not specified, defaults to the `workload` value. Useful when multiple workload directories share the same base model (e.g., `llama3.1` and `llama3.3` both use `model: llama3`)
 
@@ -198,7 +199,7 @@ Existing recipes using `hf_tokenizers` should eventually migrate to the `hugging
 ```yaml
 downloads:
   hf_tokenizers:
-    - 'nvidia/Nemotron-4-340B-Base'
+    - 'Qwen/Qwen3-30B-A3B'
 ```
 
 **Migrated (Tokenizer only):**
@@ -206,7 +207,7 @@ downloads:
 ```yaml
 downloads:
   huggingface:
-    - repo_id: nvidia/Nemotron-4-340B-Base
+    - repo_id: Qwen/Qwen3-30B-A3B
       assets: [tokenizer]
 ```
 
@@ -222,12 +223,14 @@ downloads:
     - repo_id: Qwen/Qwen3-30B-A3B
 ```
 
-#### 2. Tokenizer-only (Nemotron Pattern)
+#### 2. Tokenizer-only syntax
+
+Current recipes usually need both tokenizer and config assets. This example uses a current repository ID only to show the `assets: [tokenizer]` syntax for a recipe that intentionally needs tokenizer files only.
 
 ```yaml
 downloads:
   huggingface:
-    - repo_id: nvidia/Nemotron-4-340B-Base
+    - repo_id: Qwen/Qwen3-30B-A3B
       assets: [tokenizer]
 ```
 
@@ -291,7 +294,7 @@ For more details, see [tools.md](tools.md).
 
 ## Setup Section (Optional)
 
-Defines virtual environment creation, dependencies, and setup tasks.
+Defines virtual environment creation, dependencies, and setup tasks. Omit this section for image-only recipes that only need container downloads and run metadata.
 
 ### Basic Setup with Dependencies
 
@@ -368,17 +371,7 @@ setup:
 - `srun`: Run via SLURM srun
 - `sbatch`: Submit as SLURM batch job
 
-### Legacy Setup Script
-
-> **⚠️ DEPRECATED:** The `setup_script` functionality is deprecated and will be removed in a future release. Please migrate to the `tasks` feature above for all setup operations.
-
-For backward compatibility only:
-
-```yaml
-setup:
-  setup_script: "setup.sh"  # Path to setup script (DEPRECATED - use tasks instead)
-  venv_req: true
-```
+Setup tasks can be used with or without `dependencies`. If `venv_req: true` is set without dependencies, the installer creates an empty workload-specific virtual environment before running tasks. If `venv_req` is omitted or false, tasks run without a virtual environment.
 
 ## Run Section (Required)
 
@@ -402,7 +395,20 @@ run:
 
 - **`nemo`**: NeMo launcher (nemo2 workloads)
 - **`megatron_bridge`**: Megatron bridge launcher
+- **`configured_sbatch`**: SLURM sbatch submission with llmb-run-managed experiment directories
 - **`sbatch`**: Direct SLURM sbatch submission
+
+### Launch Script Env Contract
+
+Launch scripts should treat values passed through `llmb-run submit --env KEY=value` or a YAML task spec `env:` block as explicit container-launch overrides.
+
+- `llmb-run` validates `--env` keys as bash-style environment variable names and exports the corresponding `KEY=value` pairs into the job environment. YAML `env:` entries from `-f` task files receive the same treatment.
+- For `sbatch` and `configured_sbatch` launchers, `llmb-run` also exports `LLMB_CONTAINER_ENV=KEY1,KEY2,...`.
+  Launch scripts that invoke `srun` should pass this through to Pyxis `--container-env`, and may append additional keys if needed.
+- For `nemo` and `megatron_bridge` launchers, `llmb-run` appends repeatable `-E KEY=value` flags into `CONFIG_OVERRIDES`.
+  Launch scripts should preserve that variable and may append additional override flags to it if needed.
+
+This contract covers explicit `--env` values and YAML `env:` blocks. Environment variables from cluster config or workload config continue to flow through the normal job environment unless the launch script chooses to add them to its container override mechanism.
 
 ### GPU Configs
 
@@ -412,14 +418,14 @@ Define test configurations for each GPU type:
 gpu_configs:
   h100:
     model_configs:
-      - model_size: '15b'
-        dtypes: ['fp8', 'bf16']
-        scales: [16, 32, 64, 128]
+      - model_size: '30b'
+        dtypes: ['bf16']
+        scales: [16, 32, 64]
   b200:
     model_configs:
-      - model_size: '15b'
-        dtypes: ['fp8']
-        scales: [32, 64, 128, 256]
+      - model_size: '30b'
+        dtypes: ['bf16']
+        scales: [8, 16, 32, 64]
 ```
 
 **Supported GPU Types**: `h100`, `b200`, `gb200`, `gb300`
@@ -432,9 +438,9 @@ Each model config specifies:
 
 ```yaml
 model_configs:
-  - model_size: '340b'
-    dtypes: ['fp8', 'bf16']
-    scales: [128, 256, 512, 1024]
+  - model_size: '405b'
+    dtypes: ['fp8', 'nvfp4']
+    scales: [256, 512]
     exact_scales: false  # Optional: allow power-of-2 extension
 ```
 
@@ -544,74 +550,75 @@ Here's a complete `metadata.yaml` example:
 
 ```yaml
 general:
-  workload: nemotron4
+  workload: qwen3
   workload_type: pretrain
-  framework: nemo2
+  framework: megatron_bridge
 
 container:
-  images: 
-    - 'nvcr.io#nvidia/nemo:25.07.01'
+  images:
+    - 'nvcr.io#nvidia/nemo:26.04.00'
 
 repositories:
-  nemo:
-    url: "https://github.com/NVIDIA/NeMo.git"
-    commit: "763ffa8b00a2fca9f7a204e14111ed190de7d947"
-  megatron_core:
-    url: "https://github.com/NVIDIA/Megatron-LM.git"
-    commit: "ac198fc0d60a8c748597e01ca4c6887d3a7bcf3d"
+  megatron_bridge:
+    url: "https://github.com/NVIDIA-NeMo/Megatron-Bridge.git"
+    commit: "f4d10a3746d1220f2aef57d54d49303b9150d901"
   nemo_run:
-    url: "https://github.com/NVIDIA/NeMo-Run.git"
-    commit: "04f900a9c1cde79ce6beca6a175b4c62b99d7982"
+    url: "https://github.com/NVIDIA-NeMo/Run.git"
+    commit: "64b91e0187b93475ea0d54028317e349ced7ac1b"
 
 downloads:
   huggingface:
-    - repo_id: 'nvidia/Nemotron-4-340B-Base'
-      assets: [tokenizer]
-
-tools:
-  nsys:
-    by_gpu:
-      h100: "2025.5.1.121-3638078"
-      gb200: "2025.5.1.121-3638078"
-      default: "2025.4.1.172-3634357"
+    - repo_id: 'Qwen/Qwen3-30B-A3B'
+    - repo_id: 'Qwen/Qwen3-235B-A22B'
 
 setup:
   venv_req: true
   dependencies:
+    git:
+      megatron_bridge:
+        repo_key: megatron_bridge
+        install_method:
+          type: clone
     pip:
-      - package: nemo
-        repo_key: nemo
-        install_target: '.[nlp]'
-      - 'scipy<1.13.0'
-      - 'bitsandbytes==0.46.0'
-      - package: megatron-core
-        repo_key: megatron_core
       - package: nemo_run
         repo_key: nemo_run
 
 run:
-  launcher_type: 'nemo'
+  launcher_type: 'megatron_bridge'
   launch_script: 'launch.sh'
   gpu_configs:
-    h100:
+    gb300:
       model_configs:
-        - model_size: '15b'
-          dtypes: ['fp8', 'bf16']
-          scales: [16, 32, 64, 128, 256, 512, 1024, 2048]
-          proxy_scales: [8, 16]           # Optional: reduced scales for debug/validation
-        - model_size: '340b'
-          dtypes: ['fp8', 'bf16']
-          scales: [256, 512, 1024, 2048]
-          proxy_scales: [128, 256]        # Optional: reduced scales for debug/validation
+        - model_size: '235b'
+          dtypes: ['bf16']
+          scales: [256, 512]
+        - model_size: '30b'
+          dtypes: ['bf16']
+          scales: [8, 16, 32, 64]
+    gb200:
+      model_configs:
+        - model_size: '235b'
+          dtypes: ['bf16']
+          scales: [256, 512]
+        - model_size: '30b'
+          dtypes: ['bf16']
+          scales: [8, 16, 32, 64]
     b200:
       model_configs:
-        - model_size: '15b'
-          dtypes: ['fp8', 'bf16']
-          scales: [16, 32, 64, 128, 256, 512, 1024]
-          proxy_scales: [8, 16]
-        - model_size: '340b'
-          dtypes: ['fp8', 'bf16']
-          scales: [128, 256, 512, 1024]
+        - model_size: '235b'
+          dtypes: ['bf16']
+          scales: [256, 512]
+        - model_size: '30b'
+          dtypes: ['bf16']
+          scales: [8, 16, 32, 64]
+    h100:
+      model_configs:
+        - model_size: '235b'
+          dtypes: ['bf16']
+          scales: [256, 512]
+        - model_size: '30b'
+          dtypes: ['bf16']
+          scales: [16, 32, 64]
 ```
 
 ## Validation
@@ -795,9 +802,9 @@ The complete schema is defined in `.gitlab/ci/metadata_schema.yaml`. Key enums a
 ### Enums
 
 - **GPU Types**: `h100`, `b200`, `gb200`, `gb300`, `default` (for by_gpu only)
-- **Workload Types**: `pretrain`, `inference`, `finetune`, `tools`
-- **Dtypes**: `fp8`, `bf16`, `nvfp4`
-- **Launcher Types**: `nemo`, `megatron_bridge`, `sbatch`
+- **Workload Types**: `pretrain`, `inference`, `finetune`, `microbenchmark`, `tools`
+- **Dtypes**: `fp8`, `bf16`, `nvfp4`, `mxfp4`
+- **Launcher Types**: `nemo`, `megatron_bridge`, `configured_sbatch`, `sbatch`
 - **Job Types**: `local`, `nemo2`, `srun`, `sbatch`
 
 ### Format Patterns

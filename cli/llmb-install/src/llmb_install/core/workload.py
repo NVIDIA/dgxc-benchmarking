@@ -36,10 +36,7 @@ from typing import Any, Dict, List, Optional
 import yaml
 
 from llmb_install.cluster.slurm import augment_env_for_job_type
-from llmb_install.environment.venv_manager import (
-    create_virtual_environment,
-    get_venv_environment,
-)
+from llmb_install.environment.venv_manager import get_venv_environment
 
 
 def find_metadata_files(root_dir: str) -> List[Path]:
@@ -104,8 +101,7 @@ def get_setup_tasks(workload_data: Dict[str, Any]) -> List[Dict[str, Any]]:
 
     Behaviour:
     • If `setup.tasks` exists, return that list preserving order.
-    • Otherwise, return an empty list - legacy `setup_script` is handled
-      elsewhere by `run_post_install_script` for full backward compatibility.
+    • Otherwise, return an empty list.
     """
     setup_cfg: Dict[str, Any] = workload_data.get("setup", {}) or {}
     tasks: List[Dict[str, Any]] = setup_cfg.get("tasks", []) or []
@@ -121,7 +117,7 @@ def run_setup_tasks(
     workload_key: str,
     workload_data: Dict[str, Any],
     venv_path: Optional[str],
-    venv_type: Optional[str],
+    venv_type: str,
     install_path: str,
     slurm_info: Dict[str, Any],
     global_env_vars: Dict[str, str],
@@ -133,7 +129,7 @@ def run_setup_tasks(
         workload_key: Identifier such as "finetune_llama4-maverick".
         workload_data: Metadata dict for the workload.
         venv_path: Path to the venv to activate for this workload (may be None).
-        venv_type: 'venv' or 'conda'.
+        venv_type: Environment type for venv_path ('uv', 'venv', or 'conda').
         install_path: Base installation path ($LLMB_INSTALL).
         slurm_info: Cluster SLURM config as gathered earlier.
         global_env_vars: Env vars collected from the user (e.g. HF_TOKEN).
@@ -204,115 +200,3 @@ def run_setup_tasks(
             if stderr_msg:
                 print(stderr_msg)
             raise
-
-
-def run_post_install_script(setup_script: str, source_dir: str, env: Dict[str, str]):
-    """Run a post-install setup script within the correct environment.
-
-    Distinct from the scripted workload install, as that also creates a venv.
-
-    Args:
-        setup_script: The name of the setup script
-        source_dir: The directory where the script is located
-        env: The environment dictionary for running subprocesses
-    """
-    print("\n⚠️  WARNING: setup_script functionality is deprecated and will be removed in a future release.")
-    print("   Please migrate to the 'tasks' feature in metadata.yaml for setup operations.")
-    print("   See documentation: docs/recipe_guide.md#setup-tasks\n")
-
-    script_path = os.path.join(source_dir, setup_script)
-    print(f"Running post-install script: {script_path}")
-    try:
-        if not os.path.exists(script_path):
-            print(f"Warning: Post-install script {script_path} not found, skipping.")
-            return
-
-        os.chmod(script_path, 0o755)
-
-        subprocess.run([script_path], env=env, cwd=source_dir, check=True, text=True)
-        print("\n✓ Post-install script completed successfully.")
-
-    except subprocess.CalledProcessError as e:
-        print(f"\nError running post-install script (return code: {e.returncode})")
-        raise
-
-
-def install_scripted_workload(
-    workload_key: str,
-    workload_data: Dict[str, Any],
-    install_path: str,
-    venv_type: str,
-    env_vars: Dict[str, str],
-    gpu_type: str,
-) -> Optional[str]:
-    """Install a workload whose dependencies are defined entirely by a shell script.
-
-    This function is used for workloads that rely on a 'setup_script' to handle
-    their setup, rather than declaring dependencies in the metadata. It will
-    create a dedicated virtual environment for this workload.
-
-    Args:
-        workload_key: The unique identifier for the workload.
-        workload_data: The dictionary of metadata for the workload.
-        install_path: The base installation directory for all workloads.
-        venv_type: The type of virtual environment to create ('venv' or 'conda').
-        env_vars: The environment variables to pass to the setup script.
-        gpu_type: GPU type (e.g., 'h100', 'gb200').
-    Returns:
-        The path to the created virtual environment, or None if no venv was required.
-    """
-    print(f"\n\nInstalling {workload_key} (scripted method)")
-    print("-----------------------------------------")
-    print("⚠️  WARNING: Scripted workload installation is deprecated and will be removed in a future release.")
-    print("   Please migrate to dependency-based installation with 'tasks' feature in metadata.yaml.")
-    print("   See documentation: docs/recipe_guide.md#setup-tasks\n")
-
-    target_dir = os.path.join(install_path, "workloads", workload_key)
-    os.makedirs(target_dir, exist_ok=True)
-
-    env = os.environ.copy()
-    venv_path = None
-
-    setup_config = workload_data.get('setup', {})
-    if setup_config.get('venv_req', False):
-        venv_name = f"{workload_key}_venv"
-        venvs_dir = os.path.join(install_path, "venvs")
-        os.makedirs(venvs_dir, exist_ok=True)
-        venv_path = os.path.join(venvs_dir, venv_name)
-        create_virtual_environment(venv_path, venv_type)
-        env = get_venv_environment(venv_path, venv_type)
-    else:
-        print(f"No virtual environment required for {workload_key}")
-
-    env['LLMB_INSTALL'] = install_path
-    env['LLMB_WORKLOAD'] = os.path.join(install_path, "workloads", workload_key)
-    # Signal to setup scripts that this is an automated install (prevents automatic sqsh downloads)
-    env['MANUAL_INSTALL'] = 'false'
-    env['GPU_TYPE'] = gpu_type
-    if env_vars:
-        env.update(env_vars)
-
-    source_dir = workload_data['path']
-    print(f"Installing {workload_key} to {target_dir}")
-
-    setup_script = setup_config.get('setup_script')
-    if setup_script:
-        script_path = os.path.join(source_dir, setup_script)
-        print(f"Running setup script: {script_path}")
-
-        if not os.path.exists(script_path):
-            print(f"Error: Setup script {script_path} not found!")
-            return venv_path
-
-        os.chmod(script_path, 0o755)
-
-        try:
-            subprocess.run([script_path], env=env, cwd=source_dir, check=True, text=True)
-            print(f"\n✓ Setup script for {workload_key} completed successfully.")
-        except subprocess.CalledProcessError as e:
-            print(f"\nError running setup script for {workload_key} (return code: {e.returncode})")
-            raise
-    else:
-        print(f"No setup script specified for {workload_key}")
-
-    return venv_path

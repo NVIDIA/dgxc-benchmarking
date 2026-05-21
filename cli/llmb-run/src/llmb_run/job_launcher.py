@@ -37,9 +37,20 @@ from llmb_run.constants import (
     NVLINK_DOMAIN_SIZE,
     SLURM_OUTPUT_PATTERN,
 )
+from llmb_run.env_args import (
+    apply_nemo_explicit_env_contract,
+    apply_nemo_workload_args_contract,
+    apply_sbatch_explicit_env_contract,
+)
+from llmb_run.job_history import record_job_submission
 from llmb_run.nsys_mount_handler import get_tool_mounts
 from llmb_run.run_config import create_llmb_config
-from llmb_run.slurm_utils import SlurmJob, get_cluster_name
+from llmb_run.slurm_args import (
+    ADDITIONAL_SLURM_PARAMS_KEY,
+    SlurmArgs,
+    validate_no_additional_slurm_params_conflict,
+)
+from llmb_run.slurm_utils import SlurmJob, get_cluster_name, parse_slurm_job_id
 from llmb_run.tasks import format_task_output
 
 logger = logging.getLogger('llmb_run.job_launcher')
@@ -284,6 +295,24 @@ class JobLauncher(ABC):
         """Determine GPU type for a task from cluster config only."""
         return self.config.gpu_type
 
+    def resolve_task_slurm_args(self, task, *, workload_config=None) -> SlurmArgs | None:
+        """Resolve per-task canonical Slurm args in one place."""
+        cli_args = task.slurm_args
+        if not cli_args:
+            return None
+
+        workload_environment = {}
+        if workload_config:
+            workload_environment = workload_config.get('environment', {})
+
+        validate_no_additional_slurm_params_conflict(
+            cli_args=cli_args,
+            cluster_environment=self.config.environment,
+            workload_environment=workload_environment,
+            task_environment=task.env_overrides,
+        )
+        return cli_args
+
 
 class SbatchLauncher(JobLauncher):
     """Launcher for SLURM sbatch jobs.
@@ -292,6 +321,7 @@ class SbatchLauncher(JobLauncher):
 
     def launch(self, task):
         """Launch a task using the legacy sbatch method."""
+        workload_config = self.config.workload_config(task.workload_key)
         job = {
             "workload": task.workload_key,
             "LLMB_INSTALL": self.config.llmb_install,
@@ -317,6 +347,11 @@ class SbatchLauncher(JobLauncher):
         ntasks_per_node = str(gpus_per_node) if task.scale >= gpus_per_node else str(task.scale)
 
         llmb_workload = f"{self.config.llmb_install}/workloads/{job['workload']}"
+        try:
+            slurm_args = self.resolve_task_slurm_args(task, workload_config=workload_config)
+        except ValueError as e:
+            logger.error(format_task_output(task, prefix="ERROR: ", suffix=str(e)))
+            return SlurmJob(job_id=None, job_workdir=None)
 
         cmd = [
             "sbatch",
@@ -329,8 +364,8 @@ class SbatchLauncher(JobLauncher):
             f"--ntasks-per-node={ntasks_per_node}",
         ]
 
-        if task.extra_slurm_params and 'nice' in task.extra_slurm_params:
-            cmd.append(f"--nice={task.extra_slurm_params['nice']}")
+        if slurm_args:
+            cmd.extend(slurm_args.to_sbatch_args())
 
         cmd.append(self.get_launch_script(task))
 
@@ -367,6 +402,7 @@ class SbatchLauncher(JobLauncher):
         # Convert all task override values to strings
         task_env = {k: str(v) for k, v in task.env_overrides.items()}
         env.update(task_env)
+        apply_sbatch_explicit_env_contract(env, task.explicit_env_overrides)
 
         # Handle model parameter overrides
         if task.model_overrides:
@@ -375,16 +411,19 @@ class SbatchLauncher(JobLauncher):
         try:
             logger.debug(f"Command: {cmd}")
             result = subprocess.run(cmd, capture_output=True, check=True, text=True, env=env, cwd=job['dir'])
-            job_id = result.stdout.strip()
+            job_id = parse_slurm_job_id(result.stdout)
             logger.info(format_task_output(task, prefix="SUBMITTED: ", suffix=f"jobid={job_id}"))
 
             # Create llmb-config.yaml file in the current directory
-            create_llmb_config(task, job_id, None, self.config, self.workloads)
+            config_path = create_llmb_config(task, str(job_id), None, self.config, self.workloads)
 
             # TODO: This job directory is not correct.
-            return SlurmJob(job_id=job_id, job_workdir=None)
+            return SlurmJob(job_id=job_id, job_workdir=None, llmb_config_path=config_path)
         except subprocess.CalledProcessError as e:
             logger.error(format_task_output(task, prefix="ERROR: ", suffix=f"error={e.stderr.strip()}"))
+            return SlurmJob(job_id=None, job_workdir=None)
+        except ValueError as e:
+            logger.error(format_task_output(task, prefix="ERROR: ", suffix=str(e)))
             return SlurmJob(job_id=None, job_workdir=None)
 
 
@@ -396,6 +435,7 @@ class ConfiguredSbatchLauncher(JobLauncher):
 
     def launch(self, task):
         """Launch a task using sbatch with a pre-created experiment directory."""
+        workload_config = self.config.workload_config(task.workload_key)
         # Working directory for sbatch (where the launch script lives)
         script_dir = self.workloads[task.workload_key]["dir"]
         # Base directory for experiments (under $LLMB_INSTALL/workloads/)
@@ -430,6 +470,11 @@ class ConfiguredSbatchLauncher(JobLauncher):
 
         num_nodes = (task.scale + gpus_per_node - 1) // gpus_per_node
         ntasks_per_node = str(gpus_per_node) if task.scale >= gpus_per_node else str(task.scale)
+        try:
+            slurm_args = self.resolve_task_slurm_args(task, workload_config=workload_config)
+        except ValueError as e:
+            logger.error(format_task_output(task, prefix="ERROR: ", suffix=str(e)))
+            return SlurmJob(job_id=None, job_workdir=None)
 
         cmd = [
             "sbatch",
@@ -442,8 +487,9 @@ class ConfiguredSbatchLauncher(JobLauncher):
             f"--ntasks-per-node={ntasks_per_node}",
         ]
 
-        if task.extra_slurm_params and 'nice' in task.extra_slurm_params:
-            cmd.append(f"--nice={task.extra_slurm_params['nice']}")
+        segment_override = slurm_args.get_named_param('segment') if slurm_args else None
+        if slurm_args:
+            cmd.extend(slurm_args.to_sbatch_args())
 
         cmd.append(self.get_launch_script(task))
 
@@ -472,15 +518,6 @@ class ConfiguredSbatchLauncher(JobLauncher):
             env['ENABLE_VBOOST'] = 'true'
             logger.debug("Automatically enabled VBoost for 'eos' cluster")
 
-        # Set SBATCH_SEGMENT_SIZE for GB200/GB300 if not already set in environment
-        if (
-            gpu_type in {'gb200', 'gb300'}
-            and 'SBATCH_SEGMENT_SIZE' not in env
-            and 'SBATCH_SEGMENT_SIZE' not in task.env_overrides
-        ):
-            env['SBATCH_SEGMENT_SIZE'] = str(_compute_segment_size(num_nodes))
-            logger.debug(f"Set SBATCH_SEGMENT_SIZE={env['SBATCH_SEGMENT_SIZE']} for {gpu_type}")
-
         # Handle environment variables from config
         if self.config.environment:
             env_vars = {k: str(v) for k, v in self.config.environment.items()}
@@ -489,30 +526,48 @@ class ConfiguredSbatchLauncher(JobLauncher):
         # Convert all task override values to strings
         task_env = {k: str(v) for k, v in task.env_overrides.items()}
         env.update(task_env)
+        apply_sbatch_explicit_env_contract(env, task.explicit_env_overrides)
 
         # Handle model parameter overrides
         if task.model_overrides:
             env.update({k.upper(): str(v) for k, v in task.model_overrides.items()})
 
-        # Backward-compat: also pass segment size as a CLI flag for older Slurm
-        # versions where SBATCH_SEGMENT_SIZE did not exist but --segment did.
-        if 'SBATCH_SEGMENT_SIZE' in env:
-            cmd.insert(-1, f"--segment={env['SBATCH_SEGMENT_SIZE']}")
+        # Resolve segment as a --segment flag. CLI override is already in cmd
+        # via to_sbatch_args(). Otherwise, check for SBATCH_SEGMENT_SIZE from any
+        # env source, or auto-detect for GB200/GB300.
+        # NOTE: Newer Slurm versions support SBATCH_SEGMENT_SIZE as an env var
+        # natively; if we ever drop support for older versions, we could set the
+        # env var instead of the flag.
+        if segment_override is None:
+            env_segment = env.get('SBATCH_SEGMENT_SIZE')
+            if env_segment is not None:
+                cmd.insert(-1, f"--segment={env_segment}")
+            elif gpu_type in {'gb200', 'gb300'}:
+                computed = _compute_segment_size(num_nodes)
+                cmd.insert(-1, f"--segment={computed}")
+                logger.debug(f"Auto-detected segment size {computed} for {gpu_type}")
+
+        # Remove SBATCH_SEGMENT_SIZE from the subprocess env — we pass --segment
+        # as a flag instead.
+        env.pop('SBATCH_SEGMENT_SIZE', None)
 
         try:
             logger.debug(f"Command: {cmd}")
             result = subprocess.run(cmd, capture_output=True, check=True, text=True, env=env, cwd=script_dir)
-            job_id = result.stdout.strip()
+            job_id = parse_slurm_job_id(result.stdout)
             logger.info(
                 format_task_output(task, prefix="SUBMITTED: ", suffix=f"jobid={job_id} workdir={experiment_dir}")
             )
 
             # Create llmb-config.yaml file in the experiment directory
-            create_llmb_config(task, job_id, experiment_dir, self.config, self.workloads)
+            config_path = create_llmb_config(task, str(job_id), experiment_dir, self.config, self.workloads)
 
-            return SlurmJob(job_id=job_id, job_workdir=experiment_dir)
+            return SlurmJob(job_id=job_id, job_workdir=experiment_dir, llmb_config_path=config_path)
         except subprocess.CalledProcessError as e:
             logger.error(format_task_output(task, prefix="ERROR: ", suffix=f"error={e.stderr.strip()}"))
+            return SlurmJob(job_id=None, job_workdir=None)
+        except ValueError as e:
+            logger.error(format_task_output(task, prefix="ERROR: ", suffix=str(e)))
             return SlurmJob(job_id=None, job_workdir=None)
 
 
@@ -534,6 +589,15 @@ class Nemo2Launcher(JobLauncher):
             return SlurmJob(job_id=None, job_workdir=None)
 
         try:
+            slurm_args = self.resolve_task_slurm_args(task, workload_config=workload_config)
+        except ValueError as e:
+            logger.error(format_task_output(task, prefix="ERROR: ", suffix=str(e)))
+            return SlurmJob(job_id=None, job_workdir=None)
+
+        try:
+            workload_metadata = self.workloads[task.workload_key].get('metadata', {})
+            launcher_type = workload_metadata.get('run', {}).get('launcher_type')
+
             # Get venv environment with the correct type
             env = get_venv_environment(venv_path, venv_type)
 
@@ -575,14 +639,19 @@ class Nemo2Launcher(JobLauncher):
             # Convert all task override values to strings
             task_env = {k: str(v) for k, v in task.env_overrides.items()}
             env.update(task_env)
+            if launcher_type == 'megatron_bridge':
+                apply_nemo_workload_args_contract(env, task.extra_workload_args)
+            apply_nemo_explicit_env_contract(env, task.explicit_env_overrides)
 
             # Handle model parameter overrides
             if task.model_overrides:
                 env.update({k.upper(): str(v) for k, v in task.model_overrides.items()})
 
+            if slurm_args:
+                env[ADDITIONAL_SLURM_PARAMS_KEY] = slurm_args.to_additional_slurm_params()
+
             # Handle custom tool mounts if needed (workarounds for container bugs during profiling)
             try:
-                workload_metadata = self.workloads[task.workload_key].get('metadata', {})
                 tool_mounts = get_tool_mounts(
                     llmb_install=self.config.llmb_install,
                     workload_metadata=workload_metadata,
@@ -641,34 +710,18 @@ class Nemo2Launcher(JobLauncher):
                     )
                     return SlurmJob(job_id=None, job_workdir=None)
                 else:
+                    try:
+                        parsed_job_id = parse_slurm_job_id(job_id)
+                    except ValueError as e:
+                        logger.error(format_task_output(task, prefix="ERROR: ", suffix=str(e)))
+                        return SlurmJob(job_id=None, job_workdir=None)
                     logger.info(format_task_output(task, prefix="LAUNCHED: ", suffix=f"jobid={job_id}"))
                     logger.info(f"JobID: {job_id}, Workdir: {local_dir}")
 
-                    # Apply scontrol nice if specified
-                    if nice_value := (task.extra_slurm_params or {}).get('nice'):
-                        scontrol_cmd = ["scontrol", "update", f"jobid={job_id}", f"nice={nice_value}"]
-                        try:
-                            scontrol_result = subprocess.run(
-                                scontrol_cmd, capture_output=True, check=False, text=True, timeout=10
-                            )
-                            if scontrol_result.returncode != 0:
-                                # Log non-zero return codes for debugging, as this can happen if the job already started.
-                                logger.debug(
-                                    f"scontrol failed for job {job_id} (nice={nice_value}): {scontrol_result.stderr.strip()}"
-                                )
-                        except FileNotFoundError:
-                            logger.warning("`scontrol` command not found. Cannot apply nice value.")
-                        except subprocess.TimeoutExpired:
-                            logger.warning(f"Timeout executing `scontrol` for job {job_id}.")
-                        except Exception as e:
-                            logger.warning(
-                                f"An unexpected error occurred while executing scontrol for job {job_id}: {e}"
-                            )
-
                     # Create llmb-config.yaml file in the experiment directory
-                    create_llmb_config(task, job_id, local_dir, self.config, self.workloads)
+                    config_path = create_llmb_config(task, str(parsed_job_id), local_dir, self.config, self.workloads)
 
-                    return SlurmJob(job_id=job_id, job_workdir=local_dir)
+                    return SlurmJob(job_id=parsed_job_id, job_workdir=local_dir, llmb_config_path=config_path)
             else:
                 console.print("\n[bold red]Launch Error:[/bold red]")
                 console.print(result.stderr)
@@ -734,6 +787,8 @@ def run_tests(config, task_list, workloads):
         if not slurm_job.job_id:
             failed_tasks.append(task)
             continue
+
+        record_job_submission(config, task, slurm_job, workloads)
 
         # Run post-processing pipeline (resparse, upload, workload inspector)
         if slurm_job.job_id and slurm_job.job_workdir:

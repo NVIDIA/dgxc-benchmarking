@@ -23,7 +23,10 @@
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from llmb_run.slurm_args import SlurmArgs
 
 logger = logging.getLogger('llmb_run.tasks')
 
@@ -37,8 +40,10 @@ class WorkloadTask:
     profile: bool = False
     proxy: bool = False
     env_overrides: dict = field(default_factory=dict)
+    explicit_env_overrides: dict = field(default_factory=dict)
     model_overrides: dict = field(default_factory=dict)
-    extra_slurm_params: Dict[str, Any] = field(default_factory=dict)
+    slurm_args: 'SlurmArgs | None' = None
+    extra_workload_args: tuple[str, ...] = ()
 
 
 def format_task_output(task, prefix="", suffix=""):

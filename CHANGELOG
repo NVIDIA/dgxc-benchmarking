@@ -1,3 +1,40 @@
+## [v26.05.00] - 2026-05-19
+
+### Added
+
+- Kimi K2 MXFP8 pretrain support.
+- Nemotron 3 Nano (30B) and Super (120B) pretrain recipes.
+- Slurm topology checks and CPU governor reporting in the system info microbenchmark.
+- `llmb-run` job history and log handling.
+- `llmb-run` flags: `--env` for container env overrides, additional Slurm pass-through flags, and `dump-env` Megatron-Bridge mode.
+
+### Changed
+
+- Updated recipes to NeMo 26.04.00 where applicable.
+- Refreshed DeepSeek V3, Nemotron 3, and Qwen3 configurations.
+
+### Fixed
+
+- Legacy-parser grad-norm NaN handling.
+- Archive exclusion for `nsys_profile` and PyTorch profiling output directories.
+- Torchtitan container compatibility.
+
+### Removed
+
+- Deprecated Grok1 and Nemotron4 recipes.
+- Legacy `setup_script` installer path and Conda support.
+- Deprecated `llmb-run` commands.
+
+### Known Issues
+
+- DeepSeek V3 Megatron-Bridge on H100 requires `uv <=0.9.28` during setup.
+- EFA limitations remain for DeepSeek V3 (Megatron-Bridge H100, TorchTitan) and Qwen3 (30B H100, 235B H100); see Known Issues section of README for details.
+- Optional PCT fixed-core CPU binding may improve select workloads on Granite Rapids systems where PCT is enabled. See the README Known Issues section before applying the patch.
+
+### End of Support
+
+- LLMB `v25.12.x` and earlier are no longer supported as of `v26.05.00`. These release lines will not receive further updates, fixes, or support.
+
 ## [v26.02.01] - 2026-04-24
 
 ### Added

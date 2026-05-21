@@ -1,5 +1,5 @@
 #!/bin/bash
-# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -28,58 +28,58 @@ fi
 
 set -eu -o pipefail
 
-#Required environment variables
-: "${LLMB_INSTALL:?Required variable LLMB_INSTALL}"
-
 export WORKLOAD_TYPE=pretrain
-export MODEL_NAME=qwen3
-export MODEL_SIZE=${MODEL_SIZE:-235b}
-export MODEL_SIZE=${MODEL_SIZE,,}
-
-# Map short model size to full model size for --model_size argument
-if [ $MODEL_SIZE = "235b" ]; then
-    MODEL_SIZE_FULL="235b_a22b"
-elif [ $MODEL_SIZE = "30b" ]; then
-    MODEL_SIZE_FULL="30b_a3b"
-else
-    echo "Unsupported MODEL_SIZE: $MODEL_SIZE"
-    exit 1
-fi
+export MODEL_NAME=nemotron_3
+export FW_VERSION=26.04.00
 
 export OPENBLAS_NUM_THREADS=1 # Required for login nodes with tight memory restrictions. Do not remove.
 
 export LLMB_WORKLOAD=$LLMB_INSTALL/workloads/${WORKLOAD_TYPE}_${MODEL_NAME}
+export NEMORUN_HOME=$LLMB_WORKLOAD
 export LLMB_REPO=$PWD
 
-export NEMORUN_HOME=$LLMB_WORKLOAD
-export NEMO_HOME=${NEMO_HOME:-$LLMB_WORKLOAD}
-
-export DTYPE=${DTYPE:-bf16}
-export DTYPE=${DTYPE,,}
-export GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
-export GPU_TYPE=${GPU_TYPE,,}
-export JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
-
-FW_VERSION=26.04.00
-
 export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh}
-if [ "$MODEL_SIZE" = "235b" ]; then
-    export TIME_LIMIT=${TIME_LIMIT:-"02:00:00"}
+
+DTYPE=${DTYPE:-bf16}
+DTYPE=${DTYPE,,}
+FP8_RECIPE=${FP8_RECIPE:-mx}
+FP8_RECIPE=${FP8_RECIPE,,}
+GPU_TYPE=${GPU_TYPE:?GPU_TYPE is a required variable.}
+GPU_TYPE=${GPU_TYPE,,}
+JOB_TOTAL_GPUS=${JOB_TOTAL_GPUS:?JOB_TOTAL_GPUS is a required variable.}
+MODEL_SIZE=${MODEL_SIZE:-30b}
+MODEL_SIZE=${MODEL_SIZE,,}
+
+if [[ $MODEL_SIZE == "30b" ]]; then
+    MODEL_RECIPE_NAME="nemotron_3_nano"
+elif [[ $MODEL_SIZE == "120b" ]]; then
+    MODEL_RECIPE_NAME="nemotron_3_super"
 else
-    export TIME_LIMIT=${TIME_LIMIT:-"01:00:00"}
+    echo "Error: Invalid MODEL_SIZE '$MODEL_SIZE'. Supported values: 30b, 120b" >&2
+    exit 1
 fi
-export MAX_STEPS=${MAX_STEPS:-50}
-export PROFILE_START_STEP=${PROFILE_START_STEP:-45}
-export PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
 
 PROFILE_ENABLED=${ENABLE_PROFILE:-false}
 PROFILE_ENABLED=${PROFILE_ENABLED,,}
 PYTORCH_PROFILE_ENABLED=${ENABLE_PYTORCH_PROFILE:-false}
 PYTORCH_PROFILE_ENABLED=${PYTORCH_PROFILE_ENABLED,,}
+PROFILE_START_STEP=${PROFILE_START_STEP:-45}
+PROFILE_STOP_STEP=${PROFILE_STOP_STEP:-50}
 GPU_METRICS_ENABLED=${ENABLE_GPU_METRICS:-false}
 GPU_METRICS_ENABLED=${GPU_METRICS_ENABLED,,}
 ENABLE_VBOOST=${ENABLE_VBOOST:-false}
 ENABLE_VBOOST=${ENABLE_VBOOST,,}
+TIME_LIMIT=${TIME_LIMIT:-"00:45:00"}
+MAX_STEPS=${MAX_STEPS:-50}
+
+if [[ $DTYPE == "fp8" ]]; then
+    if [[ $GPU_TYPE == "h100" ]]; then
+        FP8_RECIPE="cs"
+    fi
+    COMPUTE_TYPE=${DTYPE}_${FP8_RECIPE}
+else
+    COMPUTE_TYPE=${DTYPE}
+fi
 
 # Handle additional SLURM parameters from environment variable
 ADDITIONAL_SLURM_PARAMS=${ADDITIONAL_SLURM_PARAMS:-""}
@@ -90,9 +90,9 @@ if [ -n "$ADDITIONAL_SLURM_PARAMS" ]; then
     SLURM_ARGS="--additional_slurm_params ${ADDITIONAL_SLURM_PARAMS}"
 fi
 
-# Mount Hugging Face cache for tokenizers
 export HF_HOME="$LLMB_INSTALL/.cache/huggingface"
 CONTAINER_MOUNTS="$HF_HOME"
+
 if [[ -n ${RUN_CONF_MOUNTS:-""} ]]; then
     if [[ -n ${CONTAINER_MOUNTS} ]]; then
         CONTAINER_MOUNTS+=","
@@ -100,112 +100,50 @@ if [[ -n ${RUN_CONF_MOUNTS:-""} ]]; then
     CONTAINER_MOUNTS+="${RUN_CONF_MOUNTS}"
 fi
 
-CONFIG_OVERRIDES="${CONFIG_OVERRIDES:-}"
-if [[ -n ${CONFIG_OVERRIDES} ]]; then
-    CONFIG_OVERRIDES+=" "
-fi
+CONFIG_OVERRIDES=""
 if [[ -n ${CONTAINER_MOUNTS} ]]; then
     CONFIG_OVERRIDES+=" --custom_mounts $CONTAINER_MOUNTS"
-fi
-
-# Optional overrides: only set when user provides values.
-if [[ -n ${TP:-} ]]; then
-    CONFIG_OVERRIDES+=" -tp $TP "
-fi
-if [[ -n ${PP:-} ]]; then
-    CONFIG_OVERRIDES+=" -pp $PP "
-fi
-if [[ -n ${CP:-} ]]; then
-    CONFIG_OVERRIDES+=" -cp $CP "
-fi
-if [[ -n ${EP:-} ]]; then
-    CONFIG_OVERRIDES+=" -ep $EP "
-fi
-if [[ -n ${ETP:-} ]]; then
-    CONFIG_OVERRIDES+=" -et $ETP "
-fi
-if [[ -n ${GBS:-} ]]; then
-    CONFIG_OVERRIDES+=" -gb $GBS "
-fi
-if [[ -n ${MBS:-} ]]; then
-    CONFIG_OVERRIDES+=" -mb $MBS "
-fi
-if [[ -n ${VP:-} ]]; then
-    CONFIG_OVERRIDES+=" -vp $VP "
-fi
-if [[ -n ${CUDA_GRAPH_SCOPE:-} ]]; then
-    CUDA_GRAPH_IMPL="transformer_engine"
-    if [[ $CUDA_GRAPH_SCOPE == "full_iteration" ]]; then
-        CUDA_GRAPH_IMPL="local"
-    elif [[ $CUDA_GRAPH_SCOPE == "none" ]]; then
-        CUDA_GRAPH_IMPL="none"
-    fi
-    CONFIG_OVERRIDES+=" --cuda_graph_impl=$CUDA_GRAPH_IMPL "
-    if [[ $CUDA_GRAPH_IMPL != "none" ]]; then
-        CONFIG_OVERRIDES+=" --cuda_graph_scope=$CUDA_GRAPH_SCOPE "
-    fi
-fi
-
-if [[ $PROFILE_ENABLED == "true" ]] && [[ $PYTORCH_PROFILE_ENABLED == "true" ]]; then
-    echo "Error: ENABLE_PROFILE and ENABLE_PYTORCH_PROFILE are mutually exclusive." >&2
-    exit 1
 fi
 
 if [[ $PROFILE_ENABLED == "true" ]]; then
     CONFIG_OVERRIDES+=" --enable_nsys "
     CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
     CONFIG_OVERRIDES+=" --profiling_stop_step=$PROFILE_STOP_STEP "
-    CONFIG_OVERRIDES+=" --nsys_trace=cuda,nvtx "
+    PROFILE_RANKS=$(seq -s, 0 $((JOB_TOTAL_GPUS - 1)))
+    CONFIG_OVERRIDES+=" --profiling_ranks=$PROFILE_RANKS"
+    CONFIG_OVERRIDES+=" --nsys_trace=cuda "
     CONFIG_OVERRIDES+=" --nsys_extra_args=--nvtx-domain-include=NCCL "
-    CONFIG_OVERRIDES+=" --profiling_ranks=$(seq -s, 0 $((JOB_TOTAL_GPUS - 1))) "
     if [[ $GPU_METRICS_ENABLED == true ]]; then
         CONFIG_OVERRIDES+=" --profiling_gpu_metrics "
     fi
-    MAX_STEPS=$PROFILE_STOP_STEP
 fi
 
 if [[ $PYTORCH_PROFILE_ENABLED == "true" ]]; then
     CONFIG_OVERRIDES+=" --pytorch_profiler true "
 fi
 
-if [[ $DTYPE == "fp8" ]]; then
-    if [[ $GPU_TYPE == "h100" ]]; then
-        export FP8_RECIPE=${FP8_RECIPE:-fp8_cs}
-    else
-        export FP8_RECIPE=${FP8_RECIPE:-fp8_mx}
-    fi
-    export FP8_RECIPE=${FP8_RECIPE,,}
-    COMPUTE_DTYPE=$FP8_RECIPE
-else
-    COMPUTE_DTYPE=$DTYPE
-fi
-
 if [[ $ENABLE_VBOOST == true ]]; then
     CONFIG_OVERRIDES+=" --enable_vboost true "
 fi
 
-if [[ $GPU_TYPE == "gb200" ]] || [[ $GPU_TYPE == "gb300" ]]; then
+if [[ $GPU_TYPE == "gb300" ]] || [[ $GPU_TYPE == "gb200" ]]; then
     GPUS_PER_NODE=4
-else
+elif [[ $GPU_TYPE == "b300" ]] || [[ $GPU_TYPE == "b200" ]] || [[ $GPU_TYPE == "h100" ]]; then
     GPUS_PER_NODE=8
 fi
 
-if [[ $DTYPE == "bf16" ]] && [[ $MODEL_SIZE == "235b" ]] && [[ $GPU_TYPE != "h100" ]]; then
-    export NCCL_IB_QPS_PER_CONNECTION=${NCCL_IB_QPS_PER_CONNECTION:-4}
-fi
-
-#run command
+# run command
 pushd $LLMB_WORKLOAD/Megatron-Bridge
 
 python3 scripts/performance/setup_experiment.py \
     --container_image $IMAGE \
-    --offline \
-    --compute_dtype $COMPUTE_DTYPE \
-    --model_family_name qwen \
-    --model_recipe_name qwen3_${MODEL_SIZE_FULL} \
+    --compute_dtype $COMPUTE_TYPE \
     --gpu $GPU_TYPE \
     --num_gpus $JOB_TOTAL_GPUS \
     --gpus_per_node $GPUS_PER_NODE \
+    --offline \
+    --model_family_name nemotronh \
+    --model_recipe_name ${MODEL_RECIPE_NAME} \
     ${CONFIG_OVERRIDES} \
     --account $SBATCH_ACCOUNT \
     --partition $SBATCH_PARTITION \

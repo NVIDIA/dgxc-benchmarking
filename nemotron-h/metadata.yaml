@@ -32,11 +32,11 @@ container:
 repositories:
   megatron_bridge:
     url: "https://github.com/NVIDIA-NeMo/Megatron-Bridge.git"
-    commit: "aeead1ae667d795ebe725cb4a608581a21f402cc"
+    commit: "f07871e23f637f4ae87d92256babc51fdbb12f39"
 
   nemo_run:
     url: "https://github.com/NVIDIA-NeMo/Run.git"
-    commit: "525d68bfce2d6baed86ed3d7d0edbae07833ea0d"
+    commit: "ab0c4328275c4c731f1bdea3ceb0e68a9a17a6a2"
 
 setup:
   venv_req: true
@@ -84,4 +84,4 @@ run:
       model_configs:
         - model_size: '56b'
           dtypes: 'fp8'
-          scales: [32, 64, 128, 256, 512, 1024]
+          scales: [32, 64, 128, 256, 512]

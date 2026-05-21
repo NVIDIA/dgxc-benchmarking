@@ -20,41 +20,39 @@
 # DEALINGS IN THE SOFTWARE.
 config:
   scale: 512
-  repeats: 3
-  profile: true
+  repeats: 1
+  profile: false
 workloads:
   gb300:
   - pretrain_deepseek-v3_671b:
-      dtypes: [bf16, fp8]
+      dtypes: [bf16, fp8, nvfp4]
   - pretrain_gpt_oss_120b:
       dtypes: [bf16]
-  - pretrain_grok1_314b:
-      dtypes: [bf16, fp8]
+  - pretrain_kimi-k2_1t:
+      dtypes: [fp8]
   - pretrain_llama3.1_405b:
       dtypes: [fp8, nvfp4]
   - pretrain_llama3.1_70b:
       dtypes: [fp8, nvfp4]
   - pretrain_nemotron-h_56b:
       dtypes: [fp8]
-  - pretrain_nemotron4-340b_340b:
-      dtypes: [bf16, fp8]
+  - pretrain_nemotron_3_120b:
+      dtypes: [bf16, fp8, nvfp4]
   - pretrain_qwen3_235b:
       dtypes: [bf16]
   gb200:
   - pretrain_deepseek-v3_671b:
-      dtypes: [bf16, fp8]
+      dtypes: [bf16, fp8, nvfp4]
   - pretrain_gpt_oss_120b:
       dtypes: [bf16]
-  - pretrain_grok1_314b:
-      dtypes: [bf16, fp8]
+  - pretrain_kimi-k2_1t:
+      dtypes: [fp8]
   - pretrain_llama3.1_405b:
       dtypes: [fp8, nvfp4]
   - pretrain_llama3.1_70b:
-      dtypes: [fp8]
+      dtypes: [fp8, nvfp4]
   - pretrain_nemotron-h_56b:
       dtypes: [fp8]
-  - pretrain_nemotron4-340b_340b:
-      dtypes: [bf16, fp8]
   - pretrain_qwen3_235b:
       dtypes: [bf16]
   b300:
@@ -63,11 +61,13 @@ workloads:
   - pretrain_gpt_oss_120b:
       dtypes: [bf16]
   - pretrain_llama3.1_405b:
-      dtypes: [fp8]
+      dtypes: [fp8, nvfp4]
   - pretrain_llama3.1_70b:
-      dtypes: [fp8]
+      dtypes: [fp8, nvfp4]
   - pretrain_nemotron-h_56b:
       dtypes: [fp8]
+  - pretrain_nemotron_3_120b:
+      dtypes: [bf16]
   - pretrain_qwen3_235b:
       dtypes: [bf16]
   b200:
@@ -75,15 +75,15 @@ workloads:
       dtypes: [bf16, fp8]
   - pretrain_gpt_oss_120b:
       dtypes: [bf16]
-  - pretrain_grok1_314b:
-      dtypes: [bf16, fp8]
+  - pretrain_kimi-k2_1t:
+      dtypes: [fp8]
   - pretrain_llama3.1_405b:
       dtypes: [fp8, nvfp4]
   - pretrain_llama3.1_70b:
       dtypes: [fp8, nvfp4]
   - pretrain_nemotron-h_56b:
       dtypes: [fp8]
-  - pretrain_nemotron4-340b_340b:
+  - pretrain_nemotron_3_120b:
       dtypes: [bf16, fp8]
   - pretrain_qwen3_235b:
       dtypes: [bf16]
@@ -92,13 +92,9 @@ workloads:
       dtypes: [fp8]
   - pretrain_gpt_oss_120b:
       dtypes: [bf16]
-  - pretrain_grok1_314b:
-      dtypes: [bf16, fp8]
   - pretrain_llama3.1_70b:
       dtypes: [bf16, fp8]
   - pretrain_nemotron-h_56b:
       dtypes: [fp8]
-  - pretrain_nemotron4-340b_340b:
-      dtypes: [bf16, fp8]
   - pretrain_qwen3_235b:
       dtypes: [bf16]

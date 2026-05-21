@@ -43,7 +43,7 @@ _ARCHIVE_PREFIX = "llmb-archive"
 _NCCL_WORKLOAD_NAME = "microbenchmark_nccl"
 _NCCL_TOP_LEVEL_PATTERNS = ("llmb-config_*.yaml", "slurm-*.out")
 _ARCHIVE_EXCLUDED_PATTERNS = ("*.nsys-rep", "*_trace.json", "*.pt.trace.json", "*.tar.*")
-_ARCHIVE_EXCLUDED_DIRS = {"code", "checkpoints"}
+_ARCHIVE_EXCLUDED_DIRS = {"code", "checkpoints", "nsys_profile", "torch_profile", "pytorch_profile"}
 
 
 @dataclass(frozen=True)

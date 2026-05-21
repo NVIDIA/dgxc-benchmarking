@@ -33,8 +33,13 @@ While the benchmarks can be run independently, we recommend looping in your NVID
 
 ### **Run benchmark recipes via llmb-run**
 
-1. "llmb-run" is a tool that automates execution of the test suite, and is the recommended way to launch the suite.
-2. For an installed GPU type, executing `llmb-run exemplar` will launch the full Exemplar test suite (including running each test three times). See the [llmb-run README](cli/llmb-run/README.md) for more info.
+```bash
+llmb-run exemplar
+```
+
+This launches the full Exemplar test suite for the installed GPU type. `llmb-run` is the recommended tool for executing the suite; the `exemplar` subcommand is a convenience that launches every required workload in one go.
+
+If individual workloads fail, you can re-run them on their own — Exemplar requires a passing run for each workload in the suite, not a single end-to-end execution. See the [llmb-run README](cli/llmb-run/README.md) for repeat and profiling behavior.
 
 ### **Verify results**
 
@@ -44,12 +49,11 @@ While the benchmarks can be run independently, we recommend looping in your NVID
 
 ### **Optimize with NVIDIA**
 
-1. Work with your NVIDIA account team to investigate any tuning opportunities with NVIDIA performance experts.
+Work with your NVIDIA account team to investigate any tuning opportunities with NVIDIA performance experts.
 
 ### **Qualify for Exemplar**
 
-1. If approved, your cloud is recognized as an [NVIDIA Exemplar Cloud](https://www.nvidia.com/en-us/data-center/ai-cloud-performance/) for the selected platform(s).
-2. NVIDIA is happy to collaborate to support downstream efforts highlighting your achievement.
+If approved, your cloud is recognized as an [NVIDIA Exemplar Cloud](https://www.nvidia.com/en-us/data-center/ai-cloud-performance/) for the selected platform(s). NVIDIA is happy to collaborate to support downstream efforts highlighting your achievement.
 
 ## **Ongoing Expectations**
 
@@ -60,44 +64,44 @@ To start, contact your NVIDIA account team and reference this DGX Cloud Benchmar
 
 ## Exemplar Workload Recipes
 
-Scale: **512 GPUs** | Repeats: **3x** | Profiling: enabled for 1 of the 3 total runs
+Scale: **512 GPUs** | Repeats: **1** | Profiling: **disabled**
 
 ### GB300
 
-| Model       | Size | Dtypes     |
-| :---------- | :--- | :--------- |
-| DeepSeek-V3 | 671B | BF16, FP8  |
-| GPT (OSS)   | 120B | BF16       |
-| Grok-1      | 314B | BF16, FP8  |
-| Llama 3.1   | 405B | FP8, NVFP4 |
-| Llama 3.1   | 70B  | FP8, NVFP4 |
-| Nemotron-H  | 56B  | FP8        |
-| Nemotron-4  | 340B | BF16, FP8  |
-| Qwen3       | 235B | BF16       |
+| Model       | Size | Dtypes           |
+| :---------- | :--- | :--------------- |
+| DeepSeek-V3 | 671B | BF16, FP8, NVFP4 |
+| GPT (OSS)   | 120B | BF16             |
+| Kimi-K2     | 1T   | FP8              |
+| Llama 3.1   | 405B | FP8, NVFP4       |
+| Llama 3.1   | 70B  | FP8, NVFP4       |
+| Nemotron-H  | 56B  | FP8              |
+| Nemotron 3  | 120B | BF16, FP8, NVFP4 |
+| Qwen3       | 235B | BF16             |
 
 ### GB200
 
-| Model       | Size | Dtypes     |
-| :---------- | :--- | :--------- |
-| DeepSeek-V3 | 671B | BF16, FP8  |
-| GPT (OSS)   | 120B | BF16       |
-| Grok-1      | 314B | BF16, FP8  |
-| Llama 3.1   | 405B | FP8, NVFP4 |
-| Llama 3.1   | 70B  | FP8        |
-| Nemotron-H  | 56B  | FP8        |
-| Nemotron-4  | 340B | BF16, FP8  |
-| Qwen3       | 235B | BF16       |
+| Model       | Size | Dtypes           |
+| :---------- | :--- | :--------------- |
+| DeepSeek-V3 | 671B | BF16, FP8, NVFP4 |
+| GPT (OSS)   | 120B | BF16             |
+| Kimi-K2     | 1T   | FP8              |
+| Llama 3.1   | 405B | FP8, NVFP4       |
+| Llama 3.1   | 70B  | FP8, NVFP4       |
+| Nemotron-H  | 56B  | FP8              |
+| Qwen3       | 235B | BF16             |
 
 ### B300
 
-| Model       | Size | Dtypes |
-| :---------- | :--- | :----- |
-| DeepSeek-V3 | 671B | BF16   |
-| GPT (OSS)   | 120B | BF16   |
-| Llama 3.1   | 405B | FP8    |
-| Llama 3.1   | 70B  | FP8    |
-| Nemotron-H  | 56B  | FP8    |
-| Qwen3       | 235B | BF16   |
+| Model       | Size | Dtypes     |
+| :---------- | :--- | :--------- |
+| DeepSeek-V3 | 671B | BF16       |
+| GPT (OSS)   | 120B | BF16       |
+| Llama 3.1   | 405B | FP8, NVFP4 |
+| Llama 3.1   | 70B  | FP8, NVFP4 |
+| Nemotron-H  | 56B  | FP8        |
+| Nemotron 3  | 120B | BF16       |
+| Qwen3       | 235B | BF16       |
 
 ### B200
 
@@ -105,11 +109,11 @@ Scale: **512 GPUs** | Repeats: **3x** | Profiling: enabled for 1 of the 3 total 
 | :---------- | :--- | :--------- |
 | DeepSeek-V3 | 671B | BF16, FP8  |
 | GPT (OSS)   | 120B | BF16       |
-| Grok-1      | 314B | BF16, FP8  |
+| Kimi-K2     | 1T   | FP8        |
 | Llama 3.1   | 405B | FP8, NVFP4 |
 | Llama 3.1   | 70B  | FP8, NVFP4 |
 | Nemotron-H  | 56B  | FP8        |
-| Nemotron-4  | 340B | BF16, FP8  |
+| Nemotron 3  | 120B | BF16, FP8  |
 | Qwen3       | 235B | BF16       |
 
 ### H100
@@ -118,8 +122,6 @@ Scale: **512 GPUs** | Repeats: **3x** | Profiling: enabled for 1 of the 3 total 
 | :---------- | :--- | :-------- |
 | DeepSeek-V3 | 671B | FP8       |
 | GPT (OSS)   | 120B | BF16      |
-| Grok-1      | 314B | BF16, FP8 |
 | Llama 3.1   | 70B  | BF16, FP8 |
 | Nemotron-H  | 56B  | FP8       |
-| Nemotron-4  | 340B | BF16, FP8 |
 | Qwen3       | 235B | BF16      |

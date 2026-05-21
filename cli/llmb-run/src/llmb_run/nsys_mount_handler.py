@@ -49,6 +49,7 @@ CONTAINER_NSYS_INSTALL_DIRS: Dict[str, str] = {
     'nvcr.io#nvidia/nemo:25.11.01': '/usr/local/cuda-13.0/NsightSystems-cli-2025.5.1',
     'nvcr.io#nvidia/nemo:26.02.00': '/usr/local/cuda-13.0/NsightSystems-cli-2025.5.1',
     'nvcr.io#nvidia/nemo:26.02.01': '/usr/local/cuda-13.0/NsightSystems-cli-2026.1.0',
+    'nvcr.io#nvidia/nemo:26.04.00': '/usr/local/cuda-13.1/NsightSystems-cli-2026.1.1/',
 }
 
 # Container image to CUPTI library path lookup table

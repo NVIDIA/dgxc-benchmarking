@@ -4,12 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "llmb-install"
-version = "1.8.6"
+version = "1.9.1"
 requires-python = ">=3.10"
 description = "Installer for LLM benchmarking workloads"
 
 dependencies = [
     "PyYAML~=6.0",
+    "pydantic>=2.0,<3",
     "questionary~=2.1",
     "rich>=10.0.0,<15",
     "transformers>4.57.3,<5.0.0",

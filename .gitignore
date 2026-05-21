@@ -41,5 +41,6 @@ nsys_analysis_build/
 **/NeMo
 
 # AI agent files
+CLAUDE.local.md
 GEMINI.md
 plans/

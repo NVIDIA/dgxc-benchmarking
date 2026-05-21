@@ -5,17 +5,74 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.10.11] - 2026-04-14
+## [1.14.4] - 2026-05-15
+
+### Changed
+
+- `llmb-run exemplar` now falls back to one non-profiled repeat when `config.repeats` and `config.profile` are omitted.
+
+## [1.14.3] - 2026-05-13
+
+### Added
+
+- `llmb-run --version` now also prints the recipe version from the configured install's `release.yaml` when available.
+
+## [1.14.2] - 2026-05-12
 
 ### Fixed
 
-- Archive now excludes experiment-level `checkpoints/` directories, preventing Megatron-Bridge `*.distcp` checkpoint shards from bloating archives.
+- Exclude `torch_profile/` PyTorch profiler output directories from `llmb-run archive`.
 
-## [1.10.10] - 2026-04-10
+## [1.14.1] - 2026-05-08
+
+### Fixed
+
+- Require supported pretraining job logs to reach their reported final iteration before showing parsed performance metrics.
+
+## [1.14.0] - 2026-05-05
+
+### Added
+
+- `llmb-run jobs`: local SQLite-backed job history with submission recording, Slurm status refresh, performance results for supported workload logs, detail view, launcher-aware log access, and rebuild from existing non-legacy `llmb-config_*.yaml` files.
+
+## [1.13.1] - 2026-05-04
+
+### Fixed
+
+- Accept trillion-parameter (`t`) model-size suffixes in workload parsing, bulk YAML headers, and Exemplar ordering.
+
+## [1.13.0] - 2026-04-21
+
+### Added
+
+- `llmb-run submit --dump-env` for Megatron-Bridge workloads, capturing a redacted rank-0 environment snapshot.
+
+### Removed
+
+- Removed deprecated `llmb-run single`, `llmb-run bulk`, and `llmb-run submit-all` commands. Use `llmb-run submit` for explicit, file-based, and discovery submissions.
+
+## [1.12.1] - 2026-04-21
+
+### Fixed
+
+- Archive now excludes `nsys_profile/` directories to avoid packaging large profiling artifacts.
+
+## [1.12.0] - 2026-04-21
+
+### Added
+
+- `llmb-run submit`: repeatable `--env KEY=value` flag for explicit job environment overrides. YAML task-spec `env:` blocks now receive the same treatment.
 
 ### Fixed
 
 - Archive now excludes `*.pt.trace.json` files produced by newer PyTorch profiling output.
+- Archive now excludes experiment-level `checkpoints/` directories, preventing Megatron-Bridge `*.distcp` checkpoint shards from bloating archives.
+
+## [1.11.0] - 2026-04-09
+
+### Added
+
+- `llmb-run submit`: first-class Slurm submission flags `--nodelist`, `--exclude`, `--reservation`, `--segment`, `--nice`, and repeatable `--slurm-arg`.
 
 ## [1.10.9] - 2026-04-06
 

@@ -27,97 +27,26 @@ stable settings across installs while excluding per-install varying fields.
 
 import os
 import stat
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
+from pydantic import ValidationError
 
-from llmb_install.config.models import InstallConfig, SlurmConfig
+from llmb_install.config.models import ClusterSettings, InstallConfig
 from llmb_install.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-@dataclass
-class SystemConfig:
+class SystemConfig(ClusterSettings):
     """Sanitized system configuration that persists across installs.
 
     Contains stable system settings but excludes per-install variables like
-    install_path and selected_workloads.
+    install_path and selected_workloads. Inherits all cluster settings from
+    ClusterSettings.
     """
-
-    # Core system settings (stable)
-    venv_type: str  # 'uv', 'venv', 'conda'
-    install_method: str  # 'local' or 'slurm'
-    gpu_type: str  # 'h100', 'gb200', 'b200'
-    node_architecture: str  # 'x86_64', 'aarch64'
-    workload_selection_mode: str = 'custom'  # 'custom' or 'exemplar'
-
-    # SLURM settings (stable for a cluster)
-    slurm: Optional[SlurmConfig] = None
-
-    # Environment variables (potentially stable)
-    environment_vars: Dict[str, str] = None
-
-    # Shared container image folder (stable)
-    image_folder: Optional[str] = None
-
-    def __post_init__(self):
-        """Initialize default values."""
-        if self.environment_vars is None:
-            self.environment_vars = {}
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for serialization."""
-        result = {
-            'venv_type': self.venv_type,
-            'install_method': self.install_method,
-            'gpu_type': self.gpu_type,
-            'node_architecture': self.node_architecture,
-            'workload_selection_mode': self.workload_selection_mode,
-            'environment_vars': self.environment_vars,
-            'image_folder': self.image_folder,
-        }
-
-        if self.slurm:
-            result['slurm'] = {
-                'account': self.slurm.account,
-                'gpu_partition': self.slurm.gpu_partition,
-                'cpu_partition': self.slurm.cpu_partition,
-                'gpu_partition_gres': self.slurm.gpu_partition_gres,
-                'cpu_partition_gres': self.slurm.cpu_partition_gres,
-            }
-        else:
-            result['slurm'] = None
-
-        return result
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'SystemConfig':
-        """Create from dictionary."""
-        slurm_data = data.get('slurm')
-        slurm_config = None
-        if slurm_data:
-            slurm_config = SlurmConfig(
-                account=slurm_data['account'],
-                gpu_partition=slurm_data['gpu_partition'],
-                cpu_partition=slurm_data['cpu_partition'],
-                gpu_partition_gres=slurm_data.get('gpu_partition_gres'),
-                cpu_partition_gres=slurm_data.get('cpu_partition_gres'),
-            )
-
-        return cls(
-            venv_type=data['venv_type'],
-            install_method=data['install_method'],
-            gpu_type=data['gpu_type'],
-            node_architecture=data['node_architecture'],
-            workload_selection_mode=data.get('workload_selection_mode', 'custom'),
-            slurm=slurm_config,
-            environment_vars=data.get('environment_vars', {}),
-            image_folder=data.get('image_folder'),
-        )
 
     @classmethod
     def from_install_config(cls, install_config: InstallConfig) -> 'SystemConfig':
@@ -126,16 +55,7 @@ class SystemConfig:
         This sanitizes the install config by keeping only stable system settings
         and excluding per-install variables.
         """
-        return cls(
-            venv_type=install_config.venv_type,
-            install_method=install_config.install_method,
-            gpu_type=install_config.gpu_type,
-            node_architecture=install_config.node_architecture,
-            workload_selection_mode=install_config.workload_selection_mode,
-            slurm=install_config.slurm,
-            environment_vars=install_config.environment_vars.copy(),
-            image_folder=install_config.image_folder,
-        )
+        return cls.model_validate(install_config.model_dump())
 
 
 def _get_system_config_dir() -> Path:
@@ -180,7 +100,7 @@ class SystemConfigManager:
             # Write to temporary file first (atomic operation)
             temp_path = self.config_path.with_suffix('.tmp')
             with open(temp_path, 'w') as f:
-                yaml.safe_dump(system_config.to_dict(), f, default_flow_style=False, indent=2)
+                yaml.safe_dump(system_config.model_dump(), f, default_flow_style=False, indent=2)
 
             # Set restrictive permissions (0600) for security
             os.chmod(temp_path, stat.S_IRUSR | stat.S_IWUSR)
@@ -217,12 +137,19 @@ class SystemConfigManager:
                 logger.warning(f"System config file is empty: {self.config_path}")
                 return None
 
-            system_config = SystemConfig.from_dict(data)
+            system_config = SystemConfig.model_validate(data)
             logger.debug(f"Loaded system config from {self.config_path}")
             logger.debug(f"Available defaults: {list(data.keys())}")
             return system_config
 
-        except (yaml.YAMLError, KeyError, TypeError) as e:
+        except ValidationError as e:
+            details = "; ".join(f"{' -> '.join(str(p) for p in err['loc'])}: {err['msg']}" for err in e.errors())
+            logger.warning(
+                f"System config at {self.config_path} is invalid ({details}). "
+                f"Ignoring saved defaults — you will be prompted for all settings."
+            )
+            return None
+        except (yaml.YAMLError, KeyError, TypeError, ValueError) as e:
             logger.warning(f"Failed to load system config from {self.config_path}: {e}")
             return None
 
@@ -300,7 +227,7 @@ class InstallStateManager:
             existing_cluster_config: For incremental installs, the original cluster config
         """
         state_data = {
-            'install_config': config.to_dict(),
+            'install_config': config.model_dump(),
             'completed_workloads': completed_workloads,
             'workload_venvs': workload_venvs or {},
             'timestamp': datetime.now().isoformat(),
@@ -374,7 +301,7 @@ class InstallStateManager:
                 return None
 
             # Reconstruct InstallConfig
-            install_config = InstallConfig.from_dict(install_config_data)
+            install_config = InstallConfig.model_validate(install_config_data)
 
             # Validate that install directory still exists
             if not os.path.exists(install_config.install_path):
@@ -392,8 +319,17 @@ class InstallStateManager:
 
             return (install_config, completed_workloads, workload_venvs, existing_cluster_config)
 
-        except (yaml.YAMLError, KeyError, TypeError) as e:
+        except ValidationError as e:
+            details = "; ".join(f"{' -> '.join(str(p) for p in err['loc'])}: {err['msg']}" for err in e.errors())
+            logger.warning(
+                f"Resume state at {self.config_path} is invalid ({details}). "
+                f"Discarding saved progress — installation will start fresh."
+            )
+            self.clear_install_state()
+            return None
+        except (yaml.YAMLError, KeyError, TypeError, ValueError) as e:
             logger.warning(f"Failed to load install state from {self.config_path}: {e}")
+            self.clear_install_state()
             return None
 
     def clear_install_state(self) -> None:

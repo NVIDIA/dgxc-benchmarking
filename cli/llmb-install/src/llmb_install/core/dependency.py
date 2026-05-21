@@ -183,7 +183,8 @@ def group_workloads_by_dependencies(
         resolved_deps = _resolve_dependencies(workload_data)
 
         if not resolved_deps:
-            # Scripted workload installs without explicit dependencies
+            # Workloads without Python dependencies do not need dependency
+            # installation. They may still need image downloads or setup tasks.
             if None not in dep_groups:
                 dep_groups[None] = []
             dep_groups[None].append(key)
@@ -214,29 +215,28 @@ def print_dependency_group_summary(dep_groups: Dict[Optional[str], List[str]]) -
     print("\nWorkload Installation Plan")
     print("=========================")
 
-    scripted_workloads = dep_groups.get(None, [])
+    no_dependency_workloads = dep_groups.get(None, [])
     dependency_groups = {k: v for k, v in dep_groups.items() if k is not None}
 
-    # Count individual installations (both scripted and unique dependency workloads)
-    individual_count = len(scripted_workloads)
-    individual_count += sum(1 for workloads in dependency_groups.values() if len(workloads) == 1)
+    unique_dependency_workloads = [
+        group_workloads[0] for group_workloads in dependency_groups.values() if len(group_workloads) == 1
+    ]
 
     # Count shared virtual environment groups
     shared_count = sum(len(workloads) for workloads in dependency_groups.values() if len(workloads) > 1)
     shared_groups_count = len([g for g in dependency_groups.values() if len(g) > 1])
 
-    if individual_count > 0:
-        print(f"\nIndividual installations ({individual_count} workloads):")
-        print("Each workload will have its own virtual environment:")
-
-        # Show scripted workloads
-        for workload in sorted(scripted_workloads):
+    if no_dependency_workloads:
+        print(f"\nNo dependency setup ({len(no_dependency_workloads)} workloads):")
+        print("These workloads do not declare Python dependencies:")
+        for workload in sorted(no_dependency_workloads):
             print(f"  • {workload}")
 
-        # Show workloads with unique dependencies
-        for group_workloads in dependency_groups.values():
-            if len(group_workloads) == 1:
-                print(f"  • {group_workloads[0]}")
+    if unique_dependency_workloads:
+        print(f"\nIndividual installations ({len(unique_dependency_workloads)} workloads):")
+        print("Each workload will have its own virtual environment:")
+        for workload in sorted(unique_dependency_workloads):
+            print(f"  • {workload}")
 
     if shared_count > 0:
         print(f"\nShared virtual environment groups ({shared_count} workloads in {shared_groups_count} groups):")

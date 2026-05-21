@@ -107,6 +107,7 @@ output_result() {
     local tflops_mean="$5"
     local tflops_std_dev="$6"
     local max_iter="$7"
+    local invalid_iter="${8:-}"
 
     local display_name
     display_name=$(shorten_filename "$filename")
@@ -121,6 +122,12 @@ output_result() {
                 else
                     printf "%-90s %8s %13s %12s %19s %18s\n" "$display_name" "Failed" "-" "-" "-" "-"
                 fi
+            elif [[ $status == "Invalid" ]]; then
+                if [[ -n $invalid_iter && $invalid_iter != "unknown" ]]; then
+                    printf "%-90s %8s %13s %12s %19s %18s\n" "$display_name" "Invalid" "grad_norm=nan" "iter $invalid_iter" "-" "-"
+                else
+                    printf "%-90s %8s %13s %12s %19s %18s\n" "$display_name" "Invalid" "grad_norm=nan" "-" "-" "-"
+                fi
             fi
             ;;
         csv)
@@ -132,12 +139,24 @@ output_result() {
                 else
                     echo "$filename,Failed,,,,,"
                 fi
+            elif [[ $status == "Invalid" ]]; then
+                if [[ -n $invalid_iter && $invalid_iter != "unknown" ]]; then
+                    echo "$filename,Invalid,,,,,grad_norm=nan@iteration_$invalid_iter"
+                else
+                    echo "$filename,Invalid,,,,,grad_norm=nan"
+                fi
             fi
             ;;
         json)
             # JSON entries are collected in json_results in the main loop
             if [[ $status == "Success" ]]; then
                 json_results+=("{\"filename\": \"$filename\", \"status\": \"Success\", \"time_mean_ms\": $time_mean, \"time_std_ms\": $time_std_dev, \"tflops_mean\": ${tflops_mean:-null}, \"tflops_std\": ${tflops_std_dev:-null}}")
+            elif [[ $status == "Invalid" ]]; then
+                if [[ -n $invalid_iter && $invalid_iter != "unknown" ]]; then
+                    json_results+=("{\"filename\": \"$filename\", \"status\": \"Invalid\", \"reason\": \"grad_norm=nan\", \"invalid_iteration\": $invalid_iter}")
+                else
+                    json_results+=("{\"filename\": \"$filename\", \"status\": \"Invalid\", \"reason\": \"grad_norm=nan\"}")
+                fi
             else
                 if [[ -n $max_iter ]]; then
                     json_results+=("{\"filename\": \"$filename\", \"status\": \"Failed\", \"max_iteration\": $max_iter}")
@@ -178,9 +197,10 @@ output_footer() {
     local files_processed="$1"
     local incomplete_count="$2"
     local failed_early_count="$3"
-    local total_experiment_files="$4"
+    local invalid_count="$4"
+    local total_experiment_files="$5"
 
-    local failed_count=$((incomplete_count + failed_early_count))
+    local failed_count=$((incomplete_count + failed_early_count + invalid_count))
 
     case "$OUTPUT_FORMAT" in
         table)
@@ -188,6 +208,9 @@ output_footer() {
             echo "Summary:"
             echo "  Success experiments: $files_processed"
             echo "  Failed experiments: $failed_count"
+            if [[ $invalid_count -gt 0 ]]; then
+                echo "  Invalid grad norm experiments: $invalid_count"
+            fi
             if [[ $total_experiment_files -gt 0 ]]; then
                 echo "  Success rate: $((files_processed * 100 / total_experiment_files))%"
             else
@@ -196,7 +219,11 @@ output_footer() {
             ;;
         csv)
             # CSV doesn't need footer for parsing, but we can add a comment
-            echo "# Summary: $files_processed success, $failed_count failed, $total_experiment_files total"
+            if [[ $invalid_count -gt 0 ]]; then
+                echo "# Summary: $files_processed success, $failed_count failed ($invalid_count invalid_grad_norm), $total_experiment_files total"
+            else
+                echo "# Summary: $files_processed success, $failed_count failed, $total_experiment_files total"
+            fi
             ;;
         json)
             # Remove trailing comma from last entry and close JSON
@@ -204,6 +231,7 @@ output_footer() {
             echo '  "summary": {'
             echo "    \"success_experiments\": $files_processed,"
             echo "    \"failed_experiments\": $failed_count,"
+            echo "    \"invalid_grad_norm_experiments\": $invalid_count,"
             if [[ $total_experiment_files -gt 0 ]]; then
                 echo "    \"success_rate\": $((files_processed * 100 / total_experiment_files))"
             else
@@ -232,6 +260,7 @@ fi
 files_processed=0
 incomplete_count=0
 failed_early_count=0
+invalid_count=0
 
 # Store results for JSON formatting
 declare -a json_results
@@ -248,8 +277,8 @@ while IFS= read -r file; do
             ;;
     esac
 
-    # Check if file contains any of the new-format timing data
-    has_timing_data=$(grep -q -E "elapsed time per iteration \(ms\):|MODEL_TFLOP\/s\/GPU|TFLOP\/s\/GPU" "$file" 2> /dev/null && echo "yes" || echo "no")
+    # Check if file contains parseable timing data or an invalid grad norm marker.
+    has_timing_data=$(grep -q -i -E "elapsed time per iteration \(ms\):|MODEL_TFLOP\/s\/GPU|TFLOP\/s\/GPU|grad[ _]norm[[:space:]]*:[[:space:]]*nan" "$file" 2> /dev/null && echo "yes" || echo "no")
 
     if [[ $has_timing_data == "yes" ]]; then
         # AWK now:
@@ -258,6 +287,17 @@ while IFS= read -r file; do
         #  - when an iteration line with "elapsed time per iteration (ms)" is found within the iteration window,
         #    it pairs that elapsed time with the last_tflop (and then clears last_tflop so it isn't reused).
         result=$(awk -v min_iter="$MIN_ITERATION" -v max_iter="$MAX_ITERATION" '
+            # Reject completed-looking jobs with invalid gradients anywhere in the step output.
+            tolower($0) ~ /grad[ _]norm[[:space:]]*:[[:space:]]*nan([[:space:]]|[|]|$)/ {
+                if (invalid_grad_norm_iter == "") {
+                    if (match($0, /iteration[[:space:]]*([0-9]+)/, invalid_iter_arr)) {
+                        invalid_grad_norm_iter = invalid_iter_arr[1] + 0
+                    } else {
+                        invalid_grad_norm_iter = "unknown"
+                    }
+                }
+            }
+
             # capture the numeric token right before MODEL_TFLOP/s/GPU (handles 1234.5 and scientific)
             /MODEL_TFLOP\/s\/GPU/ || /TFLOP\/s\/GPU/ {
                 if (match($0, /([0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?)\s*(MODEL_TFLOP\/s\/GPU|TFLOP\/s\/GPU)/, tf_arr)) {
@@ -289,7 +329,9 @@ while IFS= read -r file; do
             }
 
             END {
-                if (count > 0) {
+                if (invalid_grad_norm_iter != "") {
+                    print "INVALID_GRAD_NORM:" invalid_grad_norm_iter
+                } else if (count > 0) {
                     if (max_found < max_iter) {
                         print "INCOMPLETE:" max_found
                     } else {
@@ -326,6 +368,18 @@ while IFS= read -r file; do
                     output_result "$filename" "Failed" "" "" "" "" "$max_found"
                 fi
                 incomplete_count=$((incomplete_count + 1))
+            elif [[ $result == INVALID_GRAD_NORM:* ]]; then
+                invalid_iter=${result#INVALID_GRAD_NORM:}
+                if [[ $OUTPUT_FORMAT == "json" ]]; then
+                    if [[ $invalid_iter =~ ^[0-9]+$ ]]; then
+                        json_results+=("{\"filename\": \"$filename\", \"status\": \"Invalid\", \"reason\": \"grad_norm=nan\", \"invalid_iteration\": $invalid_iter}")
+                    else
+                        json_results+=("{\"filename\": \"$filename\", \"status\": \"Invalid\", \"reason\": \"grad_norm=nan\"}")
+                    fi
+                else
+                    output_result "$filename" "Invalid" "" "" "" "" "" "$invalid_iter"
+                fi
+                invalid_count=$((invalid_count + 1))
             elif [[ $result == COMPLETE:* ]]; then
                 # Parse mean and std dev from result
                 stats=${result#COMPLETE:}
@@ -360,8 +414,8 @@ while IFS= read -r file; do
     fi
 done <<< "$out_files"
 
-# Calculate total experiment files (complete + incomplete + failed early)
-total_experiment_files=$((files_processed + incomplete_count + failed_early_count))
+# Calculate total experiment files (complete + incomplete + failed early + invalid)
+total_experiment_files=$((files_processed + incomplete_count + failed_early_count + invalid_count))
 
 # Output JSON results without trailing comma
 if [[ $OUTPUT_FORMAT == "json" ]]; then
@@ -374,7 +428,7 @@ if [[ $OUTPUT_FORMAT == "json" ]]; then
     done
 fi
 
-output_footer "$files_processed" "$incomplete_count" "$failed_early_count" "$total_experiment_files"
+output_footer "$files_processed" "$incomplete_count" "$failed_early_count" "$invalid_count" "$total_experiment_files"
 
 if [ $files_processed -eq 0 ]; then
     echo "Error: No valid complete elapsed-time and MODEL_TFLOPS data found in any .out files" >&2

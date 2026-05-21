@@ -22,180 +22,135 @@
 
 """Configuration data models for LLMB Install."""
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Literal, Optional
+
+from pydantic import AfterValidator, BaseModel, BeforeValidator, model_validator
+
+from llmb_install.constants import SUPPORTED_GPU_TYPES
 
 
-@dataclass
-class SlurmConfig:
+def _check_gpu_type(v: str) -> str:
+    if v not in SUPPORTED_GPU_TYPES:
+        raise ValueError(f"Unsupported gpu_type '{v}'. Must be one of: {sorted(SUPPORTED_GPU_TYPES)}")
+    return v
+
+
+def _coerce_env_vars(v: Any) -> Any:
+    if v is None:
+        return {}
+    if not isinstance(v, dict):
+        return v  # let pydantic's type check handle it
+    null_keys = [k for k, val in v.items() if val is None]
+    if null_keys:
+        raise ValueError(
+            f"environment_vars contains null values for: {null_keys}. "
+            "Use empty strings ('') instead of null/blank values, or remove the keys entirely."
+        )
+    return {k: str(val) for k, val in v.items()}
+
+
+def _check_non_blank(v: str) -> str:
+    if not v.strip():
+        raise ValueError("Value must not be blank or whitespace-only")
+    return v
+
+
+GpuType = Annotated[str, AfterValidator(_check_gpu_type)]
+NonBlankStr = Annotated[str, AfterValidator(_check_non_blank)]
+EnvironmentVars = Annotated[Dict[str, str], BeforeValidator(_coerce_env_vars)]
+
+
+class SlurmConfig(BaseModel):
     """SLURM cluster configuration."""
 
-    account: str
-    gpu_partition: str
-    cpu_partition: str
+    account: NonBlankStr
+    gpu_partition: NonBlankStr
+    cpu_partition: NonBlankStr
     gpu_partition_gres: Optional[int] = None
     cpu_partition_gres: Optional[int] = None
 
 
-@dataclass
-class InstallConfig:
+class ClusterSettings(BaseModel):
+    """Base cluster configuration shared across all config models.
+
+    Contains the stable settings that describe a cluster environment:
+    GPU type, architecture, venv strategy, slurm configuration, etc.
+    """
+
+    venv_type: Literal['uv', 'venv', 'conda']
+    gpu_type: GpuType
+    node_architecture: Literal['x86_64', 'aarch64']
+    install_method: Literal['local', 'slurm'] = 'slurm'
+    slurm: Optional[SlurmConfig] = None
+    workload_selection_mode: Literal['custom', 'exemplar'] = 'custom'
+    environment_vars: EnvironmentVars = {}
+    image_folder: Optional[str] = None
+
+
+class PlayfileConfig(ClusterSettings):
+    """Schema for headless playfile configuration.
+
+    Defines the fields that are valid in a playfile YAML, along with
+    playfile-specific validation rules (non-empty workloads, deprecated
+    key rejection). Slurm configuration is always required.
+    """
+
+    install_path: NonBlankStr
+    install_method: Literal['local', 'slurm']  # required in playfiles (no default)
+    selected_workloads: List[NonBlankStr]
+    slurm: SlurmConfig  # required in playfiles (no default)
+
+    @model_validator(mode='before')
+    @classmethod
+    def reject_deprecated_keys(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # TODO: Remove this deprecated-key check after next public release.
+            deprecated_keys = [key for key in ('slurm_info', 'env_vars') if key in data]
+            if deprecated_keys:
+                raise ValueError(
+                    "Playfiles must use top-level slurm and environment_vars; "
+                    "slurm_info/env_vars are no longer supported."
+                )
+        return data
+
+    @model_validator(mode='after')
+    def validate_playfile_rules(self) -> 'PlayfileConfig':
+        if not self.selected_workloads:
+            raise ValueError("selected_workloads cannot be empty")
+        return self
+
+
+class InstallConfig(ClusterSettings):
     """Central configuration object for LLMB installation."""
 
     # Required fields (no defaults)
-    install_path: str
-    venv_type: str  # 'uv', 'venv', 'conda'
-    gpu_type: str  # 'h100', 'gb200', 'b200'
-    node_architecture: str  # 'x86_64', 'aarch64'
+    install_path: NonBlankStr
 
     # Optional fields (with defaults)
-    slurm: Optional[SlurmConfig] = None
-    selected_workloads: List[str] = field(default_factory=list)
-    workload_selection_mode: str = 'custom'  # 'custom' or 'exemplar'
-    install_method: str = 'local'  # 'local' or 'slurm'
-    ui_mode: str = 'simple'  # 'simple', 'rich', 'express'
-    environment_vars: Dict[str, str] = field(default_factory=dict)
+    selected_workloads: List[NonBlankStr] = []
+    ui_mode: Literal['simple', 'rich', 'express'] = 'simple'
     cache_dirs_configured: bool = False
-    image_folder: Optional[str] = None  # Shared container image folder
-    dev_mode: bool = False  # Development mode: skip repo copying, use original location
-    llmb_repo: Optional[str] = None  # Path to LLMB repository (original or copied)
-    is_incremental_install: bool = (
-        False  # True if this is an incremental install (adding workloads to existing installation)
-    )
-
-    def __post_init__(self):
-        """Enforce environment_vars contract: all values must be strings, no None."""
-        if self.environment_vars:
-            null_keys = [k for k, v in self.environment_vars.items() if v is None]
-            if null_keys:
-                raise ValueError(
-                    f"environment_vars contains null values for: {null_keys}. "
-                    "Use empty strings ('') instead of null/blank values, or remove the keys entirely."
-                )
-            self.environment_vars = {k: str(v) for k, v in self.environment_vars.items()}
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert config to dictionary for serialization."""
-        result = {
-            'install_path': self.install_path,
-            'venv_type': self.venv_type,
-            'gpu_type': self.gpu_type,
-            'node_architecture': self.node_architecture,
-            'selected_workloads': self.selected_workloads,
-            'workload_selection_mode': self.workload_selection_mode,
-            'install_method': self.install_method,
-            'ui_mode': self.ui_mode,
-            'environment_vars': self.environment_vars,
-            'cache_dirs_configured': self.cache_dirs_configured,
-            'image_folder': self.image_folder,
-            'dev_mode': self.dev_mode,
-            'llmb_repo': self.llmb_repo,
-            'is_incremental_install': self.is_incremental_install,
-        }
-
-        if self.slurm:
-            result['slurm'] = {
-                'account': self.slurm.account,
-                'gpu_partition': self.slurm.gpu_partition,
-                'cpu_partition': self.slurm.cpu_partition,
-                'gpu_partition_gres': self.slurm.gpu_partition_gres,
-                'cpu_partition_gres': self.slurm.cpu_partition_gres,
-            }
-        else:
-            result['slurm'] = None
-
-        return result
+    dev_mode: bool = False
+    llmb_repo: Optional[str] = None
+    is_incremental_install: bool = False
 
     def to_play_dict(self) -> Dict[str, Any]:
-        """Convert config to dictionary for headless playfiles."""
-        data = self.to_dict()
-        denylist = {
-            'llmb_repo',
-            'dev_mode',
-            'ui_mode',
-            'cache_dirs_configured',
-            'is_incremental_install',
-        }
-        data = {key: value for key, value in data.items() if key not in denylist}
+        """Convert config to playfile-compatible dictionary."""
+        data = PlayfileConfig.model_validate(self.model_dump()).model_dump()
         if data.get('image_folder') is None:
             data.pop('image_folder', None)
         return data
 
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'InstallConfig':
-        """Create config from dictionary."""
-        slurm_data = data.get('slurm')
-        slurm_config = None
-        if slurm_data:
-            slurm_config = SlurmConfig(
-                account=slurm_data['account'],
-                gpu_partition=slurm_data['gpu_partition'],
-                cpu_partition=slurm_data['cpu_partition'],
-                gpu_partition_gres=slurm_data.get('gpu_partition_gres'),
-                cpu_partition_gres=slurm_data.get('cpu_partition_gres'),
-            )
-
-        return cls(
-            install_path=data['install_path'],
-            venv_type=data['venv_type'],
-            gpu_type=data['gpu_type'],
-            node_architecture=data['node_architecture'],
-            slurm=slurm_config,
-            selected_workloads=data.get('selected_workloads', []),
-            workload_selection_mode=data.get('workload_selection_mode', 'custom'),
-            install_method=data.get('install_method', 'local'),
-            ui_mode=data.get('ui_mode', 'simple'),
-            environment_vars=data.get('environment_vars', {}),
-            cache_dirs_configured=data.get('cache_dirs_configured', False),
-            image_folder=data.get('image_folder'),
-            dev_mode=data.get('dev_mode', False),
-            llmb_repo=data.get('llmb_repo'),
-            is_incremental_install=data.get('is_incremental_install', False),
-        )
-
     def get_remaining_workloads(self, completed: List[str]) -> List[str]:
-        """Get workloads that still need to be installed.
-
-        Args:
-            completed: List of completed workload names
-
-        Returns:
-            List of workload names that still need to be installed
-        """
+        """Get workloads that still need to be installed."""
         return [w for w in self.selected_workloads if w not in completed]
 
     @property
     def locked_fields_for_resume(self) -> List[str]:
-        """Get list of fields that cannot be changed during resume edit.
-
-        Returns:
-            List of field names that are locked during resume
-        """
+        """Get list of fields that cannot be changed during resume edit."""
         return ['install_path', 'gpu_type', 'node_architecture', 'venv_type', 'llmb_repo', 'dev_mode', 'image_folder']
 
     @property
     def editable_fields_for_resume(self) -> List[str]:
-        """Get list of fields that can be changed during resume edit.
-
-        Returns:
-            List of field names that can be edited during resume
-        """
+        """Get list of fields that can be changed during resume edit."""
         return ['slurm', 'install_method', 'selected_workloads']
-
-    def get_slurm_dict(self) -> Dict[str, Any]:
-        """Convert SLURM config to dictionary format for legacy code compatibility.
-
-        Returns:
-            Dictionary containing SLURM configuration, or empty dict if no SLURM config
-        """
-        if not self.slurm:
-            return {}
-
-        return {
-            'slurm': {
-                'account': self.slurm.account,
-                'gpu_partition': self.slurm.gpu_partition,
-                'cpu_partition': self.slurm.cpu_partition,
-                'gpu_partition_gres': self.slurm.gpu_partition_gres,
-                'cpu_partition_gres': self.slurm.cpu_partition_gres,
-            }
-        }

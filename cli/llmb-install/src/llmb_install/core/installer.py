@@ -58,8 +58,6 @@ from llmb_install.core.exemplar import get_exemplar_workloads, validate_exemplar
 from llmb_install.core.workload import (
     build_workload_dict,
     filter_tools_from_workload_list,
-    install_scripted_workload,
-    run_post_install_script,
     run_setup_tasks,
 )
 from llmb_install.downloads.huggingface import download_huggingface_files_for_workloads
@@ -842,8 +840,8 @@ class Installer:
         config_data = load_installation_config(args.play)
 
         # Create InstallConfig from the loaded data
-        # InstallConfig.from_dict handles all necessary conversions and defaults
-        config = InstallConfig.from_dict(config_data)
+        # model_validate handles all necessary conversions and defaults
+        config = InstallConfig.model_validate(config_data)
 
         # Convert install_path to absolute path using pathlib
         # This is typically done in _collect_configuration but needed here for headless
@@ -1101,13 +1099,15 @@ class Installer:
         # Create merged defaults dict - system config first, then resume overrides
         defaults = {}
         if system_config:
-            defaults.update(system_config.to_dict())
+            defaults.update(system_config.model_dump())
         if override_defaults:
-            defaults.update(override_defaults.to_dict())
+            defaults.update(override_defaults.model_dump())
             ui.log("Using saved installation configuration as additional defaults")  # Not wild about this language.
 
-        # Collect basic configuration using merged defaults
-        venv_type = prompt_environment_type(ui, defaults.get('venv_type'), express_mode=False)
+        # Collect basic configuration using merged defaults. Fresh installs always
+        # create recipe environments with uv; legacy venv_type values are kept
+        # only for resume, incremental, and headless compatibility paths.
+        venv_type = prompt_environment_type(ui, defaults.get('venv_type'))
         print()
 
         # Loop until we get a valid install path (not an existing installation, or user accepts incremental)
@@ -1778,8 +1778,9 @@ class Installer:
     def _collect_express_configuration(self, args: argparse.Namespace) -> InstallConfig:
         """Collect configuration for express mode using saved system config.
 
-        Express mode only prompts for install_path and workloads. All other values
-        are taken from the saved system configuration.
+        Express mode only prompts for install_path and workloads. Most values are
+        taken from the saved system configuration, but fresh installs always use
+        uv for newly-created recipe environments.
 
         Args:
             args: Parsed command line arguments
@@ -1799,7 +1800,7 @@ class Installer:
         ui.print_section("Express Mode Configuration Summary")
         ui.log(f"GPU Type: {system_config.gpu_type.upper()}")
         ui.log(f"Architecture: {system_config.node_architecture}")
-        ui.log(f"Environment: {system_config.venv_type}")
+        ui.log("Environment: uv")
         ui.log(f"Install Method: {system_config.install_method}")
         if system_config.slurm:
             ui.log(f"SLURM Account: {system_config.slurm.account}")
@@ -1850,8 +1851,10 @@ class Installer:
         dev_mode = getattr(args, 'dev_mode', False)
         self.root_dir = self._handle_repository_setup(install_path, dev_mode)
 
-        # Setup cache directories
-        setup_cache_directories(install_path, system_config.venv_type)
+        # Setup cache directories. Fresh express installs always use uv for
+        # recipe environments, regardless of stale saved venv_type defaults.
+        venv_type = prompt_environment_type(ui, system_config.venv_type)
+        setup_cache_directories(install_path, venv_type)
 
         # Get workloads from CLI or prompt and determine selection mode
         workload_selection_mode = 'custom'  # Default mode
@@ -1937,12 +1940,13 @@ class Installer:
                 cpu_partition_gres=system_config.slurm.cpu_partition_gres,
             )
 
-        # Use all saved values from system config
+        # Use saved values from system config, except for recipe environment type
+        # which is forced to uv for fresh installs.
         config = InstallConfig(
             install_path=install_path,
             gpu_type=system_config.gpu_type,
             node_architecture=system_config.node_architecture,
-            venv_type=system_config.venv_type,
+            venv_type=venv_type,
             slurm=slurm_obj,
             environment_vars=env_vars,
             selected_workloads=selected,
@@ -2234,8 +2238,7 @@ class Installer:
         # Use image_folder from config
         effective_image_folder = install_config.image_folder
 
-        # Get SLURM dict for legacy calls
-        slurm_info = install_config.get_slurm_dict()
+        slurm_info = {'slurm': install_config.slurm.model_dump()} if install_config.slurm else {}
 
         fetch_container_images(
             required_images,
@@ -2289,20 +2292,25 @@ class Installer:
 
         try:
             for dep_hash, workload_keys in dep_groups.items():
-                if dep_hash is None:  # Scripted workloads
-                    print("\n[Individual Installations - Legacy Setup Scripts]")
+                if dep_hash is None:
+                    print("\n[No Dependency Setup]")
                     print("-" * 60)
                     for workload_key in workload_keys:
-                        venv_path = install_scripted_workload(
-                            workload_key,
-                            filtered_workloads[workload_key],
-                            install_config.install_path,
-                            install_config.venv_type,
-                            install_config.environment_vars,
-                            install_config.gpu_type,
-                        )
-                        workload_venvs[workload_key] = venv_path
-                        # Execute any additional setup tasks defined for the workload
+                        workload_dir = os.path.join(install_config.install_path, "workloads", workload_key)
+                        os.makedirs(workload_dir, exist_ok=True)
+                        print(f"Installing: {workload_key}")
+
+                        venv_path = None
+                        setup_config = filtered_workloads[workload_key].get('setup', {}) or {}
+                        if setup_config.get('venv_req', False):
+                            venvs_dir = os.path.join(install_config.install_path, "venvs")
+                            os.makedirs(venvs_dir, exist_ok=True)
+                            venv_path = os.path.join(venvs_dir, f"{workload_key}_venv")
+                            create_virtual_environment(venv_path, install_config.venv_type)
+                            workload_venvs[workload_key] = venv_path
+                        else:
+                            print(f"No virtual environment required for {workload_key}")
+
                         run_setup_tasks(
                             workload_key,
                             filtered_workloads[workload_key],
@@ -2314,7 +2322,6 @@ class Installer:
                             install_config.gpu_type,
                         )
 
-                    # Track completion for scripted workloads (after all workloads in this group complete)
                     self._save_installation_progress(
                         install_config, workload_keys, completed_workloads, workload_venvs, existing_cluster_config
                     )
@@ -2368,26 +2375,8 @@ class Installer:
 
                             workload_venvs[workload_key] = venv_path
 
-                        # Run post-install scripts and setup tasks
-                        env = get_venv_environment(venv_path, install_config.venv_type)
-                        env['LLMB_INSTALL'] = install_config.install_path
-                        env['MANUAL_INSTALL'] = 'false'
-                        env['GPU_TYPE'] = install_config.gpu_type
-                        if install_config.environment_vars:
-                            env.update(install_config.environment_vars)
-
                         for workload_key in workload_keys:
                             workload_data = filtered_workloads[workload_key]
-                            setup_config = workload_data.get('setup', {})
-                            setup_script = setup_config.get('setup_script')
-                            if setup_script:
-                                # Set workload-specific env var
-                                env['LLMB_WORKLOAD'] = os.path.join(
-                                    install_config.install_path, "workloads", workload_key
-                                )
-                                source_dir = workload_data['path']
-                                run_post_install_script(setup_script, source_dir, env)
-                            # Execute new-style setup tasks (if any)
                             run_setup_tasks(
                                 workload_key,
                                 workload_data,
@@ -2452,19 +2441,9 @@ class Installer:
                         first_workload_dir = os.path.join(install_config.install_path, "workloads", first_workload_key)
                         install_dependencies(venv_path, install_config.venv_type, dependencies, first_workload_dir, env)
 
-                        # 4. For each workload, run post-install script (if any)
+                        # 4. For each workload, run setup tasks (if any)
                         for workload_key in workload_keys:
                             workload_data = filtered_workloads[workload_key]
-                            setup_config = workload_data.get('setup', {})
-                            setup_script = setup_config.get('setup_script')
-                            if setup_script:
-                                # Set workload-specific env var
-                                env['LLMB_WORKLOAD'] = os.path.join(
-                                    install_config.install_path, "workloads", workload_key
-                                )
-                                source_dir = workload_data['path']
-                                run_post_install_script(setup_script, source_dir, env)
-                            # Execute new-style setup tasks (if any)
                             run_setup_tasks(
                                 workload_key,
                                 workload_data,

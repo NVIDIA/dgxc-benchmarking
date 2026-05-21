@@ -23,136 +23,40 @@
 """Environment configuration prompts for LLMB installer."""
 
 import os
-import subprocess
-import sys
 from typing import Dict, Optional
 
-from llmb_install.constants import EXIT_CANCELLED, MAX_PYTHON_VERSION_TUPLE, MIN_PYTHON_VERSION_TUPLE
-from llmb_install.environment.detector import (
-    detect_virtual_environment,
-    get_system_python_path,
-    get_system_python_version,
-    has_active_conda_environment,
-    is_conda_installed,
-    is_uv_installed,
-    is_venv_installed,
-)
-from llmb_install.environment.venv_manager import get_clean_environment_for_subprocess
+from llmb_install.environment.detector import is_uv_installed
 from llmb_install.ui.interface import UIInterface
 
 
-def prompt_environment_type(ui: UIInterface, default: Optional[str] = None, express_mode: bool = False) -> str:
-    """Prompt the user to select their preferred environment type (uv, venv, or conda).
+def prompt_environment_type(ui: UIInterface, default: Optional[str] = None) -> str:
+    """Resolve the recipe environment type for fresh interactive installs.
+
+    uv is the only supported choice for newly-created recipe environments. The
+    installer still supports existing conda/venv configs elsewhere for resume,
+    incremental, and headless compatibility.
 
     Args:
         ui: UI interface for user interaction
-        default: Default environment type from system config (if available)
-        express_mode: Whether this is being called from express mode (shows default messages)
+        default: Deprecated saved environment type from system config, ignored for fresh installs
 
     Returns:
-        str: Selected environment type ('uv', 'venv', or 'conda')
+        str: Selected environment type ('uv')
     """
-    # Detect system Python version (clean environment)
-    if detect_virtual_environment():
-        env = get_clean_environment_for_subprocess()
-        current_python_version = get_system_python_version(env)
-        system_python_path = get_system_python_path(env)
-        if current_python_version is not None:
-            venv_available = (
-                subprocess.run(['python3', '-m', 'venv', '--help'], env=env, capture_output=True, text=True).returncode
-                == 0
-            )
-        else:
-            venv_available = False  # No system Python detected
-    else:
-        current_python_version = sys.version_info[:3]
-        system_python_path = sys.executable
-        venv_available = is_venv_installed()
-
-    # Environment availability checks
-    conda_available = is_conda_installed()
-    uv_available = is_uv_installed()
-
-    # Check compatibility
-    if current_python_version is not None:
-        python_compatible = MIN_PYTHON_VERSION_TUPLE <= current_python_version < MAX_PYTHON_VERSION_TUPLE
-        can_use_venv = venv_available and python_compatible
-    else:
-        python_compatible = False
-        can_use_venv = False  # Can't use venv if no system Python detected
-    can_use_conda = conda_available
-    can_use_uv = uv_available
-
-    # Print environment status
     ui.log("Environment Configuration")
     ui.log("------------------------")
-    if current_python_version is not None:
-        ui.log(f"System Python version: {'.'.join(map(str, current_python_version))}")
-        ui.log(f"System Python path: {system_python_path}")
-    else:
-        ui.log("System Python version: Not detected")
 
-    ui.log(
-        f"Supported version range: [{'.'.join(map(str, MIN_PYTHON_VERSION_TUPLE))}, {'.'.join(map(str, MAX_PYTHON_VERSION_TUPLE))})"
-    )
-    ui.log("")
-
-    # Determine available options
-    options = []
-    if can_use_uv:
-        options.append("uv")
-    if can_use_venv:
-        options.append("venv")
-    if can_use_conda:
-        options.append({"name": "conda (deprecated)", "value": "conda"})
-
-    if not options:
-        if not python_compatible and current_python_version is not None:
-            ui.log(f"Error: System Python version {'.'.join(map(str, current_python_version))} is not supported.")
-            ui.log(
-                f"Please use Python version in range [{'.'.join(map(str, MIN_PYTHON_VERSION_TUPLE))}, {'.'.join(map(str, MAX_PYTHON_VERSION_TUPLE))})."
-            )
-        else:
-            ui.log("Error: No supported environment managers found.")
-            ui.log("Please install at least one of: uv, venv (Python standard library), or conda.")
+    if not is_uv_installed():
+        ui.log("Error: uv is required to create recipe environments.")
+        ui.log("Please install uv and rerun the installer.")
         raise SystemExit(1)
 
-    def _option_value(opt):
-        return opt["value"] if isinstance(opt, dict) else opt
-
-    # Display available options
-    if len(options) > 1:
-        ui.log("Multiple environment options available:")
-
-        # Use provided default if valid, otherwise no default
-        if default and any(_option_value(o) == default for o in options):
-            selected_default = default
-            if express_mode:
-                ui.log(f"Using saved default: {default}")
-        else:
-            selected_default = None
-
-        selected = ui.prompt_select("Select your preferred environment type:", options, default=selected_default)
-        if selected is None:
-            # User cancelled (Ctrl-C)
-            ui.log("\nInstallation cancelled by user.")
-            raise SystemExit(EXIT_CANCELLED)
+    if default and default != "uv":
+        ui.log(f"Ignoring saved environment type '{default}'; new recipe environments use uv.")
     else:
-        selected = _option_value(options[0])
-        ui.log(f"Using {selected} (only available option)")
+        ui.log("Using uv for recipe environments.")
 
-    # Validate selection and warn if necessary
-    if selected == "venv" and detect_virtual_environment():
-        ui.log("")
-        ui.log("Warning: You are currently in a virtual environment.")
-        ui.log("The installer will use system Python to create new virtual environments.")
-
-    if selected == "conda" and detect_virtual_environment() and not has_active_conda_environment():
-        ui.log("")
-        ui.log("Warning: You are in a non-conda virtual environment.")
-        ui.log("Consider deactivating it before using conda for installation.")
-
-    return selected
+    return "uv"
 
 
 def prompt_environment_variables(

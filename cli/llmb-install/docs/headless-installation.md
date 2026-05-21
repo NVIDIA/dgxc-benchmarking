@@ -81,7 +81,7 @@ llmb-install --play my_config.yaml
 Complete configuration file structure:
 
 ```yaml
-venv_type: venv                    # 'venv', 'conda', or 'uv'
+venv_type: uv                      # 'uv' is recommended; 'venv'/'conda' remain for compatibility
 install_path: /lustre/user/llmb    # Installation directory
 slurm:
   account: myaccount

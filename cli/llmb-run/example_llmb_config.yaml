@@ -25,14 +25,14 @@ job_info:
   job_id: '3913022'
   launch_time: '2025-07-01T21:05:18.298517'
 workload_info:
-  framework: nemo2
-  gsw_version: '25.07'
-  fw_version: 25.04.01
+  framework: megatron_bridge
+  gsw_version: '26.04'
+  fw_version: 26.04.00
   workload_type: pretrain
   synthetic_dataset: true
 model_info:
-  model_name: nemotron4
-  model_size: 15b
+  model_name: llama3.1
+  model_size: 8b
   dtype: fp8
   scale: 8
   gpu_type: h100
@@ -45,7 +45,7 @@ cluster_info:
   slurm_gpu_partition: slurm_partition
 container_info:
   images:
-  - nvcr.io#nvidia/nemo:25.04.01
+  - nvcr.io#nvidia/nemo:26.04.00
 job_config:
   profile_enabled: false
   proxy: false

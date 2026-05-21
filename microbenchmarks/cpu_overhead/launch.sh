@@ -90,8 +90,8 @@ for value in $USE_CASES; do
     fi
 
     export SLURM_MPI_TYPE="pmix"
-    export SRUN_OUTPUT=${RESULT_DIR}/${LOG_NAME}_%j.out
-    export SRUN_ERROR=${RESULT_DIR}/${LOG_NAME}_%j.err
+    export SRUN_OUTPUT=${RESULT_DIR}/${LOG_NAME}_%N_%j.out
+    export SRUN_ERROR=${RESULT_DIR}/${LOG_NAME}_%N_%j.err
 
     srun --container-image "$IMAGE" \
         --container-mounts "$MOUNT_DIR" \

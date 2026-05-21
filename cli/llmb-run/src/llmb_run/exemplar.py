@@ -26,14 +26,13 @@ and enforces strict install gating.
 """
 
 import logging
-import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
 from llmb_run.config_manager import ClusterConfig
-from llmb_run.metadata_utils import normalize_model_dtype_config, parse_workload_name
+from llmb_run.metadata_utils import model_size_to_billions, normalize_model_dtype_config, parse_workload_name
 from llmb_run.task_generation import ValidationError
 from llmb_run.tasks import WorkloadTask
 
@@ -180,7 +179,7 @@ def parse_exemplar_workload_name(workload_name: str) -> Tuple[str, str]:
     """Parse workload name into workload_key and model_size.
 
     The model_size is the suffix after the last underscore and must match the pattern:
-    - \\d+(\\.\\d+)?b (e.g., '7b', '70b', '3.5b')
+    - \\d+(\\.\\d+)?[bt] (e.g., '7b', '70b', '3.5b', '1t')
 
     Args:
         workload_name: Full workload name (e.g., 'pretrain_llama3.1_70b')
@@ -196,7 +195,7 @@ def parse_exemplar_workload_name(workload_name: str) -> Tuple[str, str]:
     if model_size is None:
         raise ValidationError(
             f"Invalid workload name '{workload_name}': must contain at least one underscore "
-            f"with model size suffix (e.g., 'pretrain_llama3.1_70b')"
+            f"with model size suffix (e.g., 'pretrain_llama3.1_70b' or 'pretrain_kimi-k2_1t')"
         )
 
     return workload_key, model_size
@@ -241,24 +240,22 @@ def get_exemplar_configs_from_yaml(yaml_data: Dict[str, Any], gpu_type: str) -> 
 
 
 def _extract_numeric_model_size(model_size: str) -> float:
-    """Extract numeric value from model size string for sorting.
+    """Extract model size in billions for sorting.
 
     Examples:
         "7b" -> 7.0
         "70b" -> 70.0
         "340b" -> 340.0
         "405b" -> 405.0
+        "1t" -> 1000.0
 
     Args:
-        model_size: Model size string (e.g., "7b", "70b", "340b")
+        model_size: Model size string (e.g., "7b", "70b", "340b", "1t")
 
     Returns:
         Numeric value for sorting (defaults to 0.0 if no match)
     """
-    match = re.match(r'^(\d+(?:\.\d+)?)', model_size)
-    if match:
-        return float(match.group(1))
-    return 0.0
+    return model_size_to_billions(model_size)
 
 
 def validate_yaml_config_against_metadata(
@@ -459,7 +456,7 @@ def compute_and_validate_eligible_configs(
         Tuple of (eligible configs list, scale from YAML, repeats from YAML, profile from YAML)
         - eligible configs: List of (workload_key, model_size, dtype) tuples
         - scale: Scale value from YAML config (defaults to 512)
-        - repeats: Number of repeats from YAML config (defaults to 3)
+        - repeats: Number of repeats from YAML config (defaults to 1)
         - profile: If True, include exactly one profiled run per config (last repeat). If False, no profiling.
 
     Raises:
@@ -476,8 +473,8 @@ def compute_and_validate_eligible_configs(
     # Extract config values from YAML
     config = yaml_data.get('config', {})
     scale = config.get('scale', 512)
-    repeats = config.get('repeats', 3)
-    profile = config.get('profile', True)
+    repeats = config.get('repeats', 1)
+    profile = config.get('profile', False)
 
     # Get eligible configs from YAML and validate against metadata
     eligible_configs = get_eligible_exemplar_configs_from_yaml(yaml_data, gpu_type, workloads)
@@ -508,7 +505,7 @@ def generate_exemplar_tasks(
     Args:
         workloads: Dictionary of all workloads from get_workloads()
         cluster_config: Cluster configuration dictionary
-        repeats: Number of repeats per configuration. If None, uses value from YAML config.repeats (default: 3)
+        repeats: Number of repeats per configuration. If None, uses value from YAML config.repeats (default: 1)
 
     Returns:
         List of WorkloadTask objects, deterministically ordered:

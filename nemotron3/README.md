@@ -1,37 +1,77 @@
 # Overview
 
-This recipe contains information and scripts to produce performance results for the Nemotron-H pre-training workloads. The scripts help perform environment setup and launch benchmark jobs. Configurations use weak scaling methodology (global batch size scales proportionally with GPU count).
+This recipe contains information and scripts to produce performance results for Nemotron 3 pre-training workloads (**30b** (usually referenced as nano) and **120b** (usually referenced as super)). The scripts help perform environment setup and launch benchmark jobs. Configurations use weak scaling methodology (global batch size scales proportionally with GPU count).
 
-## GB300, GB200 and B300
-
-| Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
-| --------- | :--: | :----: | :----: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :--: | :-: |
-| FP8       |  32  |  8192  |  118   |  2  |  1  |  1  |  1  | 16  | N/A |  1  |  96  |  6  |
-| FP8       |  64  |  8192  |  118   |  2  |  1  |  1  |  1  | 32  | N/A |  1  | 192  |  6  |
-| FP8       | 128  |  8192  |  118   |  2  |  1  |  1  |  1  | 64  | N/A |  1  | 384  |  6  |
-| FP8       | 256  |  8192  |  118   |  2  |  1  |  1  |  1  | 128 | N/A |  1  | 768  |  6  |
-| FP8       | 512  |  8192  |  118   |  2  |  1  |  1  |  1  | 256 | N/A |  1  | 1536 |  6  |
-
-## B200
+## GB300 Nemotron 3 30B
 
 | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
 | --------- | :--: | :----: | :----: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :--: | :-: |
-| FP8       |  32  |  8192  |  118   |  4  |  1  |  1  |  1  |  8  | N/A |  2  |  96  |  6  |
-| FP8       |  64  |  8192  |  118   |  2  |  1  |  1  |  1  | 32  | N/A |  1  | 192  |  6  |
-| FP8       | 128  |  8192  |  118   |  2  |  1  |  1  |  1  | 64  | N/A |  1  | 384  |  6  |
-| FP8       | 256  |  8192  |  118   |  2  |  1  |  1  |  1  | 128 | N/A |  1  | 768  |  6  |
-| FP8       | 512  |  8192  |  118   |  2  |  1  |  1  |  1  | 256 | N/A |  1  | 1536 |  6  |
+| FP8/BF16  |  8   |  8192  |   52   |  1  |  1  |  1  |  8  |  8  |     |  4  | 512  | 16  |
+| FP8/BF16  |  16  |  8192  |   52   |  1  |  1  |  1  |  8  | 16  |     |  4  | 1024 | 16  |
+| FP8/BF16  |  32  |  8192  |   52   |  1  |  1  |  1  |  8  | 32  |     |  4  | 2048 | 16  |
+| FP8/BF16  |  64  |  8192  |   52   |  1  |  1  |  1  |  8  | 64  |     |  4  | 4096 | 16  |
 
-## H100
+## GB200 Nemotron 3 30B
 
 | Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
 | --------- | :--: | :----: | :----: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :--: | :-: |
-| FP8       |  32  |  8192  |  118   |  8  |  1  |  1  |  1  |  4  | N/A |  1  |  96  | 24  |
-| FP8       |  64  |  8192  |  118   |  8  |  1  |  1  |  1  |  8  | N/A |  1  | 192  | 24  |
-| FP8       | 128  |  8192  |  118   |  8  |  1  |  1  |  1  | 16  | N/A |  1  | 384  | 24  |
-| FP8       | 256  |  8192  |  118   |  8  |  1  |  1  |  1  | 32  | N/A |  1  | 768  | 24  |
-| FP8       | 512  |  8192  |  118   |  8  |  1  |  1  |  1  | 64  | N/A |  1  | 1536 | 24  |
-| FP8       | 1024 |  8192  |  118   |  8  |  1  |  1  |  1  | 128 | N/A |  1  | 3072 | 24  |
+| BF16      |  8   |  8192  |   52   |  1  |  1  |  1  |  8  |  8  |     |  2  | 512  | 32  |
+| BF16      |  16  |  8192  |   52   |  1  |  1  |  1  |  8  | 16  |     |  2  | 1024 | 32  |
+| BF16      |  32  |  8192  |   52   |  1  |  1  |  1  |  8  | 32  |     |  2  | 2048 | 32  |
+| BF16      |  64  |  8192  |   52   |  1  |  1  |  1  |  8  | 64  |     |  2  | 4096 | 32  |
+
+## B300 Nemotron 3 30B
+
+| Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
+| --------- | :--: | :----: | :----: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :--: | :-: |
+| FP8/BF16  |  8   |  8192  |   52   |  1  |  1  |  1  |  8  |  8  |     |  4  | 512  | 16  |
+| FP8/BF16  |  16  |  8192  |   52   |  1  |  1  |  1  |  8  | 16  |     |  4  | 1024 | 16  |
+| FP8/BF16  |  32  |  8192  |   52   |  1  |  1  |  1  |  8  | 32  |     |  4  | 2048 | 16  |
+| FP8/BF16  |  64  |  8192  |   52   |  1  |  1  |  1  |  8  | 64  |     |  4  | 4096 | 16  |
+
+## B200 Nemotron 3 30B
+
+| Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
+| --------- | :--: | :----: | :----: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :--: | :-: |
+| FP8/BF16  |  8   |  8192  |   52   |  1  |  1  |  1  |  8  |  8  |     |  2  | 512  | 32  |
+| FP8/BF16  |  16  |  8192  |   52   |  1  |  1  |  1  |  8  | 16  |     |  2  | 1024 | 32  |
+| FP8/BF16  |  32  |  8192  |   52   |  1  |  1  |  1  |  8  | 32  |     |  2  | 2048 | 32  |
+| FP8/BF16  |  64  |  8192  |   52   |  1  |  1  |  1  |  8  | 64  |     |  2  | 4096 | 32  |
+
+## H100 Nemotron 3 30B
+
+| Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
+| --------- | :--: | :----: | :----: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :--: | :-: |
+| FP8/BF16  |  16  |  8192  |   52   |  1  |  1  |  1  |  8  | 16  |     |  1  | 1024 | 64  |
+| FP8/BF16  |  32  |  8192  |   52   |  1  |  1  |  1  |  8  | 32  |     |  1  | 2048 | 64  |
+| FP8/BF16  |  64  |  8192  |   52   |  1  |  1  |  1  |  8  | 64  |     |  1  | 4096 | 64  |
+
+## GB300 Nemotron 3 120B
+
+| Precision      | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
+| -------------- | :--: | :----: | :----: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :--: | :-: |
+| NVFP4/FP8/BF16 |  64  |  8192  |   88   |  1  |  1  |  1  | 64  | 64  |     |  1  | 512  |  8  |
+| NVFP4/FP8/BF16 | 128  |  8192  |   88   |  1  |  1  |  1  | 64  | 128 |     |  1  | 1024 |  8  |
+| NVFP4/FP8/BF16 | 256  |  8192  |   88   |  1  |  1  |  1  | 64  | 256 |     |  1  | 2048 |  8  |
+| NVFP4/FP8/BF16 | 512  |  8192  |   88   |  1  |  1  |  1  | 64  | 512 |     |  1  | 4096 |  8  |
+
+## B300 Nemotron 3 120B
+
+| Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
+| --------- | :--: | :----: | :----: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :--: | :-: |
+| BF16      |  64  |  8192  |   88   |  1  |  1  |  1  |  8  | 64  |     |  1  | 512  |  8  |
+| BF16      | 128  |  8192  |   88   |  1  |  1  |  1  |  8  | 128 |     |  1  | 1024 |  8  |
+| BF16      | 256  |  8192  |   88   |  1  |  1  |  1  |  8  | 256 |     |  1  | 2048 |  8  |
+| BF16      | 512  |  8192  |   88   |  1  |  1  |  1  |  8  | 512 |     |  1  | 4096 |  8  |
+
+## B200 Nemotron 3 120B
+
+| Precision | GPUs | SeqLen | Layers | TP  | PP  | CP  | EP  | DP  | VP  | MBS | GBS  | GA  |
+| --------- | :--: | :----: | :----: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :--: | :-: |
+| FP8/BF16  |  64  |  8192  |   88   |  1  |  1  |  1  | 64  | 64  |     |  1  | 512  |  8  |
+| FP8/BF16  | 128  |  8192  |   88   |  1  |  1  |  1  | 64  | 128 |     |  1  | 1024 |  8  |
+| FP8/BF16  | 256  |  8192  |   88   |  1  |  1  |  1  | 64  | 256 |     |  1  | 2048 |  8  |
+| FP8/BF16  | 512  |  8192  |   88   |  1  |  1  |  1  | 64  | 512 |     |  1  | 4096 |  8  |
 
 # Performance Measurement and Analysis
 
@@ -117,16 +157,16 @@ Use the **installer** referenced in the [main README](../README.md) to prepare t
 The following directory layout and key variables are used in the recipe:
 
 - `LLMB_INSTALL`: Top-level directory for all benchmarking artifacts (images, datasets, venvs, workloads, etc).
-- `LLMB_WORKLOAD`: Workload-specific directory, e.g. `${LLMB_INSTALL}/workloads/pretrain_nemotron-h`.
+- `LLMB_WORKLOAD`: Workload-specific directory, e.g. `${LLMB_INSTALL}/workloads/pretrain_nemotron_3`.
 - Results, logs, and checkpoints are stored under subfolders of `LLMB_WORKLOAD` (see below).
 
 # Prepare Dataset
 
-Since Nemotron-H training only uses synthetic datasets, this step is omitted.
+Since Nemotron 3 training only uses synthetic datasets, this step is omitted.
 
 # Run Training
 
-Once the environment has been prepared, it is time to train a model. The training runs for the first 50 steps and then stops. Log files and results are stored under the `${LLMB_WORKLOAD}/experiments/` folder ([see Output Locations](#output-locations) for details).
+Once the environment has been prepared, it is time to train a model. The training runs for the first 50 steps by default (`MAX_STEPS`, overridable) and then stops. Log files and results are stored under the `${LLMB_WORKLOAD}/experiments/` folder ([see Output Locations](#output-locations) for details).
 
 ## Using llmb-run (Recommended)
 
@@ -136,42 +176,40 @@ The easiest way to run benchmarks is using the llmb-run launcher tool. This meth
 # Navigate to your installation directory
 cd $LLMB_INSTALL
 
-# Run a benchmark with llmb-run
-llmb-run submit -w pretrain_nemotron-h --dtype fp8 --scale 128
+# Example: Nemotron 3 nano, BF16, 8 GPUs
+llmb-run submit -w pretrain_nemotron_3 -s 30b --dtype bf16 --scale 8
 
-# Example with different scale
-llmb-run submit -w pretrain_nemotron-h --dtype fp8 --scale 1024
+# Example: Nemotron 3 super, BF16, 64 GPUs
+llmb-run submit -w pretrain_nemotron_3 -s 120b --dtype bf16 --scale 64
 ```
 
 ### Additional SLURM Parameters
 
-For `llmb-run submit`, use the built-in Slurm flags instead of `ADDITIONAL_SLURM_PARAMS`.
-
-Use a Slurm reservation:
+Use a SLURM reservation:
 
 ```bash
-llmb-run submit -w pretrain_nemotron-h --dtype fp8 --scale 128 --reservation my_reservation
+ADDITIONAL_SLURM_PARAMS="reservation=my_reservation" llmb-run submit -w pretrain_nemotron_3 -s 120b --dtype bf16 --scale 64
 ```
 
 Run on specific nodes:
 
 ```bash
-llmb-run submit -w pretrain_nemotron-h --dtype fp8 --scale 128 --nodelist node001,node002
+ADDITIONAL_SLURM_PARAMS="nodelist=node001,node002" llmb-run submit -w pretrain_nemotron_3 -s 120b --dtype bf16 --scale 64
 ```
 
 Exclude specific nodes:
 
 ```bash
-llmb-run submit -w pretrain_nemotron-h --dtype fp8 --scale 128 --exclude node003,node004
+ADDITIONAL_SLURM_PARAMS="exclude=node003,node004" llmb-run submit -w pretrain_nemotron_3 -s 120b --dtype bf16 --scale 64
 ```
 
-Combine multiple parameters:
+Combine multiple parameters (semicolon-separated):
 
 ```bash
-llmb-run submit -w pretrain_nemotron-h --dtype fp8 --scale 128 --nodelist node001,node002 --reservation my_reservation --slurm-arg exclusive
+ADDITIONAL_SLURM_PARAMS="nodelist=node001,node002;reservation=my_reservation;exclusive" llmb-run submit -w pretrain_nemotron_3 -s 120b --dtype bf16 --scale 64
 ```
 
-For more details on `llmb-run` usage, see the [llmb-run documentation](../cli/llmb-run/README.md).
+For more details on llmb-run usage, see the [llmb-run documentation](../cli/llmb-run/README.md).
 
 ## Direct Method
 
@@ -180,12 +218,12 @@ Alternatively, you can run training directly using the launch script. This metho
 **Important**:
 
 - Ensure your virtual environment is activated before running the training commands below. If you used the installer with conda, run `conda activate $LLMB_INSTALL/venvs/<env_name>`. If you used the installer with python venv, run `source $LLMB_INSTALL/venvs/<env_name>/bin/activate`.
-- Run the launch script from the installed recipe directory: `cd $LLMB_INSTALL/llmb_repo/nemotron-h/`
+- Run the launch script from the installed recipe directory: `cd $LLMB_INSTALL/llmb_repo/nemotron3/`
 
 ### Command Template
 
 ```shell
-JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] [ADDITIONAL_SLURM_PARAMS=<params>] ./launch.sh
+JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [FP8_RECIPE=<recipe>] [MODEL_SIZE=<size>] [ADDITIONAL_SLURM_PARAMS=<params>] ./launch.sh
 ```
 
 ### Environment Variables
@@ -202,47 +240,25 @@ JOB_TOTAL_GPUS=<number> GPU_TYPE=<type> [DTYPE=<precision>] [MODEL_SIZE=<size>] 
 
 **Optional:**
 
-- `DTYPE`: Precision format (fixed: `fp8`)
+- `DTYPE`: Precision format (default: `bf16`). Supported: `bf16`, `fp8`, `nvfp4`.
 
-- `FP8_RECIPE`: FP8 recipe (fixed: `cs`)
+- `FP8_RECIPE`: FP8 recipe when `DTYPE=fp8` (default: `mx`).
 
-- `MODEL_SIZE`: Model variant (fixed: `56b`)
+- `MODEL_SIZE`: Model variant (default: `30b`)
 
-  - `56b` - 56 billion parameter model (only supported size)
+  - `30b` - Nemotron 3 Nano recipe
+  - `120b` - Nemotron 3 Super recipe
 
 - `ADDITIONAL_SLURM_PARAMS`: Extra `sbatch` flags (e.g. `--nodelist`, `--reservation`), semicolon-separated
 
   - Example: `"nodelist=node001,node002;reservation=my_reservation;exclusive"`
 
-**Note:** This workload only supports:
-
-- FP8 precision
-- 56B model size
-
 ### Example Commands
 
-Train Nemotron-H 56B with FP8 precision on 128 GB300 GPUs:
+Train Nemotron 3 Nano with BF16 precision on 8 GB300 GPUs:
 
 ```shell
-JOB_TOTAL_GPUS=128 GPU_TYPE=GB300 ./launch.sh
-```
-
-Train Nemotron-H 56B with FP8 precision on 128 GB200 GPUs:
-
-```shell
-JOB_TOTAL_GPUS=128 GPU_TYPE=GB200 ./launch.sh
-```
-
-Train Nemotron-H 56B with FP8 precision on 128 B200 GPUs:
-
-```shell
-JOB_TOTAL_GPUS=128 GPU_TYPE=B200 ./launch.sh
-```
-
-Train Nemotron-H 56B with FP8 precision on 128 H100 GPUs:
-
-```shell
-JOB_TOTAL_GPUS=128 GPU_TYPE=H100 ./launch.sh
+JOB_TOTAL_GPUS=8 GPU_TYPE=GB300 DTYPE=bf16 MODEL_SIZE=30b ./launch.sh
 ```
 
 # Output Locations
@@ -261,7 +277,7 @@ experiments/
 │       └── [batch scripts and other files]
 ```
 
-The `<experiment_name>` typically follows the pattern: `pretrain_nemotron-h_56b_<dtype>_<scale>_<config>`
+The `<experiment_name>` typically follows the pattern: `pretrain_nemotron_3_nano_<dtype>_<scale>_<config>`
 
 **Key files:**
 
@@ -282,13 +298,13 @@ In order to view the resulting profiles, ensure you have the latest version of N
 
 - **MPI Ranks:** all ranks
 - **Job Steps:** 45-50
-- **Output Location:** Profiling output saved alongside training results ([see Output Locations](#output-locations))
+- **Output Location:** Profiling output saved alongside training results ([see Output Locations])
 - **Filename format:** `profile_${SLURM_JOB_ID}_${SLURM_NODEID}_${SLURM_LOCALID}.nsys-rep`
 
 **Example command:**
 
 ```shell
-llmb-run submit -w pretrain_nemotron-h --dtype fp8 --scale 128 -p
+llmb-run submit -w pretrain_nemotron_3 -s 30b --dtype fp8 --scale 8 -p
 ```
 
 ### Customizing profiling behavior:
@@ -307,7 +323,7 @@ llmb-run submit -w pretrain_nemotron-h --dtype fp8 --scale 128 -p
 **Example command with GPU metrics:**
 
 ```shell
-ENABLE_GPU_METRICS=true llmb-run submit -w pretrain_nemotron-h --dtype fp8 --scale 128 -p
+ENABLE_GPU_METRICS=true llmb-run submit -w pretrain_nemotron_3 -s 30b --dtype bf16 --scale 8 -p
 ```
 
 ### Viewing results
@@ -316,7 +332,7 @@ In order to view the profile traces (\*.nsys-rep files) interactively:
 
 - Install the latest [Nsight Systems client](https://developer.nvidia.com/nsight-systems/get-started) on your preferred system
 - Copy the generated .nsys-rep files to a folder on your preferred system. E.g., /home/nsight-traces/
-- Open Nsight Systems client, then click "File | Open" and select one or more .nsys-rep files from /home/nsight-systems folder. For more details, see [Reading Your Report in GUI guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#opening-an-existing-report).
+- Open Nsight Systems client, then click "File | Open" and select one or more .nsys-rep files from that folder. For more details, see [Reading Your Report in GUI guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#opening-an-existing-report).
 - Once loaded you can analyze the workload behavior to learn about any performance bottlenecks associated with the model or the job run.
 
 Since most of the benchmarking jobs run on multiple GPUs, there will be multiple .nsys-rep files generated for each run. [Multi-Report Analysis Guide](https://docs.nvidia.com/nsight-systems/UserGuide/index.html#multi-report-analysis) will be very helpful to automate the analysis and get to results quicker by using Nsight recipes.
@@ -332,7 +348,7 @@ PyTorch Profiling is intended for rare, advanced debugging scenarios such as NCC
 **Example command:**
 
 ```shell
-ENABLE_PYTORCH_PROFILE=true llmb-run submit -w pretrain_nemotron-h --dtype fp8 --scale 128
+ENABLE_PYTORCH_PROFILE=true llmb-run submit -w pretrain_nemotron_3 -s 30b --dtype bf16 --scale 8
 ```
 
-For details on the PyTorch Profiler and how to view resulting traces, see the [PyTorch Profiler documentation](https://docs.pytorch.org/tutorials/recipes/recipes/profiler_recipe.html).
+Trace files are saved to `torch_profile/rank-N.json.gz` in the job output directory, where `N` is the rank number. For details on the PyTorch Profiler and how to view resulting traces, see the [PyTorch Profiler documentation](https://docs.pytorch.org/tutorials/recipes/recipes/profiler_recipe.html).

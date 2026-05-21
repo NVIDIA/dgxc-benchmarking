@@ -8,65 +8,74 @@ This recipe contains information and scripts to produce performance results for 
 
 ### FP8
 
-| Llama3.1 Model Size |  GPUs   | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS    | GA  |  CG   |
-| ------------------- | :-----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :------: | :-: | :---: |
-| 405b                | 256-512 |   FP8    |  8192  |  126   | False |  4  |  8  |  1  |  1  |  1  | GPUs/32 |  4  |  1  | GPUs\*6  | 192 | False |
-| 70b                 | 64-512  |   FP8    |  8192  |   80   | True  |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  2  | GPUs\*4  |  2  | False |
-| 8b                  |  8-128  |   FP8    |  8192  |   32   | False |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  4  | GPUs\*16 |  4  | False |
+| Model Size |  GPUs   | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS    | GA  |  CG   |
+| ---------- | :-----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :------: | :-: | :---: |
+| 405b       | 256-512 |   FP8    |  8192  |  126   | False |  4  |  8  |  1  |  1  |  1  | GPUs/32 |  4  |  1  | GPUs\*6  | 192 | False |
+| 70b        | 64-512  |   FP8    |  8192  |   80   | True  |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  2  | GPUs\*4  |  2  | False |
+| 8b         |  8-128  |   FP8    |  8192  |   32   | False |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  4  | GPUs\*16 |  4  | False |
 
 ### NVFP4
 
-| Llama3.1 Model Size |  GPUs   | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS    | GA  |  CG   |
-| ------------------- | :-----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :------: | :-: | :---: |
-| 405b                | 256-512 |  NVFP4   |  8192  |  126   | False |  4  |  8  |  1  |  1  |  1  | GPUs/32 |  4  |  1  | GPUs\*6  | 192 | False |
-| 70b                 | 64-512  |  NVFP4   |  8192  |   80   | False |  1  |  4  |  1  |  1  |  1  | GPUs/4  |  5  |  1  | GPUs\*4  | 16  | False |
-| 8b                  |  8-128  |  NVFP4   |  8192  |   32   | False |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  4  | GPUs\*16 |  4  | False |
+| Model Size |  GPUs   | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS    | GA  |  CG   |
+| ---------- | :-----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :------: | :-: | :---: |
+| 405b       | 256-512 |  NVFP4   |  8192  |  126   | False |  4  |  8  |  1  |  1  |  1  | GPUs/32 |  4  |  1  | GPUs\*6  | 192 | False |
+| 70b        | 64-512  |  NVFP4   |  8192  |   80   | False |  1  |  4  |  1  |  1  |  1  | GPUs/4  |  5  |  1  | GPUs\*4  | 16  | False |
+| 8b         |  8-128  |  NVFP4   |  8192  |   32   | False |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  4  | GPUs\*16 |  4  | False |
 
 ## GB200
 
 ### FP8
 
-| Llama3.1 Model Size |  GPUs   | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS    | GA  |  CG   |
-| ------------------- | :-----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :------: | :-: | :---: |
-| 405b                | 256-512 |   FP8    |  8192  |  126   | False |  4  | 16  |  1  |  1  |  1  | GPUs/64 |  4  |  1  | GPUs\*6  | 384 | False |
-| 70b                 | 64-512  |   FP8    |  8192  |   80   | True  |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  2  | GPUs\*4  |  2  | False |
-| 8b                  |  8-128  |   FP8    |  8192  |   32   | False |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  2  | GPUs\*16 |  8  | False |
+| Model Size |  GPUs   | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS    | GA  |  CG   |
+| ---------- | :-----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :------: | :-: | :---: |
+| 405b       | 256-512 |   FP8    |  8192  |  126   | False |  4  | 16  |  1  |  1  |  1  | GPUs/64 |  4  |  1  | GPUs\*6  | 384 | False |
+| 70b        | 64-512  |   FP8    |  8192  |   80   | True  |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  2  | GPUs\*4  |  2  | False |
+| 8b         |  8-128  |   FP8    |  8192  |   32   | False |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  2  | GPUs\*16 |  8  | False |
 
 ### NVFP4
 
-| Llama3.1 Model Size |  GPUs   | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS    | GA  |  CG   |
-| ------------------- | :-----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :------: | :-: | :---: |
-| 405b                | 256-512 |  NVFP4   |  8192  |  126   | False |  4  | 16  |  1  |  1  |  1  | GPUs/64 |  8  |  1  | GPUs\*6  | 384 | False |
-| 8b                  |  8-128  |  NVFP4   |  8192  |   32   | False |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  4  | GPUs\*16 |  4  | False |
+| Model Size |  GPUs   | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS    | GA  |  CG   |
+| ---------- | :-----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :------: | :-: | :---: |
+| 405b       | 256-512 |  NVFP4   |  8192  |  126   | False |  4  | 16  |  1  |  1  |  1  | GPUs/64 |  8  |  1  | GPUs\*6  | 384 | False |
+| 8b         |  8-128  |  NVFP4   |  8192  |   32   | False |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  4  | GPUs\*16 |  4  | False |
 
 ## B300
 
 ### FP8
 
-| Llama3.1 Model Size |   GPUs   | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS   | GA  |  CG   |
-| ------------------- | :------: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :-----: | :-: | :---: |
-| 405b                | 256-1024 |   FP8    |  8192  |  126   | False |  2  |  8  |  2  |  1  |  1  | GPUs/32 |  4  |  1  | GPUs\*6 | 192 | False |
-| 70b                 |  64-128  |   FP8    |  8192  |   80   | True  |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  1  | GPUs\*4 |  4  | False |
-| 70b                 | 256-512  |   FP8    |  8192  |   80   | False |  1  |  4  |  1  |  1  |  1  | GPUs/4  |  5  |  1  | GPUs\*4 | 16  | False |
+| Model Size |    GPUs     | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS    | GA  |  CG   |
+| ---------- | :---------: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :------: | :-: | :---: |
+| 405b       |   256-512   |   FP8    |  8192  |  126   | False |  4  |  8  |  1  |  1  |  1  | GPUs/32 |  4  |  1  | GPUs\*6  | 192 | False |
+| 70b        |   **64**    |   FP8    |  8192  |   80   | True  |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  1  | GPUs\*4  |  4  | False |
+| 70b        | **128-512** |   FP8    |  8192  |   80   | False |  1  |  4  |  1  |  1  |  1  | GPUs/4  |  5  |  1  | GPUs\*4  | 16  | False |
+| 8b         |    8-128    |   FP8    |  8192  |   32   | False |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  4  | GPUs\*16 |  4  | False |
+
+### NVFP4
+
+| Model Size |  GPUs   | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS    | GA  |  CG   |
+| ---------- | :-----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :------: | :-: | :---: |
+| 405b       | 256-512 |  NVFP4   |  8192  |  126   | False |  4  |  8  |  1  |  1  |  1  | GPUs/32 |  4  |  1  | GPUs\*6  | 192 | False |
+| 70b        | 64-512  |  NVFP4   |  8192  |   80   | False |  1  |  4  |  1  |  1  |  1  | GPUs/4  |  5  |  1  | GPUs\*4  | 16  | False |
+| 8b         |  8-128  |  NVFP4   |  8192  |   32   | False |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  4  | GPUs\*16 |  4  | False |
 
 ## B200
 
 ### FP8
 
-| Llama3.1 Model Size |   GPUs   | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS    | GA  |  CG   |
-| ------------------- | :------: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :------: | :-: | :---: |
-| 405b                | 256-1024 |   FP8    |  8192  |  126   | False |  4  |  8  |  2  |  1  |  1  | GPUs/64 |  8  |  1  | GPUs\*6  | 384 | False |
-| 70b                 |  64-128  |   FP8    |  8192  |   80   | True  |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  1  | GPUs\*4  |  4  | False |
-| 70b                 | 256-1024 |   FP8    |  8192  |   80   | False |  2  |  4  |  1  |  1  |  1  | GPUs/8  |  5  |  1  | GPUs\*4  | 32  | False |
-| 8b                  |  8-128   |   FP8    |  8192  |   32   | False |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  2  | GPUs\*16 |  8  | False |
+| Model Size |     GPUs     | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS    | GA  |  CG   |
+| ---------- | :----------: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :------: | :-: | :---: |
+| 405b       |   256-1024   |   FP8    |  8192  |  126   | False |  4  |  8  |  2  |  1  |  1  | GPUs/64 |  8  |  1  | GPUs\*6  | 384 | False |
+| 70b        |    **64**    |   FP8    |  8192  |   80   | True  |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  1  | GPUs\*4  |  4  | False |
+| 70b        | **128-1024** |   FP8    |  8192  |   80   | False |  2  |  4  |  1  |  1  |  1  | GPUs/8  |  5  |  1  | GPUs\*4  | 32  | False |
+| 8b         |    8-128     |   FP8    |  8192  |   32   | False |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  2  | GPUs\*16 |  8  | False |
 
 ### NVFP4
 
-| Llama3.1 Model Size |   GPUs   | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS    | GA  |  CG   |
-| ------------------- | :------: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :------: | :-: | :---: |
-| 405b                | 256-1024 |  NVFP4   |  8192  |  126   | False |  4  | 16  |  1  |  1  |  1  | GPUs/64 |  8  |  1  | GPUs\*6  | 384 | False |
-| 70b                 | 64-1024  |  NVFP4   |  8192  |   80   | False |  2  |  4  |  1  |  1  |  1  | GPUs/8  |  5  |  1  | GPUs\*4  | 32  | False |
-| 8b                  |  8-128   |  NVFP4   |  8192  |   32   | False |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  4  | GPUs\*16 |  4  | False |
+| Model Size |   GPUs   | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |   DP    | VP  | MBS |   GBS    | GA  |  CG   |
+| ---------- | :------: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :-----: | :-: | :-: | :------: | :-: | :---: |
+| 405b       | 256-1024 |  NVFP4   |  8192  |  126   | False |  4  | 16  |  1  |  1  |  1  | GPUs/64 |  8  |  1  | GPUs\*6  | 384 | False |
+| 70b        | 64-1024  |  NVFP4   |  8192  |   80   | False |  2  |  4  |  1  |  1  |  1  | GPUs/8  |  5  |  1  | GPUs\*4  | 32  | False |
+| 8b         |  8-128   |  NVFP4   |  8192  |   32   | False |  1  |  1  |  1  |  1  |  1  |  GPUs   | NA  |  4  | GPUs\*16 |  4  | False |
 
 ## H100
 
@@ -74,90 +83,75 @@ This recipe contains information and scripts to produce performance results for 
 
 ### BF16
 
-| Llama3.1 Model Size |  GPUs   | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |    DP    | VP  | MBS |   GBS    | GA  |  CG   |
-| ------------------- | :-----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :------: | :-: | :-: | :------: | :-: | :---: |
-| 405b                |  1024   |   BF16   |  8192  |  126   | False |  8  |  8  |  2  |  1  |  1  | GPUs/128 |  8  |  1  |   1536   | 192 | False |
-| 70b                 | 64-1024 |   BF16   |  8192  |   80   | False |  4  |  4  |  2  |  1  |  1  | GPUs/32  |  5  |  1  | GPUs\*4  | 128 | False |
-| 8b                  |  8-128  |   BF16   |  8192  |   32   | False |  1  |  1  |  2  |  1  |  1  |  GPUs/2  | NA  |  1  | GPUs\*16 | 32  | False |
+| Model Size |  GPUs   | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |    DP    | VP  | MBS |   GBS    | GA  |  CG   |
+| ---------- | :-----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :------: | :-: | :-: | :------: | :-: | :---: |
+| 405b       |  1024   |   BF16   |  8192  |  126   | False |  8  |  8  |  2  |  1  |  1  | GPUs/128 |  8  |  1  |   1536   | 192 | False |
+| 70b        | 64-1024 |   BF16   |  8192  |   80   | False |  4  |  4  |  2  |  1  |  1  | GPUs/32  |  5  |  1  | GPUs\*4  | 128 | False |
+| 8b         |  8-128  |   BF16   |  8192  |   32   | False |  1  |  1  |  2  |  1  |  1  |  GPUs/2  | NA  |  1  | GPUs\*16 | 32  | False |
 
 ### FP8
 
-| Llama3.1 Model Size |  GPUs   | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |    DP    | VP  | MBS |   GBS    | GA  |  CG   |
-| ------------------- | :-----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :------: | :-: | :-: | :------: | :-: | :---: |
-| 405b                |  1024   |   FP8    |  8192  |  126   | False |  8  |  8  |  2  |  1  |  1  | GPUs/128 |  8  |  1  |   1536   | 192 | False |
-| 70b                 | 64-1024 |   FP8    |  8192  |   80   | False |  4  |  8  |  1  |  1  |  1  | GPUs/32  |  5  |  2  | GPUs\*4  |  4  | False |
-| 8b                  |  8-128  |   FP8    |  8192  |   32   | False |  1  |  1  |  1  |  1  |  1  |   GPUs   | NA  |  1  | GPUs\*16 | 16  | False |
+| Model Size |  GPUs   | Datatype | SeqLen | Layers | FSDP  | TP  | PP  | CP  | EP  | ETP |    DP    | VP  | MBS |   GBS    | GA  |  CG   |
+| ---------- | :-----: | :------: | :----: | :----: | :---: | :-: | :-: | :-: | :-: | :-: | :------: | :-: | :-: | :------: | :-: | :---: |
+| 405b       |  1024   |   FP8    |  8192  |  126   | False |  8  |  8  |  2  |  1  |  1  | GPUs/128 |  8  |  1  |   1536   | 192 | False |
+| 70b        | 64-1024 |   FP8    |  8192  |   80   | False |  4  |  8  |  1  |  1  |  1  | GPUs/32  |  5  |  2  | GPUs\*4  |  4  | False |
+| 8b         |  8-128  |   FP8    |  8192  |   32   | False |  1  |  1  |  1  |  1  |  1  |   GPUs   | NA  |  1  | GPUs\*16 | 16  | False |
 
 # Performance Measurement and Analysis
 
-Performance for Llama3.1 training is measured by the achieved GPU FLOPS via the `TFLOPS_per_GPU` metric, which indicates computational throughput efficiency. Additionally, training step timing (milliseconds per iteration) is captured and logged for every training step in the main training log file [see Output Locations](#output-locations).
+Performance is reported as:
 
-Since the early training steps typically take much longer time (with input prefetch, activation memory allocation, and JIT compilation), we use the `parse_train_timing_mbridge.sh` script to analyze iterations 35-44 and calculate mean and standard deviation for reliable performance metrics for both TFLOPS per GPU and timing measurements.
+- `s/iter` — wall-clock seconds per training step
+- `TFLOPS/GPU` — sustained FLOPS achieved per GPU
 
-### Running the parse_train_timing_mbridge.sh script
+Each benchmark runs 50 steps; iterations 35–44 are averaged to skip warmup (input prefetch, activation allocation, JIT compilation).
 
-To analyze training timing from your experiment results, run the script from the workload directory. In an installed environment, recipe files are available under `$LLMB_INSTALL/llmb_repo` (a copy created by the installer).
+## Viewing results with `llmb-run jobs`
+
+Each `llmb-run jobs` command refreshes Slurm state and parses the training log for any job that has finished (succeeded, failed, or cancelled) — there is no background updater. Run from `$LLMB_INSTALL`:
 
 ```bash
-# Basic usage - parses results in the directory named 'experiments' in the current folder
-$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh
+# List all jobs you've submitted, with parsed metrics
+llmb-run jobs
 
-# Specify a different experiments directory
-$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh /path/to/experiments
+# Full details for one job (Job ID comes from the listing above)
+llmb-run jobs show <job_id>
 
-# Output in CSV format
-$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh --format=csv
-
-# Output in JSON format
-$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh --format=json
-
-# Show full filenames instead of shortened versions
-$LLMB_INSTALL/llmb_repo/common/parse_train_timing_mbridge.sh --full-names
+# Open the training log; --follow tails it, --dir prints the experiment directory
+llmb-run jobs log <job_id>
 ```
 
-Example output:
+Example `llmb-run jobs` output (illustrative values):
 
-```shell
-Elapsed Time (ms) and TFLOPS/GPU Analysis (iterations 35-44)
-================================================================================
-Experiment                                                                                   Status Time Mean (ms) Time Std (ms) TFLOPS_per_GPU Mean TFLOPS_per_GPU Std
------------------------------------------------------------------------------------------- -------- ------------- ------------ ------------------- ------------------
-pretrain_llama31_405b_fp8_cs_gpus128_tp2_pp1_cp1_vpNone_ep1_mbs1_gbs64_658572               Success      5741.470       68.670             1636.80              20.89
+```text
+  Workload              DType  Scale   Job ID  Profile  Submit Time       Slurm Status  Elapsed   s/iter  TFLOPS/GPU
+  pretrain_example_8b   bf16     128  1234567  No       2026-04-17 13:42  COMPLETED     00:12:34    4.21     1234.56
+  pretrain_example_70b  fp8      256  1234589  No       2026-04-17 14:05  RUNNING       00:03:11
 ```
 
-To obtain throughput as a tokens per second measurement, follow this formula:
+Blank `s/iter` or `TFLOPS/GPU` means the job has not finished yet, or the log did not contain enough completed iterations. See the [llmb-run README](../cli/llmb-run/README.md#jobs-command) for the full command reference.
 
-```shell
-(sequence length) * (global batch size) / (training step time in seconds) = (throughput in tokens per second)
+## Derived metrics
+
+To convert step time into tokens per second:
+
+```text
+(throughput in tokens/sec) = (sequence length) * (global batch size) / (s/iter)
 ```
 
-E.g. 8192 * 64 / 5.74 = 91339
+To estimate time-to-train for a target token budget:
 
-To calculate time to train with 1T tokens estimate:
-
-```shell
-(total tokens) / (throughput in tokens per second) / (number of seconds in a day) = (time to train in days) 
+```text
+(time to train in days) = (total tokens) / (throughput in tokens/sec) / 86400
 ```
 
-E.g. 1e12 / 91339 / 86400 = 126.72 days
+To compute model FLOPs utilization (MFU):
 
-To calculate the model flops utilization (MFU).
-
-```shell
-MFU = avg(TFLOPS_GPU) / (peak GPU FLOPS)
+```text
+MFU = TFLOPS/GPU / (peak GPU FLOPS)
 ```
-
-**Peak theoretical FP8 throughput across GPUs (in TFLOPS)**
 
 For peak theoretical throughput values used in MFU calculations, see the [Peak Theoretical Throughput](../README.md#peak-theoretical-throughput) section in the main README.
-
-E.g. Llama3.1 405b FP8 on 128x GB200 GPUs that has an average of 1636.8 TFLOPs per GPU for steps 34-44
-
-```shell
-peak FLOPS for GB200 = 4900 TFLOPS
-avg(TFLOPS_GPU) = 1636.8
-MFU =  1636.8 / 4900 = 33.40%
-```
 
 # Prerequisites
 
@@ -167,7 +161,9 @@ Requires Python 3.12.x, or conda.
 
 ## Request Access
 
-Access to the Llama 3.1 models must be requested through [Meta's website](https://www.llama.com/llama-downloads/) then requested on the [HuggingFace Llama 3.1](https://huggingface.co/meta-llama/Llama-3.1-405B) page. The approval process is not automatic and could take a day or more.
+Access requirements depend on the model size. The 405B configuration requires Llama 3.1 access, which must be requested through [Meta's website](https://www.llama.com/llama-downloads/) and then on the [HuggingFace Llama 3.1 405B](https://huggingface.co/meta-llama/Llama-3.1-405B) page.
+
+The 8B and 70B configurations intentionally reuse Megatron-Bridge `llama3` configs, so they require Llama 3 family access instead. Request access through [Meta's website](https://www.llama.com/llama-downloads/) and then request access to either [HuggingFace Llama 3 70B](https://huggingface.co/meta-llama/Meta-Llama-3-70B) or [HuggingFace Llama 3 8B](https://huggingface.co/meta-llama/Meta-Llama-3-8B). Either approval grants access to the Llama 3 family. The approval process is not automatic and could take a day or more.
 
 ## Slurm
 
@@ -220,31 +216,33 @@ llmb-run submit -w pretrain_llama3.1 -s 8b --dtype fp8 --scale 16
 
 ### Additional SLURM Parameters
 
-Use a SLURM reservation:
+For `llmb-run submit`, use the built-in Slurm flags instead of `ADDITIONAL_SLURM_PARAMS`.
+
+Use a Slurm reservation:
 
 ```bash
-ADDITIONAL_SLURM_PARAMS="reservation=my_reservation" llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128
+llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128 --reservation my_reservation
 ```
 
 Run on specific nodes:
 
 ```bash
-ADDITIONAL_SLURM_PARAMS="nodelist=node001,node002" llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128
+llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128 --nodelist node001,node002
 ```
 
 Exclude specific nodes:
 
 ```bash
-ADDITIONAL_SLURM_PARAMS="exclude=node003,node004" llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128
+llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128 --exclude node003,node004
 ```
 
-Combine multiple parameters (semicolon-separated):
+Combine multiple parameters:
 
 ```bash
-ADDITIONAL_SLURM_PARAMS="nodelist=node001,node002;reservation=my_reservation;exclusive" llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128
+llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128 --nodelist node001,node002 --reservation my_reservation --slurm-arg exclusive
 ```
 
-For more details on llmb-run usage, see the [llmb-run documentation](../cli/llmb-run/README.md).
+For more details on `llmb-run` usage, see the [llmb-run documentation](../cli/llmb-run/README.md).
 
 ## Direct Method
 
@@ -334,7 +332,7 @@ The `<experiment_name>` typically follows these patterns:
 
 **Key files:**
 
-- `log-<experiment_name>.out` - Contains training step timing and performance metrics analyzed by `parse_train_timing_mbridge.sh`
+- `log-<experiment_name>.out` - Contains training step timing and performance metrics parsed by `llmb-run jobs`
 - `nsys_profile/` - Contains profiling traces when using the `-p` flag with `llmb-run` or when `ENABLE_PROFILE=true`
 
 # Profiling
@@ -404,7 +402,7 @@ PyTorch Profiling is intended for rare, advanced debugging scenarios such as NCC
 ENABLE_PYTORCH_PROFILE=true llmb-run submit -w pretrain_llama3.1 -s 405b --dtype fp8 --scale 128
 ```
 
-For details on the PyTorch Profiler and how to view resulting traces, see the [PyTorch Profiler documentation](https://docs.pytorch.org/tutorials/recipes/recipes/profiler_recipe.html).
+Trace files are saved to `torch_profile/rank-N.json.gz` in the job output directory, where `N` is the rank number. For details on the PyTorch Profiler and how to view resulting traces, see the [PyTorch Profiler documentation](https://docs.pytorch.org/tutorials/recipes/recipes/profiler_recipe.html).
 
 # Run With Checkpoints
 

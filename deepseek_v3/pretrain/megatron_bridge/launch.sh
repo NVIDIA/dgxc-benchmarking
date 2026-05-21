@@ -43,8 +43,10 @@ DTYPE=${DTYPE,,}
 
 if [[ $GPU_TYPE == "h100" ]]; then
     FW_VERSION=25.09.00
-else
+elif [[ $GPU_TYPE == "b300" ]] || [[ $GPU_TYPE == "b200" ]]; then
     FW_VERSION=26.02.01
+else
+    FW_VERSION=26.04.00
 fi
 
 if [[ $DTYPE == "fp8" ]]; then
@@ -93,7 +95,10 @@ if [[ -n ${RUN_CONF_MOUNTS:-""} ]]; then
     CONTAINER_MOUNTS+="${RUN_CONF_MOUNTS}"
 fi
 
-CONFIG_OVERRIDES=""
+CONFIG_OVERRIDES="${CONFIG_OVERRIDES:-}"
+if [[ -n ${CONFIG_OVERRIDES} ]]; then
+    CONFIG_OVERRIDES+=" "
+fi
 if [[ -n ${CONTAINER_MOUNTS} ]]; then
     CONFIG_OVERRIDES+=" --custom_mounts $CONTAINER_MOUNTS"
 fi
@@ -103,11 +108,16 @@ if [[ $PROFILE_ENABLED == "true" ]] && [[ $PYTORCH_PROFILE_ENABLED == "true" ]];
     exit 1
 fi
 
+if [[ $PYTORCH_PROFILE_ENABLED == "true" ]] && [[ $GPU_TYPE == "h100" ]]; then
+    echo "Error: PyTorch profiling is not supported on H100 (nemo:25.09.00). Use GB300, GB200, B300, or B200." >&2
+    exit 1
+fi
+
 if [[ $PROFILE_ENABLED == "true" ]]; then
     CONFIG_OVERRIDES+=" --enable_nsys "
     CONFIG_OVERRIDES+=" --profiling_start_step=$PROFILE_START_STEP "
     CONFIG_OVERRIDES+=" --profiling_stop_step=$PROFILE_STOP_STEP "
-    if [[ $FW_VERSION == "26.02.01" ]]; then
+    if [[ $FW_VERSION == "26.04.00" ]] || [[ $FW_VERSION == "26.02.01" ]]; then
         PROFILE_RANKS=$(seq -s, 0 $((JOB_TOTAL_GPUS - 1)))
         CONFIG_OVERRIDES+=" --profiling_ranks=$PROFILE_RANKS"
         CONFIG_OVERRIDES+=" --nsys_trace=cuda "
@@ -149,9 +159,13 @@ if [[ $GPU_TYPE == "h100" ]] && [[ $DTYPE == "fp8" ]]; then
     CONFIG_OVERRIDES+=" --fp8_recipe cs "
 fi
 
+if [[ $FW_VERSION == "26.04.00" ]]; then
+    CONFIG_OVERRIDES+=" --packager none "
+fi
+
 # run command
 pushd $LLMB_WORKLOAD/Megatron-Bridge
-if [[ $FW_VERSION == "26.02.01" ]]; then
+if [[ $FW_VERSION == "26.04.00" ]] || [[ $FW_VERSION == "26.02.01" ]]; then
     python3 scripts/performance/setup_experiment.py \
         --container_image $IMAGE \
         --compute_dtype $COMPUTE_TYPE \

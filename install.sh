@@ -160,7 +160,7 @@ get_python_version() {
 
 # Check if we're in a virtual environment (standard venv/virtualenv or conda)
 in_virtual_env() {
-    [[ -n ${VIRTUAL_ENV:-} ]] || [[ -n ${CONDA_DEFAULT_ENV:-} ]]
+    [[ -n ${VIRTUAL_ENV:-} ]] || [[ -n ${CONDA_DEFAULT_ENV:-} ]] || [[ -n ${CONDA_PREFIX:-} ]]
 }
 
 # Create a temporary summary file for llmb-install to write structured output.
@@ -429,12 +429,31 @@ install_package() {
     popd > /dev/null
 }
 
+install_optional_package() {
+    local package_name="$1"
+    local package_dir="$2"
+
+    if [[ ! -d $package_dir ]]; then
+        return 0
+    fi
+
+    if [[ ! -f $package_dir/pyproject.toml ]]; then
+        echo "⚠️  Skipping optional $package_name: missing $package_dir/pyproject.toml" >&2
+        return 0
+    fi
+
+    if ! install_package "$package_name" "$package_dir"; then
+        echo "⚠️  Optional package $package_name failed to install; continuing." >&2
+    fi
+}
+
 echo ""
 echo "📦 Installing core tools..."
 
 # Install runner and installer dependencies
 install_package "llmb-run" "cli/llmb-run"
 install_package "llmb-install" "cli/llmb-install"
+install_optional_package "llmb-collector" "cli/llmb-collector"
 
 echo "✅ Core tools installed successfully"
 

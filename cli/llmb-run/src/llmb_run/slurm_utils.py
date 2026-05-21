@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
@@ -22,18 +22,40 @@
 """SLURM utilities for job management."""
 
 import logging
+import re
 import shlex
 import subprocess
 from dataclasses import dataclass
 
 logger = logging.getLogger('llmb_run.slurm_utils')
 
+SACCT_TIMEOUT_SECONDS = 30
+
 
 @dataclass
 class SlurmJob:
     job_id: int | None
-    job_status: str = None
-    job_workdir: str = None
+    job_status: str | None = None
+    job_workdir: str | None = None
+    llmb_config_path: str | None = None
+
+
+@dataclass(frozen=True)
+class SlurmAccountingRecord:
+    job_id: int
+    state: str
+    elapsed: str
+    submit_time: str
+    node_list: str
+    exit_code: str
+
+
+def parse_slurm_job_id(raw_job_id: object) -> int:
+    """Parse a Slurm job id from sbatch/NeMo output."""
+    match = re.match(r'\s*(\d+)', str(raw_job_id or ''))
+    if not match:
+        raise ValueError(f"Unable to parse Slurm job id from '{raw_job_id}'.")
+    return int(match.group(1))
 
 
 def get_slurm_job_status(jobid: int):
@@ -54,6 +76,64 @@ def get_slurm_job_status(jobid: int):
     except subprocess.CalledProcessError as e:
         logger.error(f"Error running sacct for job {jobid}: {e.stderr}")
         return None
+
+
+def get_slurm_job_statuses(job_ids: list[int]) -> dict[int, SlurmAccountingRecord] | None:
+    """Get Slurm accounting records for multiple jobs with one sacct call.
+
+    Returns a dict (possibly empty) on success. Job ids that sacct does not
+    know about are simply absent from the dict — sacct does not error for
+    unknown ids. Returns None when sacct itself could not be queried (timeout,
+    missing binary, non-zero exit), so callers can distinguish "no records
+    found" from "could not refresh".
+    """
+    if not job_ids:
+        return {}
+
+    unique_job_ids = sorted({int(job_id) for job_id in job_ids})
+    cmd = [
+        "sacct",
+        "-X",
+        "-P",
+        "--noheader",
+        f"--jobs={','.join(str(job_id) for job_id in unique_job_ids)}",
+        "--format=JobIDRaw,State,Elapsed,Submit,NodeList,ExitCode",
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=SACCT_TIMEOUT_SECONDS)
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        stderr = getattr(e, 'stderr', '') or str(e)
+        logger.warning(f"Unable to refresh Slurm job status with sacct: {stderr}")
+        return None
+
+    records: dict[int, SlurmAccountingRecord] = {}
+    for line in result.stdout.splitlines():
+        if not line.strip():
+            continue
+
+        fields = line.rstrip('\n').split('|')
+        if len(fields) < 6:
+            logger.debug(f"Skipping unexpected sacct output line: {line}")
+            continue
+
+        raw_job_id, state, elapsed, submit_time, node_list, exit_code = fields[:6]
+        try:
+            job_id = parse_slurm_job_id(raw_job_id)
+        except ValueError:
+            logger.debug(f"Skipping sacct output with invalid job id: {line}")
+            continue
+
+        records[job_id] = SlurmAccountingRecord(
+            job_id=job_id,
+            state=state.strip(),
+            elapsed=elapsed.strip(),
+            submit_time=submit_time.strip(),
+            node_list=node_list.strip(),
+            exit_code=exit_code.strip(),
+        )
+
+    return records
 
 
 def get_cluster_name():
