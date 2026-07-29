@@ -156,6 +156,9 @@ if [[ $GPU_TYPE == "gb300" ]] || [[ $GPU_TYPE == "gb200" ]]; then
         CONFIG_OVERRIDES+=" -vp None "
         CONFIG_OVERRIDES+=" -ep $JOB_TOTAL_GPUS "
         CONFIG_OVERRIDES+=" --hidden_size 1024 "
+        if [[ $GPU_TYPE == "gb200" ]] && [[ $COMPUTE_TYPE == "fp8_mx" ]]; then
+            CONFIG_OVERRIDES+=" --recompute_modules=mla_up_proj "
+        fi
         if [[ $JOB_TOTAL_GPUS -le 8 ]]; then
             CONFIG_OVERRIDES+=" --num_layers 24 "
             CONFIG_OVERRIDES+=" -mb 4 "

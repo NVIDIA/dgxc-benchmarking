@@ -1,4 +1,12 @@
-## [v26.06.00] - 2026-06-30
+## [v26.06.01] - 2026-07-29
+
+### Fixed
+
+- Removed non-existent Nemotron 3 120B NVFP4 GB300 configuration from Exemplar.
+- Enabled MLA up-projection recomputation for DeepSeek V4 GB200 FP8 proxy runs to resolve OOM issue.
+- Nemotron 3 launch configuration now preserves externally supplied overrides.
+
+## [v26.06.00] - 2026-06-29
 
 ### Added
 

@@ -76,7 +76,7 @@ Scale: **512 GPUs** | Repeats: **1** | Profiling: **disabled**
 | Llama 3.1   | 405B | FP8, NVFP4       |
 | Llama 3.1   | 70B  | FP8, NVFP4       |
 | Nemotron-H  | 56B  | FP8              |
-| Nemotron 3  | 120B | BF16, FP8, NVFP4 |
+| Nemotron 3  | 120B | BF16, FP8        |
 | Qwen3       | 235B | BF16             |
 
 ### GB200
