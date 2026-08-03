@@ -1,0 +1,19 @@
+--- a/scripts/performance/utils/executors.py
++++ b/scripts/performance/utils/executors.py
+@@ -40,8 +40,16 @@
+     "TRANSFORMERS_OFFLINE": "1",  # Disable online downloads from HuggingFace
+     "TOKENIZERS_PARALLELISM": "False",  # Restrict warning message prints
+     "NCCL_NVLS_ENABLE": "0",  # Disable NVLink SHARP to save memory
++    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+     "NVTE_NORM_FWD_USE_CUDNN": "1",
+     "NVTE_NORM_BWD_USE_CUDNN": "1",
+     "TORCH_NCCL_HIGH_PRIORITY": "1",
+     "HF_HUB_OFFLINE": "1",
++    # EFA networking optimizations
++    "FI_PROVIDER": "efa",  # Force EFA libfabric provider
++    "NCCL_SOCKET_IFNAME": "^docker,lo,veth",  # Exclude virtual interfaces from NCCL socket comm
++    # NCCL tuning flags
++    "NCCL_BUFFSIZE": "8388608",
++    "NCCL_P2P_NET_CHUNKSIZE": "8388608",  # Base value (8MB); overridden to 2MB for 70B/405B by perf_plugins.py
++    "NCCL_TUNER_PLUGIN": "/opt/amazon/ofi-nccl/lib/libnccl-ofi-tuner.so",
+ }
