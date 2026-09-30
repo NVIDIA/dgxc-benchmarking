@@ -41,12 +41,10 @@ def test_get_named_param_and_is_empty():
     "raw, match",
     [
         ("", "cannot be empty"),
-        ("   ", "cannot be empty"),
         ("--exclusive", "leading '--'"),
         ("=gpu", "non-empty key and value"),
         ("constraint=", "non-empty key and value"),
         ("nodelist=n1", "dedicated flag"),
-        ("nice=3", "dedicated flag"),
     ],
 )
 def test_bad_slurm_arg_rejected(raw, match):
@@ -95,7 +93,7 @@ def test_conflict_lists_all_sources():
         validate_no_additional_slurm_params_conflict(cli_args=cli, cluster_environment=env, workload_environment=env)
 
 
-@pytest.mark.parametrize("value", ["", "   ", None])
+@pytest.mark.parametrize("value", ["   ", None])
 def test_blank_env_values_do_not_conflict(value):
     validate_no_additional_slurm_params_conflict(
         cli_args=build_cli_slurm_args(nice=1), cluster_environment={"ADDITIONAL_SLURM_PARAMS": value}

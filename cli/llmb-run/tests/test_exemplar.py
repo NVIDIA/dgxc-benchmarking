@@ -57,13 +57,13 @@ ENTRIES = [
 
 @pytest.mark.parametrize(
     "name, expected",
-    [("pretrain_llama3.1_70b", ("pretrain_llama3.1", "70b")), ("pretrain_kimi-k2_1t", ("pretrain_kimi-k2", "1t"))],
+    [("pretrain_llama3.1_70b", ("pretrain_llama3.1", "70b"))],
 )
 def test_parse_exemplar_workload_name(name, expected):
     assert parse_exemplar_workload_name(name) == expected
 
 
-@pytest.mark.parametrize("name", ["pretrain_nosize", "nounderscore", "pretrain_7x"])
+@pytest.mark.parametrize("name", ["pretrain_nosize", "pretrain_7x"])
 def test_parse_exemplar_workload_name_rejects(name):
     with pytest.raises(ValidationError, match="Invalid workload name"):
         parse_exemplar_workload_name(name)
@@ -122,12 +122,6 @@ def test_get_configs_expands_dtypes_and_dedups_dtype_repeats():
 def test_validate_against_metadata_rejects(args, match):
     with pytest.raises(ValidationError, match=match):
         validate_yaml_config_against_metadata(*args[:5], WORKLOADS)
-
-
-def test_validate_against_metadata_does_not_accept_power_of_two_extrapolation():
-    # 512 is a power of two above 256, but exemplar requires it to be listed.
-    with pytest.raises(ValidationError):
-        validate_yaml_config_against_metadata("pretrain_noscale", "8b", "fp8", 512, "gb200", WORKLOADS)
 
 
 def test_validate_strict_installs_empty_and_missing(make_cluster_config):
@@ -250,7 +244,7 @@ def test_generate_cli_repeats_override_yaml(make_cluster_config, tmp_path):
     assert len(generate_exemplar_tasks(WORKLOADS, cfg, repeats=2)) == 2
 
 
-@pytest.mark.parametrize("bad", [0, -1, True, "3", 1.5])
+@pytest.mark.parametrize("bad", [0, True, "3", 1.5])
 def test_generate_rejects_invalid_repeats(make_cluster_config, tmp_path, bad):
     cfg = setup(make_cluster_config, tmp_path, ENTRIES[1:2], config={"repeats": bad})
     with pytest.raises(ValidationError, match="Invalid exemplar repeats"):

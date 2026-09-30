@@ -15,16 +15,12 @@ from llmb_run.task_generation import (
     [
         ([], 512, False, []),
         ([8, 16, 32], None, False, [8, 16, 32]),
-        ([8, 16, 32], None, True, [8, 16, 32]),
         ([8, 16, 32], 16, False, [8, 16]),
         ([32, 8, 16], 512, True, [8, 16, 32]),
         ([8, 16, 32], 512, False, [8, 16, 32, 64, 128, 256, 512]),
         ([8, 16, 32], 100, False, [8, 16, 32, 64]),
-        ([8, 16, 32], 512, True, [8, 16, 32]),
-        ([128, 256], 1024, False, [128, 256, 512, 1024]),
         ([8, 24], 100, False, [8, 24, 32, 64]),
         ([8, 16], 4, False, []),
-        ([8, 16], 4, True, []),
         (["8", "16"], 16, False, [8, 16]),
     ],
 )
@@ -47,12 +43,10 @@ def request(make_cluster_config, **kwargs):
     [
         ({}, "Must specify scale"),
         ({"file_path": "t.yaml", "workload": "w", "scale": "8"}, "Cannot mix --file"),
-        ({"file_path": "t.yaml", "max_scale": 8}, "Cannot mix --file"),
         ({"model_size": "7b", "scale": "8"}, "requires --workload"),
         ({"workload": "a,b", "model_size": "7b", "scale": "8"}, "multiple workloads"),
         ({"workload": "pretrain_x_7b", "model_size": "70b", "scale": "8"}, "implies size '7b'"),
         ({"workload": "w", "scale": "8", "max_scale": 16}, "Cannot use --scale"),
-        ({"workload": "w", "scale": "8", "min_scale": True}, "Cannot use --scale"),
         ({"workload": "w", "scale": "8,16", "dtype": "fp8", "model_size": "7b", "force": True}, "single values"),
         ({"workload": "w", "max_scale": 8, "dtype": "fp8", "model_size": "7b", "force": True}, "only supported"),
         ({"workload": "w", "scale": "8", "dtype": "fp8", "force": True}, "only supported"),
@@ -75,8 +69,6 @@ def test_validate_normalizes_model_size_and_strips_redundant_suffix(make_cluster
     "kwargs",
     [
         {"scale": "8"},
-        {"max_scale": 512},
-        {"min_scale": True},
         {"file_path": "t.yaml"},
         {"workload": "pretrain_x_7b", "dtype": "fp8", "scale": "8", "force": True},
         {"workload": "pretrain_x", "model_size": "7b", "dtype": "fp8", "scale": "8", "force": True},

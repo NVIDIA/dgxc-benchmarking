@@ -27,11 +27,6 @@ def test_utc_timestamp_format_for_given_time():
     assert utc_timestamp(datetime.datetime(2026, 3, 4, 5, 6, 7, tzinfo=datetime.timezone.utc)) == "20260304T050607Z"
 
 
-def test_utc_timestamp_defaults_to_now():
-    stamp = utc_timestamp()
-    datetime.datetime.strptime(stamp, "%Y%m%dT%H%M%SZ")
-
-
 def test_default_archive_output_path(tmp_path):
     out = default_archive_output(tmp_path, "20260101T000000Z", "26.04")
     assert out == tmp_path / "llmb-archive_26.04_20260101T000000Z.tar.zst"

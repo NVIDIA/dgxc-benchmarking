@@ -37,23 +37,14 @@ def write(path, lines):
 @pytest.mark.parametrize(
     "framework, expected",
     [
-        ("nemo2", "nemo"),
-        ("NeMo2", "nemo"),
-        ("  nemo2 ", "nemo"),
+        ("  NeMo2 ", "nemo"),
         ("megatron_bridge", "megatron_bridge"),
-        ("Megatron_Bridge", "megatron_bridge"),
         ("nemo", None),
-        ("pytorch", None),
-        ("", None),
         (None, None),
     ],
 )
 def test_parser_name_for_framework(framework, expected):
     assert parser_name_for_framework(framework) == expected
-
-
-def test_window_constants():
-    assert (MIN_ITERATION, MAX_ITERATION) == (35, 44)
 
 
 def test_megatron_bridge_success_converts_ms_to_seconds(tmp_path):

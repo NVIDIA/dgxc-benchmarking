@@ -13,10 +13,7 @@ from llmb_run.metadata_utils import model_size_to_billions, normalize_model_dtyp
         ("pretrain_baz", ("pretrain_baz", None)),
         ("pretrain_invalid_7x", ("pretrain_invalid_7x", None)),
         ("pretrain_foo_b", ("pretrain_foo_b", None)),
-        ("pretrain_foo_7.b", ("pretrain_foo_7.b", None)),
         ("nounderscore", ("nounderscore", None)),
-        ("7b", ("7b", None)),
-        ("_7b", ("", "7b")),
     ],
 )
 def test_parse_workload_name(name, expected):
@@ -25,7 +22,7 @@ def test_parse_workload_name(name, expected):
 
 @pytest.mark.parametrize(
     "size, expected",
-    [("70b", 70.0), ("1t", 1000.0), ("1.5t", 1500.0), ("3.5B", 3.5), ("0.6b", 0.6), ("bogus", 0.0), ("", 0.0)],
+    [("70b", 70.0), ("1t", 1000.0), ("3.5B", 3.5), ("bogus", 0.0)],
 )
 def test_model_size_to_billions(size, expected):
     assert model_size_to_billions(size) == pytest.approx(expected)

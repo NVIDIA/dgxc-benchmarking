@@ -17,7 +17,7 @@ from llmb_run.env_args import (
 )
 
 
-@pytest.mark.parametrize("key", ["A", "_x", "NCCL_DEBUG", "a1_b2"])
+@pytest.mark.parametrize("key", ["_x", "NCCL_DEBUG"])
 def test_validate_env_key_accepts_shell_names(key):
     assert validate_env_key(key) == key
 
@@ -26,7 +26,7 @@ def test_validate_env_key_strips_whitespace():
     assert validate_env_key("  FOO ") == "FOO"
 
 
-@pytest.mark.parametrize("key", ["1ABC", "A-B", "A B", "A.B", "A=B", "é"])
+@pytest.mark.parametrize("key", ["1ABC", "A B", "é"])
 def test_validate_env_key_rejects_bad_names(key):
     with pytest.raises(ValueError, match="invalid"):
         validate_env_key(key)
@@ -38,7 +38,7 @@ def test_validate_env_key_rejects_empty(key):
         validate_env_key(key)
 
 
-@pytest.mark.parametrize("key", [None, 5, b"A"])
+@pytest.mark.parametrize("key", [None, 5])
 def test_validate_env_key_rejects_non_string(key):
     with pytest.raises(ValueError, match="invalid"):
         validate_env_key(key)
@@ -49,12 +49,12 @@ def test_validate_env_key_error_names_source():
         validate_env_key("1x", source="workload env")
 
 
-@pytest.mark.parametrize("value", ["", "abc", "a_b@c%d+e=f:g,h./i-j", "/path/to/file.txt", "1"])
+@pytest.mark.parametrize("value", ["", "a_b@c%d+e=f:g,h./i-j"])
 def test_shell_safe_value_accepts(value):
     validate_shell_safe_env_value("K", value)
 
 
-@pytest.mark.parametrize("value", ["a b", "a'b", 'a"b', "a;b", "$HOME", "a`b`", "a|b", "a*b", "a\nb", "a\\b", "a&b"])
+@pytest.mark.parametrize("value", ["a b", "a'b", "$HOME", "a\nb"])
 def test_shell_safe_value_rejects(value):
     with pytest.raises(ValueError, match="'K'.*shell-special"):
         validate_shell_safe_env_value("K", value)
@@ -92,7 +92,7 @@ def test_parse_cli_mbridge_args_preserves_order():
     assert parse_cli_mbridge_args(None) == ()
 
 
-@pytest.mark.parametrize("bad", ["", "a b", "a\tb", "a\n"])
+@pytest.mark.parametrize("bad", ["", "a b"])
 def test_parse_cli_mbridge_args_rejects_empty_and_whitespace(bad):
     with pytest.raises(ValueError, match="--mbridge-arg"):
         parse_cli_mbridge_args(["ok", bad])

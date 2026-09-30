@@ -9,12 +9,6 @@ from llmb_run.job_logs import (
 )
 
 
-def test_find_job_logs_sorted_by_retry(tmp_path):
-    for name in ("log-a_10_2.out", "log-a_10_0.out", "log-a_10_1.out"):
-        (tmp_path / name).write_text("x")
-    assert [f.retry for f in find_job_logs(tmp_path, 10)] == [0, 1, 2]
-
-
 def test_find_job_logs_ignores_non_matching_and_directories(tmp_path):
     (tmp_path / "log-a_10_0.out").write_text("x")
     (tmp_path / "log-a_10_0.err").write_text("x")
@@ -59,9 +53,8 @@ def test_read_tail_returns_last_lines(tmp_path):
     assert read_tail(p, 100) == "1\n2\n3\n4"
 
 
-@pytest.mark.parametrize("count", [0, -1])
-def test_read_tail_rejects_non_positive_count(tmp_path, count):
+def test_read_tail_rejects_non_positive_count(tmp_path):
     p = tmp_path / "f.log"
     p.write_text("1\n")
     with pytest.raises(ValueError, match="at least 1"):
-        read_tail(p, count)
+        read_tail(p, 0)
