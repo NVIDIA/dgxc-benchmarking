@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: python (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [llmb-install, llmb-run]
+    defaults:
+      run:
+        working-directory: cli/${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@v7
+      # setup-uv has no floating major tag past v7; pin the exact release.
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: cli/${{ matrix.package }}/uv.lock
+      # --locked fails if uv.lock is out of date with pyproject.toml, so ruff/black
+      # run at the versions pinned in the lockfile.
+      - name: ruff check
+        run: uv run --locked --extra dev ruff check .
+      - name: black --check
+        run: uv run --locked --extra dev black --check .
+      - name: pytest
+        run: |
+          # Exit code 5 means no tests were collected; tolerated only until a package gets tests.
+          rc=0
+          uv run --locked --extra dev pytest -q || rc=$?
+          if [ "$rc" -eq 5 ]; then
+            echo "::notice::No tests collected in cli/${{ matrix.package }}"
+          elif [ "$rc" -ne 0 ]; then
+            exit "$rc"
+          fi
+
+  shell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SHELLCHECK_VERSION: v0.11.0
+      SHELLCHECK_SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+    steps:
+      - uses: actions/checkout@v7
+      # The runner image ships an older shellcheck; pin the release so CI and
+      # local runs agree on the rule set.
+      - name: Install shellcheck
+        run: |
+          curl -sSL -o shellcheck.tar.xz \
+            "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          echo "${SHELLCHECK_SHA256}  shellcheck.tar.xz" | sha256sum -c -
+          tar -xJf shellcheck.tar.xz
+          install -m 0755 "shellcheck-${SHELLCHECK_VERSION}/shellcheck" "$RUNNER_TEMP/shellcheck"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: List scripts
+        run: |
+          # Vendored snapshot and the k8s recipes (own Makefile) are excluded.
+          git ls-files -z '*.sh' \
+            ':!:microbenchmarks/llmb_collector/source_snapshot/**' \
+            ':!:inference/k8s_recipes/**' > "$RUNNER_TEMP/scripts.txt"
+          tr '\0' '\n' < "$RUNNER_TEMP/scripts.txt"
+      - name: bash -n
+        run: xargs -0 -n1 bash -n < "$RUNNER_TEMP/scripts.txt"
+      - name: shellcheck
+        run: |
+          shellcheck --version
+          xargs -0 shellcheck --severity=warning < "$RUNNER_TEMP/scripts.txt"
+
+  yaml:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install PyYAML==6.0.2
+      - name: Parse recipe and config YAML
+        run: |
+          python - <<'PY'
+          import re
+          import subprocess
+          import sys
+
+          import yaml
+
+          files = subprocess.check_output(["git", "ls-files"], text=True).splitlines()
+          extra = {"cli/llmb-run/cluster_config.yaml", "cli/llmb-run/example_llmb_config.yaml"}
+          targets = [f for f in files if re.search(r"(^|/)(metadata|exemplar|release)\.yaml$", f) or f in extra]
+          failed = 0
+          for path in targets:
+              try:
+                  with open(path) as fh:
+                      yaml.safe_load(fh)
+              except yaml.YAMLError as exc:
+                  failed += 1
+                  print(f"::error file={path}::{exc}")
+          print(f"checked {len(targets)} files, {failed} failed")
+          sys.exit(1 if failed else 0)
+          PY
+
+  k8s-recipes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: inference/k8s_recipes/requirements-validation.txt
+      - run: python -m pip install -r inference/k8s_recipes/requirements-validation.txt
+      # All offline; matrix-check only reads the tree (no README/catalog rewrite).
+      - run: make -C inference/k8s_recipes validate contract-check render-check lint matrix-check
