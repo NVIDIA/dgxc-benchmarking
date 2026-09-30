@@ -1,4 +1,5 @@
 import sqlite3
+import sys
 
 import pytest
 
@@ -170,7 +171,9 @@ def test_format_jobs_table_empty_hint():
     assert "llmb-run jobs rebuild" in format_jobs_table([], {})
 
 
-def test_format_jobs_table_plain_text_content(make_cluster_config):
+def test_format_jobs_table_plain_text_content(make_cluster_config, monkeypatch):
+    # Colour is keyed off the real stdout; force the piped case so `pytest -s` agrees.
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: False)
     out = format_jobs_table(seeded_rows(make_cluster_config), {})
     assert "\x1b[" not in out
     header = out.splitlines()[0]

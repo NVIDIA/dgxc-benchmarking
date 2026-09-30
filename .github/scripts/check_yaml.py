@@ -18,16 +18,23 @@ PATTERN = re.compile(r"(^|/)(metadata|exemplar|release)\.yaml$")
 EXTRA = {"cli/llmb-run/cluster_config.yaml", "cli/llmb-run/example_llmb_config.yaml"}
 
 
+MERGE_TAG = "tag:yaml.org,2002:merge"
+
+
 class StrictLoader(yaml.SafeLoader):
     def construct_mapping(self, node, deep=False):
         seen = set()
         for key_node, _ in node.value:
+            # `<<` has no constructor of its own; SafeLoader flattens it below.
+            # Overriding a merged key is legitimate, so only literal keys count.
+            if key_node.tag == MERGE_TAG:
+                continue
             key = self.construct_object(key_node, deep=deep)
             try:
                 duplicate = key in seen
                 seen.add(key)
             except TypeError:
-                continue  # unhashable (complex) key; nothing to compare
+                continue  # unhashable key; SafeLoader reports it itself
             if duplicate:
                 raise yaml.constructor.ConstructorError(
                     "while constructing a mapping",

@@ -5,10 +5,11 @@ on:
   push:
     branches: [main]
 
-# Cancel superseded PR runs, but let every push to main finish so each
-# commit on main gets its own result.
+# Cancel superseded PR runs. Pushes to main are keyed by commit so every
+# commit gets its own result; sharing one group would let a third push
+# cancel the pending run of the second.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -50,10 +51,11 @@ jobs:
         run: uv run --locked ${{ matrix.package }} --help
       - name: pytest
         run: |
-          # Exit code 5 means no tests were collected; tolerated only until a package gets tests.
+          # Exit code 5 means no tests were collected. llmb-install has none yet, so it
+          # gets a notice; llmb-run has a suite, so collecting nothing there is a failure.
           rc=0
           uv run --locked --extra dev pytest -q || rc=$?
-          if [ "$rc" -eq 5 ]; then
+          if [ "$rc" -eq 5 ] && [ "${{ matrix.package }}" = "llmb-install" ]; then
             echo "::notice::No tests collected in cli/${{ matrix.package }}"
           elif [ "$rc" -ne 0 ]; then
             exit "$rc"

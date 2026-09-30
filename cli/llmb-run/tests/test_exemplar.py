@@ -148,6 +148,18 @@ def test_compute_eligible_defaults(make_cluster_config, tmp_path):
     assert len(configs) == 5
 
 
+def test_compute_does_not_filter_on_workload_type(make_cluster_config, tmp_path):
+    # The llmb-run README says exemplar eligibility requires workload type
+    # `pretrain`, but the code never checks it: any workload listed in
+    # exemplar.yaml with a matching GPU/dtype/scale is eligible.
+    workloads = dict(WORKLOADS)
+    workloads["finetune_x"] = wl(sizes={"70b": {"fp8": [512]}})
+    workloads["finetune_x"]["metadata"]["general"] = {"workload_type": "finetune"}
+    cfg = setup(make_cluster_config, tmp_path, [{"finetune_x_70b": {"dtypes": ["fp8"]}}])
+    configs, _, _, _ = compute_and_validate_eligible_configs(workloads, cfg)
+    assert configs == [("finetune_x", "70b", "fp8")]
+
+
 def test_compute_reads_config_values(make_cluster_config, tmp_path):
     cfg = setup(make_cluster_config, tmp_path, ENTRIES[1:2], config={"scale": 512, "repeats": 4, "profile": True})
     _, scale, repeats, profile = compute_and_validate_eligible_configs(WORKLOADS, cfg)

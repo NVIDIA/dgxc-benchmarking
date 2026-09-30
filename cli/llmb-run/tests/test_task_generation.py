@@ -188,7 +188,7 @@ def test_discovery_specific_scales_filtered_by_support(make_cluster_config):
     tasks = discover(
         make_cluster_config, specific_scales=[4, 16, 128], dtype_filter=["fp8"], workload_filter=["pretrain_a_7b"]
     )
-    # 4 is below minimum; 16 is listed; 128 is above the max tested scale.
+    # 4 is below minimum; 16 is listed; 128 is above the listed scales but kept by power-of-two extension.
     assert triples(tasks) == [("pretrain_a", "7b", "fp8", 16), ("pretrain_a", "7b", "fp8", 128)]
 
 
