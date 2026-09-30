@@ -49,11 +49,6 @@ export IMAGE=${RUN_CONF_IMAGE:-$LLMB_INSTALL/images/nvidia+nemo+$FW_VERSION.sqsh
 export GPU_TYPE="${GPU_TYPE:-}"
 GPU_TYPE="${GPU_TYPE,,}"
 
-# DCGM diagnostic run level for step 8g: 1 = quick deployment checks (default),
-# 2 = adds short GPU stress tests (~2 min), 3/4 = long runs that need a larger
-# --time; 0 skips the diagnostic.
-export DCGM_DIAG_LEVEL="${DCGM_DIAG_LEVEL:-1}"
-
 FAILED_STEPS=0
 
 print_banner() {
@@ -403,58 +398,6 @@ check_dcgm_health() {
 
 run_step "8f" "dcgmi health - DCGM GPU health watches (PCIe, memory, InfoROM, thermal, NVLink)" \
     "$(declare -f check_dcgm_health); check_dcgm_health"
-
-# shellcheck disable=SC2317  # invoked indirectly via declare -f
-check_dcgm_diag() {
-    local level="$1"
-
-    case "${level}" in
-        0)
-            echo "DCGM_DIAG_LEVEL=0; DCGM diagnostic skipped."
-            return 0
-            ;;
-        1 | 2 | 3 | 4) ;;
-        *)
-            echo "[FAILED] Invalid DCGM_DIAG_LEVEL '${level}' (expected 0-4)."
-            return 1
-            ;;
-    esac
-
-    command -v dcgmi > /dev/null 2>&1 || {
-        echo "[WARNING] dcgmi not found; DCGM is not installed on this node. Skipping DCGM diagnostic."
-        return 0
-    }
-
-    # Level 1 is a few seconds of deployment/software checks; level 2 adds short
-    # GPU stress tests (~2 min); levels 3-4 run long enough to exceed this job's
-    # time limit unless it is raised.
-    local out rc
-    out=$(dcgmi diag -r "${level}" 2>&1)
-    rc=$?
-    printf '%s\n' "${out}"
-    echo
-
-    if printf '%s\n' "${out}" | grep -qiE 'unable to connect|host engine'; then
-        echo "[WARNING] dcgmi could not reach nv-hostengine (exit ${rc}); skipping DCGM diagnostic."
-        return 0
-    fi
-
-    # Result cells in the dcgmi diag table read Pass / Skip / Warn / Fail.
-    if printf '%s\n' "${out}" | grep -qE '\|[[:space:]]*Fail'; then
-        echo "[FAILED] DCGM diagnostic level ${level} reported one or more failing tests (see above)."
-        return 1
-    elif [ "${rc}" -ne 0 ]; then
-        echo "[FAILED] dcgmi diag -r ${level} returned exit code ${rc}."
-        return "${rc}"
-    elif printf '%s\n' "${out}" | grep -qE '\|[[:space:]]*Warn'; then
-        echo "[WARNING] DCGM diagnostic level ${level} reported warnings (see above)."
-    else
-        echo "[OK] DCGM diagnostic level ${level} passed."
-    fi
-}
-
-run_step "8g" "dcgmi diag -r ${DCGM_DIAG_LEVEL} - DCGM GPU diagnostic" \
-    "$(declare -f check_dcgm_diag); check_dcgm_diag '${DCGM_DIAG_LEVEL}'"
 run_step "9" "sysctl kernel.numa_balancing - automatic NUMA balancing" \
     "val=\$(sysctl -n kernel.numa_balancing) && printf 'kernel.numa_balancing = %s (%s)\n' \"\${val}\" \"\$([ \"\${val}\" = 0 ] && echo disabled || echo enabled)\""
 
