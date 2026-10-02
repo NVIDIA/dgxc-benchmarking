@@ -9,6 +9,12 @@ These Performance Recipes support performance characterization
 
 Each recipe maps to one workload and can be run at various cluster scales and precisions. These workloads are tested against NVIDIA Reference Architectures to establish baselines for comparison. These performance metrics are collected from production environments and are subject to real-world variability.
 
+## Contributions
+
+This project is currently not accepting contributions.
+
+This is a temporary pause while we transition to a new license.
+
 ## Prerequisites
 
 To use the Performance Recipes, make sure the following prerequisites are available on your cluster:
