@@ -332,6 +332,72 @@ check_nvlink_ber() {
 
 run_step "8e" "nvidia-smi nvlink -e - NVLink bit-error-rate" \
     "$(declare -f check_nvlink_ber); check_nvlink_ber"
+
+# shellcheck disable=SC2317  # invoked indirectly via declare -f
+check_dcgm_health() {
+    # DCGM is optional cluster tooling: dcgmi talks to a running nv-hostengine
+    # and cannot run standalone, so a missing binary or hostengine is reported
+    # as a warning rather than a step failure.
+    command -v dcgmi > /dev/null 2>&1 || {
+        echo "[WARNING] dcgmi not found; DCGM is not installed on this node. Skipping DCGM health check."
+        return 0
+    }
+
+    local disc disc_rc
+    disc=$(dcgmi discovery -l 2>&1)
+    disc_rc=$?
+    echo "--- dcgmi discovery -l ---"
+    printf '%s\n' "${disc}"
+    echo
+    if [ "${disc_rc}" -ne 0 ]; then
+        echo "[WARNING] dcgmi could not reach nv-hostengine (exit ${disc_rc}); skipping DCGM health check."
+        echo "          Start the DCGM host engine (e.g. 'systemctl start nvidia-dcgm') to enable it."
+        return 0
+    fi
+
+    # Use a temporary group of all GPUs so health watches are not set on a
+    # group some other consumer of the shared hostengine may own.
+    local grp grp_out
+    grp_out=$(dcgmi group -c "llmb_sysinfo_$$" --default 2>&1)
+    grp=$(printf '%s\n' "${grp_out}" | grep -oE 'group ID of [0-9]+' | grep -oE '[0-9]+$')
+    if [ -z "${grp}" ]; then
+        printf '%s\n' "${grp_out}"
+        echo "[FAILED] Could not create a DCGM GPU group."
+        return 1
+    fi
+
+    local health health_rc rc=0
+    if ! dcgmi health -g "${grp}" -s a > /dev/null 2>&1; then
+        echo "[FAILED] Could not enable DCGM health watches on group ${grp}."
+        dcgmi group -d "${grp}" > /dev/null 2>&1
+        return 1
+    fi
+    health=$(dcgmi health -g "${grp}" -c 2>&1)
+    health_rc=$?
+    dcgmi group -d "${grp}" > /dev/null 2>&1
+
+    echo "--- dcgmi health -c (PCIe, memory, InfoROM, thermal/power, NVLink) ---"
+    printf '%s\n' "${health}"
+    echo
+
+    local overall
+    overall=$(printf '%s\n' "${health}" | awk -F'|' '/Overall Health/ { gsub(/^[ \t]+|[ \t]+$/,"",$3); print $3; exit }')
+    if [ "${health_rc}" -ne 0 ] && [ -z "${overall}" ]; then
+        echo "[FAILED] dcgmi health check returned exit code ${health_rc}."
+        rc=1
+    elif [ "${overall}" = "Healthy" ]; then
+        echo "[OK] DCGM reports overall health: Healthy."
+    elif printf '%s' "${overall}" | grep -qi 'fail'; then
+        echo "[FAILED] DCGM reports overall health: ${overall} (see incidents above)."
+        rc=1
+    else
+        echo "[WARNING] DCGM reports overall health: ${overall:-unknown} (see incidents above)."
+    fi
+    return "${rc}"
+}
+
+run_step "8f" "dcgmi health - DCGM GPU health watches (PCIe, memory, InfoROM, thermal, NVLink)" \
+    "$(declare -f check_dcgm_health); check_dcgm_health"
 run_step "9" "sysctl kernel.numa_balancing - automatic NUMA balancing" \
     "val=\$(sysctl -n kernel.numa_balancing) && printf 'kernel.numa_balancing = %s (%s)\n' \"\${val}\" \"\$([ \"\${val}\" = 0 ] && echo disabled || echo enabled)\""
 

@@ -25,6 +25,9 @@ model metadata so it fits the current `llmb-run` recipe schema.
       NVLinks; on `gb200`/`gb300` (NVL72) additionally warns if the node does not report 72
       up links (gated on `GPU_TYPE`; no count is enforced on other platforms)
     - `nvidia-smi nvlink -e` - NVLink bit-error-rate; warns on non-baseline BER values
+    - `dcgmi health` - enables DCGM health watches (PCIe, memory, InfoROM, thermal/power,
+      NVLink) on a temporary all-GPU group and checks them; warns on `Warning`, fails on
+      `Failure`. Requires a running `nv-hostengine`; skipped with a warning if DCGM is absent
 09. `sysctl -n kernel.numa_balancing`
 10. `ibv_devinfo` - InfiniBand HCA device names and attributes
     - `/sys/class/infiniband/*/ports/*/state` - warns if a port is not ACTIVE (some down
